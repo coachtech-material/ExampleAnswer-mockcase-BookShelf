@@ -33,9 +33,9 @@ Webアプリケーション開発では、画面に表示されているデー�
 // routes/web.php
 
 // ...
-Route::middleware(\'auth\')->group(function () {
+Route::middleware('auth')->group(function () {
     // ...
-    Route::get(\'/books/export/csv\', [BookController::class, \'exportCsv\'])->name(\'books.export\');
+    Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
     // ...
 });
 ```
@@ -59,45 +59,45 @@ class BookController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
-        $keyword = $request->input(\'keyword\');
-        $genreId = $request->input(\'genre\');
+        $keyword = $request->input('keyword');
+        $genreId = $request->input('genre');
 
-        $query = Book::with(\'genres\');
+        $query = Book::with('genres');
 
         if ($keyword) {
             $query->where(function ($q) use ($keyword): void {
-                $q->where(\'title\', \'like\', "%{$keyword}%")
-                  ->orWhere(\'author\', \'like\', "%{$keyword}%");
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
             });
         }
 
         if ($genreId) {
-            $query->whereHas(\'genres\', function ($q) use ($genreId): void {
-                $q->where(\'genres.id\', $genreId);
+            $query->whereHas('genres', function ($q) use ($genreId): void {
+                $q->where('genres.id', $genreId);
             });
         }
 
         $books = $query->get();
 
         $headers = [
-            \'Content-Type\' => \'text/csv; charset=UTF-8\',
-            \'Content-Disposition\' => \'attachment; filename="books_\' . date(\'Ymd_His\') . \'.csv"\',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="books_' . date('Ymd_His') . '.csv"',
         ];
 
         return response()->stream(function () use ($books): void {
-            $handle = fopen(\'php://output\', \'w\');
+            $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, [\'ID\', \'タイトル\', \'著者\', \'ISBN\', \'出版日\', \'ジャンル\', \'登録日\']);
+            fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
 
             foreach ($books as $book) {
                 fputcsv($handle, [
                     $book->id,
                     $book->title,
                     $book->author,
-                    $book->isbn ?? \'\',
-                    $book->published_date?->format(\'Y-m-d\') ?? \'\',
-                    $book->genres->pluck(\'name\')->implode(\, \'),
-                    $book->created_at->format(\'Y-m-d H:i:s\'),
+                    $book->isbn ?? '',
+                    $book->published_date?->format('Y-m-d') ?? '',
+                    $book->genres->pluck('name')->implode(', '),
+                    $book->created_at->format('Y-m-d H:i:s'),
                 ]);
             }
 
@@ -119,8 +119,8 @@ class BookController extends Controller
 <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-bold">書籍一覧</h1>
     <div>
-        <a href="{{ route(\'books.create\') }}" class="bg-green-500 text-white px-4 py-2 rounded">新規登録</a>
-        <a href="{{ route(\'books.export\', request()->query()) }}" class="bg-gray-500 text-white px-4 py-2 rounded">CSVエクスポート</a>
+        <a href="{{ route('books.create') }}" class="bg-green-500 text-white px-4 py-2 rounded">新規登録</a>
+        <a href="{{ route('books.export', request()->query()) }}" class="bg-gray-500 text-white px-4 py-2 rounded">CSVエクスポート</a>
     </div>
 </div>
 ```
@@ -129,7 +129,7 @@ class BookController extends Controller
 
 ### 思考1：検索ロジックはDRYに保つ
 
-> 「CSVエクスポートの対象データは、一覧表示の検索結果と完全に同じだよね。ということは、`index`メソッドとほぼ同じ検索ロジックが必要になる。ここでコピペするのはDRY（Don\'t Repeat Yourself）原則に反する。本当は`Book`モデルに**ローカルスコープ**を定義してロジックを共通化するのがベストプラクティスだけど、今回は学習のためにコントローラー内にロジックを再記述してみよう。リファクタリングの機会があれば、スコープ化は最優先候補だね。」
+> 「CSVエクスポートの対象データは、一覧表示の検索結果と完全に同じだよね。ということは、`index`メソッドとほぼ同じ検索ロジックが必要になる。ここでコピペするのはDRY（Don't Repeat Yourself）原則に反する。本当は`Book`モデルに**ローカルスコープ**を定義してロジックを共通化するのがベストプラクティスだけど、今回は学習のためにコントローラー内にロジックを再記述してみよう。リファクタリングの機会があれば、スコープ化は最優先候補だね。」
 
 ### 思考2：大量データを扱うなら`StreamedResponse`と`chunk()`を検討する
 
@@ -141,7 +141,7 @@ class BookController extends Controller
 
 ### 思考4：ダウンロードリンクには検索条件を引き継がせる
 
-> 「CSVダウンロードボタンを押したとき、現在の検索条件（キーワードやジャンル）がエクスポート処理に引き継がれないと意味がない。`index`画面のビューで、`route(\'books.export\', request()->query())`のように、`request()->query()`をルートの第二引数に渡すのが簡単で確実。これで現在表示されているページのURLのクエリパラメータ（`?keyword=...`など）が、そのままエクスポート用のURLにも引き継がれる。」
+> 「CSVダウンロードボタンを押したとき、現在の検索条件（キーワードやジャンル）がエクスポート処理に引き継がれないと意味がない。`index`画面のビューで、`route('books.export', request()->query())`のように、`request()->query()`をルートの第二引数に渡すのが簡単で確実。これで現在表示されているページのURLのクエリパラメータ（`?keyword=...`など）が、そのままエクスポート用のURLにも引き継がれる。」
 
 ## 6. まとめ
 
