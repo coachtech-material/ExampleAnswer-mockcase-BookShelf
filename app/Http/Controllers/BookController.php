@@ -21,18 +21,48 @@ class BookController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = $request->input('query');
+        $keyword = $request->input('keyword');
+        $genreId = $request->input('genre');
+        $sort = $request->input('sort', 'newest');
 
-        $books = Book::with('genres')
-            ->when($query, function ($q, $query) {
-                return $q->where('title', 'like', "%{$query}%")
-                         ->orWhere('author', 'like', "%{$query}%");
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+        $query = Book::with('genres')->withAvg('reviews', 'rating');
 
-        return view('books.index', compact('books', 'query'));
+        // キーワード検索
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
+
+        // ジャンル絞り込み
+        if ($genreId) {
+            $query->whereHas('genres', function ($q) use ($genreId) {
+                $q->where('genres.id', $genreId);
+            });
+        }
+
+        // 並び順
+        switch ($sort) {
+            case 'oldest':
+                $query->oldest();
+                break;
+            case 'rating':
+                $query->orderByDesc('reviews_avg_rating');
+                break;
+            case 'title':
+                $query->orderBy('title');
+                break;
+            case 'newest':
+            default:
+                $query->latest();
+                break;
+        }
+
+        $books = $query->paginate(10)->withQueryString();
+        $genres = Genre::orderBy('name')->get();
+
+        return view('books.index', compact('books', 'genres', 'keyword', 'genreId', 'sort'));
     }
 
     /**
@@ -40,18 +70,7 @@ class BookController extends Controller
      */
     public function search(Request $request): View
     {
-        $query = $request->input('query');
-
-        $books = Book::with('genres')
-            ->when($query, function ($q, $query) {
-                return $q->where('title', 'like', "%{$query}%")
-                         ->orWhere('author', 'like', "%{$query}%");
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
-
-        return view('books.index', compact('books', 'query'));
+        return $this->index($request);
     }
 
     /**
@@ -131,14 +150,27 @@ class BookController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
-        $query = $request->input('query');
+        $keyword = $request->input('keyword');
+        $genreId = $request->input('genre');
 
-        $books = Book::with('genres')
-            ->when($query, function ($q, $query) {
-                return $q->where('title', 'like', "%{$query}%")
-                        ->orWhere('author', 'like', "%{$query}%");
-            })
-            ->get();
+        $query = Book::with('genres');
+
+        // キーワード検索
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
+
+        // ジャンル絞り込み
+        if ($genreId) {
+            $query->whereHas('genres', function ($q) use ($genreId) {
+                $q->where('genres.id', $genreId);
+            });
+        }
+
+        $books = $query->get();
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -171,6 +203,9 @@ class BookController extends Controller
         }, 200, $headers);
     }
 
+    /**
+     * ISBN検索（Google Books API）
+     */
     public function fetch(Request $request): JsonResponse
     {
         $isbn = $request->input('isbn');
@@ -182,7 +217,7 @@ class BookController extends Controller
         $apiKey = config('services.google.books_api_key');
         $url = "https://www.googleapis.com/books/v1/volumes?q=isbn:{$isbn}";
 
-        if ($apiKey ) {
+        if ($apiKey) {
             $url .= "&key={$apiKey}";
         }
 
