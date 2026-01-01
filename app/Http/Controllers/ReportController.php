@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Book;
 use App\Models\Review;
-use Illuminate\Http\Request;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -33,6 +34,10 @@ class ReportController extends Controller
 
     /**
      * 統計データを生成
+     *
+     * @param Collection<int, Review> $reviews
+     * @param Collection<int, Book> $favoriteBooks
+     * @return array<string, mixed>
      */
     private function generateStats(Collection $reviews, Collection $favoriteBooks): array
     {
@@ -48,13 +53,16 @@ class ReportController extends Controller
 
     /**
      * 基本統計サマリーを生成
-     * 使用: count(), avg(), max(), min()
+     * 使用: count(), avg(), max(), min(), pluck(), unique()
+     *
+     * @param Collection<int, Review> $reviews
+     * @return array<string, int|float>
      */
     private function generateSummary(Collection $reviews): array
     {
         return [
             'total_reviews' => $reviews->count(),
-            'average_rating' => $reviews->avg('rating') ?? 0,
+            'average_rating' => round($reviews->avg('rating') ?? 0, 1),
             'highest_rating' => $reviews->max('rating') ?? 0,
             'lowest_rating' => $reviews->min('rating') ?? 0,
             'total_books_reviewed' => $reviews->pluck('book_id')->unique()->count(),
@@ -63,39 +71,46 @@ class ReportController extends Controller
 
     /**
      * 評価分布を生成
-     * 使用: groupBy(), map(), count()
+     * 使用: groupBy(), map(), count(), mapWithKeys()
+     *
+     * @param Collection<int, Review> $reviews
+     * @return Collection<int, int>
      */
     private function generateRatingDistribution(Collection $reviews): Collection
     {
         // 1〜5の評価ごとにグループ化し、件数をカウント
         $distribution = $reviews
             ->groupBy('rating')
-            ->map(fn (Collection $group) => $group->count());
+            ->map(fn (Collection $group): int => $group->count());
 
         // 1〜5の全ての評価を含むように補完
         return collect(range(1, 5))
-            ->mapWithKeys(fn (int $rating) => [$rating => $distribution->get($rating, 0)]);
+            ->mapWithKeys(fn (int $rating): array => [$rating => $distribution->get($rating, 0)]);
     }
 
     /**
      * ジャンル別統計を生成
-     * 使用: flatMap(), groupBy(), map(), sortByDesc(), take()
+     * 使用: flatMap(), groupBy(), map(), sortByDesc(), take(), values()
+     *
+     * @param Collection<int, Review> $reviews
+     * @return Collection<int, array<string, mixed>>
      */
     private function generateGenreStats(Collection $reviews): Collection
     {
         return $reviews
             // 各レビューから書籍のジャンルを展開（flatMap）
-            ->flatMap(function (Review $review) {
-                return $review->book->genres->map(fn ($genre) => [
+            ->flatMap(fn (Review $review): Collection => $review->book->genres->map(
+                fn ($genre): array => [
                     'genre_name' => $genre->name,
                     'rating' => $review->rating,
-                ]);
-            })
+                ]
+            ))
             // ジャンル名でグループ化
             ->groupBy('genre_name')
             // 各ジャンルの統計を計算
-            ->map(function (Collection $genreReviews, string $genreName) {
+            ->map(function (Collection $genreReviews, string $genreName): array {
                 $ratings = $genreReviews->pluck('rating');
+
                 return [
                     'name' => $genreName,
                     'count' => $genreReviews->count(),
@@ -113,12 +128,15 @@ class ReportController extends Controller
     /**
      * お気に入りジャンルを分析
      * 使用: flatMap(), countBy(), sortDesc(), take()
+     *
+     * @param Collection<int, Book> $favoriteBooks
+     * @return Collection<string, int>
      */
     private function generateFavoriteGenres(Collection $favoriteBooks): Collection
     {
         return $favoriteBooks
             // 各書籍からジャンル名を展開
-            ->flatMap(fn ($book) => $book->genres->pluck('name'))
+            ->flatMap(fn (Book $book): Collection => $book->genres->pluck('name'))
             // ジャンル名ごとにカウント
             ->countBy()
             // 降順ソート
@@ -129,19 +147,22 @@ class ReportController extends Controller
 
     /**
      * 高評価書籍を取得
-     * 使用: filter(), sortByDesc(), take()
+     * 使用: filter(), sortByDesc(), take(), map(), values()
+     *
+     * @param Collection<int, Review> $reviews
+     * @return Collection<int, array<string, mixed>>
      */
     private function getTopRatedBooks(Collection $reviews): Collection
     {
         return $reviews
             // 評価4以上をフィルタ
-            ->filter(fn (Review $review) => $review->rating >= 4)
+            ->filter(fn (Review $review): bool => $review->rating >= 4)
             // 評価で降順ソート
             ->sortByDesc('rating')
             // 上位5件を取得
             ->take(5)
             // 必要な情報のみ抽出
-            ->map(fn (Review $review) => [
+            ->map(fn (Review $review): array => [
                 'title' => $review->book->title,
                 'author' => $review->book->author,
                 'rating' => $review->rating,
@@ -152,13 +173,16 @@ class ReportController extends Controller
 
     /**
      * 読書継続日数を計算
-     * 使用: map(), unique(), sort(), reduce()
+     * 使用: map(), unique(), sort(), values(), reduce()
+     *
+     * @param Collection<int, Review> $reviews
+     * @return array<string, int>
      */
     private function calculateReadingStreak(Collection $reviews): array
     {
         // レビュー日をユニークな日付リストに変換
         $reviewDates = $reviews
-            ->map(fn (Review $review) => $review->created_at->format('Y-m-d'))
+            ->map(fn (Review $review): string => $review->created_at->format('Y-m-d'))
             ->unique()
             ->sort()
             ->values();
@@ -168,27 +192,31 @@ class ReportController extends Controller
         }
 
         // 連続日数を計算（reduce使用）
-        $streakData = $reviewDates->reduce(function (array $carry, string $date) {
-            $currentDate = \Carbon\Carbon::parse($date);
-            
-            if ($carry['last_date'] === null) {
-                $carry['current'] = 1;
-                $carry['longest'] = 1;
-            } else {
-                $lastDate = \Carbon\Carbon::parse($carry['last_date']);
-                $diffDays = $lastDate->diffInDays($currentDate);
-                
-                if ($diffDays === 1) {
-                    $carry['current']++;
-                    $carry['longest'] = max($carry['longest'], $carry['current']);
-                } elseif ($diffDays > 1) {
+        $streakData = $reviewDates->reduce(
+            function (array $carry, string $date): array {
+                $currentDate = Carbon::parse($date);
+
+                if ($carry['last_date'] === null) {
                     $carry['current'] = 1;
+                    $carry['longest'] = 1;
+                } else {
+                    $lastDate = Carbon::parse($carry['last_date']);
+                    $diffDays = $lastDate->diffInDays($currentDate);
+
+                    if ($diffDays === 1) {
+                        $carry['current']++;
+                        $carry['longest'] = max($carry['longest'], $carry['current']);
+                    } elseif ($diffDays > 1) {
+                        $carry['current'] = 1;
+                    }
                 }
-            }
-            
-            $carry['last_date'] = $date;
-            return $carry;
-        }, ['current' => 0, 'longest' => 0, 'last_date' => null]);
+
+                $carry['last_date'] = $date;
+
+                return $carry;
+            },
+            ['current' => 0, 'longest' => 0, 'last_date' => null]
+        );
 
         return [
             'current_streak' => $streakData['current'],

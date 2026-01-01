@@ -17,9 +17,9 @@ class BookController extends Controller
         $query = $request->input('query');
 
         $books = Book::with('genres')
-            ->when($query, function ($q, $query) {
-                return $q->where('title', 'like', "%{$query}%")
-                         ->orWhere('author', 'like', "%{$query}%");
+            ->when($query, function ($q, $query): void {
+                $q->where('title', 'like', "%{$query}%")
+                  ->orWhere('author', 'like', "%{$query}%");
             })
             ->latest()
             ->paginate(10);
@@ -33,6 +33,7 @@ class BookController extends Controller
     public function show(Book $book): JsonResponse
     {
         $book->load(['genres', 'reviews.user']);
+
         return response()->json($book);
     }
 

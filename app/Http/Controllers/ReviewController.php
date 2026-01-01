@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
-use App\Models\Review;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use App\Models\Book;
+use App\Models\Review;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class ReviewController extends Controller
 {
-    public function store(StoreReviewRequest $request, Book $book)
+    /**
+     * レビューを投稿
+     */
+    public function store(StoreReviewRequest $request, Book $book): RedirectResponse
     {
         $book->reviews()->create([
             'user_id' => Auth::id(),
@@ -21,15 +26,23 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
 
-    public function edit(Review $review)
+    /**
+     * レビュー編集フォームを表示
+     */
+    public function edit(Review $review): View
     {
         $this->authorize('update', $review);
+
         return view('reviews.edit', compact('review'));
     }
 
-    public function update(UpdateReviewRequest $request, Review $review)
+    /**
+     * レビューを更新
+     */
+    public function update(UpdateReviewRequest $request, Review $review): RedirectResponse
     {
         $this->authorize('update', $review);
+
         $review->update([
             'rating' => $request->rating,
             'comment' => $request->comment,
@@ -38,9 +51,13 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
     }
 
-    public function destroy(Review $review)
+    /**
+     * レビューを削除
+     */
+    public function destroy(Review $review): RedirectResponse
     {
         $this->authorize('delete', $review);
+
         $book = $review->book;
         $review->delete();
 

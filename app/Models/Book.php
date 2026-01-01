@@ -4,38 +4,70 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Book extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
-        "user_id",
-        "title",
-        "author",
-        "isbn",
-        "published_date",
-        "description",
-        "image_url",
+        'user_id',
+        'title',
+        'author',
+        'isbn',
+        'published_date',
+        'description',
+        'image_url',
     ];
 
-    public function user()
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'published_date' => 'date',
+        ];
+    }
+
+    /**
+     * 書籍を登録したユーザー
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function reviews()
+    /**
+     * 書籍に対するレビュー
+     */
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
 
-    public function genres()
+    /**
+     * 書籍のジャンル
+     */
+    public function genres(): BelongsToMany
     {
-        return $this->belongsToMany(Genre::class);
+        return $this->belongsToMany(Genre::class)->withTimestamps();
     }
 
-    public function favoritedByUsers()
+    /**
+     * 書籍をお気に入りに登録したユーザー
+     */
+    public function favoritedByUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'favorites');
+        return $this->belongsToMany(User::class, 'favorites')->withTimestamps();
     }
 }
