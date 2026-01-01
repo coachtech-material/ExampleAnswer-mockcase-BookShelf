@@ -28,6 +28,9 @@
                     <x-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
                         {{ __('ジャンル管理') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                        {{ __('マイレポート') }}
+                    </x-nav-link>
                     @endauth
                 </div>
             </div>
@@ -96,6 +99,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
                 {{ __('ジャンル管理') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                {{ __('マイレポート') }}
             </x-responsive-nav-link>
             @endauth
         </div>

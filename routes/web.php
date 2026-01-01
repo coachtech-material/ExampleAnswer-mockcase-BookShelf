@@ -7,6 +7,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ReviewLikeController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +52,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // マイ読書レポート
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 });
 
 // 書籍詳細（認証不要、{book}パラメータを含むため最後に定義）
