@@ -14,9 +14,18 @@ Webアプリケーション開発では、画面に表示されているデー�
 | **検索条件の維持** | 検索画面で絞り込んだ結果が、そのままCSVに出力される。 |
 | **パフォーマンス** | 大量のデータ（数万件以上）をエクスポートする場合でも、サーバーのメモリを使い果たさないように実装する。 |
 
-## 3. 実装
+## 3. How to: この実装にたどり着くための調べ方
 
-### 3.1. ルートの定義
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **CSVをダウンロードさせたい** | `laravel csv download` / `laravel response csv` | レスポンスのドキュメントに`streamDownload`というメソッドが見つかる。クロージャ内で`fopen`や`fputcsv`を使ってファイル内容を書き込んでいく方法がわかる。 |
+| **大量のデータを扱いたい** | `laravel csv export large data` / `laravel chunk memory` | `chunk()`メソッドや`cursor()`メソッドを使うことで、DBから一度に全件取得するのではなく、少しずつ処理できることがわかる。メモリ消費を抑えるための基本的なテクニックとして紹介されている。 |
+| **CSVが文字化けする** | `laravel csv export excel 文字化け` | BOM（バイトオーダーマーク）をファイルの先頭に書き込むことで解決できるという情報が見つかる。具体的なコード`fwrite($handle, "\xEF\xBB\xBF");`も多くの記事で紹介されている。 |
+| **ダウンロードURLにパラメータを渡したい** | `laravel route parameter query` | `route()`ヘルパの第二引数に連想配列を渡すことでクエリパラメータを付与できることがわかる。`request()->query()`を使えば現在のURLの全クエリパラメータをそのまま渡せることもわかる。 |
+
+## 4. 実装
+
+### 4.1. ルートの定義
 
 まず、CSVダウンロード用のエンドポイントを`routes/web.php`に追加します。
 
@@ -24,14 +33,14 @@ Webアプリケーション開発では、画面に表示されているデー�
 // routes/web.php
 
 // ...
-Route::middleware('auth')->group(function () {
+Route::middleware(\'auth\')->group(function () {
     // ...
-    Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
+    Route::get(\'/books/export/csv\', [BookController::class, \'exportCsv\'])->name(\'books.export\');
     // ...
 });
 ```
 
-### 3.2. BookControllerの実装
+### 4.2. BookControllerの実装
 
 次に、`BookController`に`exportCsv`メソッドを追加します。
 
@@ -50,45 +59,45 @@ class BookController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
-        $keyword = $request->input('keyword');
-        $genreId = $request->input('genre');
+        $keyword = $request->input(\'keyword\');
+        $genreId = $request->input(\'genre\');
 
-        $query = Book::with('genres');
+        $query = Book::with(\'genres\');
 
         if ($keyword) {
             $query->where(function ($q) use ($keyword): void {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
+                $q->where(\'title\', \'like\', "%{$keyword}%")
+                  ->orWhere(\'author\', \'like\', "%{$keyword}%");
             });
         }
 
         if ($genreId) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
-                $q->where('genres.id', $genreId);
+            $query->whereHas(\'genres\', function ($q) use ($genreId): void {
+                $q->where(\'genres.id\', $genreId);
             });
         }
 
         $books = $query->get();
 
         $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="books_' . date('Ymd_His') . '.csv"',
+            \'Content-Type\' => \'text/csv; charset=UTF-8\',
+            \'Content-Disposition\' => \'attachment; filename="books_\' . date(\'Ymd_His\') . \'.csv"\',
         ];
 
         return response()->stream(function () use ($books): void {
-            $handle = fopen('php://output', 'w');
+            $handle = fopen(\'php://output\', \'w\');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
+            fputcsv($handle, [\'ID\', \'タイトル\', \'著者\', \'ISBN\', \'出版日\', \'ジャンル\', \'登録日\']);
 
             foreach ($books as $book) {
                 fputcsv($handle, [
                     $book->id,
                     $book->title,
                     $book->author,
-                    $book->isbn ?? '',
-                    $book->published_date?->format('Y-m-d') ?? '',
-                    $book->genres->pluck('name')->implode(', '),
-                    $book->created_at->format('Y-m-d H:i:s'),
+                    $book->isbn ?? \'\',
+                    $book->published_date?->format(\'Y-m-d\') ?? \'\',
+                    $book->genres->pluck(\'name\')->implode(\, \'),
+                    $book->created_at->format(\'Y-m-d H:i:s\'),
                 ]);
             }
 
@@ -100,7 +109,7 @@ class BookController extends Controller
 }
 ```
 
-### 3.3. ビューの実装
+### 4.3. ビューの実装
 
 書籍一覧画面（`resources/views/books/index.blade.php`）に、CSVダウンロードボタンを追加します。このとき、現在の検索条件をクエリパラメータとして引き継ぐようにします。
 
@@ -110,17 +119,17 @@ class BookController extends Controller
 <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-bold">書籍一覧</h1>
     <div>
-        <a href="{{ route('books.create') }}" class="bg-green-500 text-white px-4 py-2 rounded">新規登録</a>
-        <a href="{{ route('books.export', request()->query()) }}" class="bg-gray-500 text-white px-4 py-2 rounded">CSVエクスポート</a>
+        <a href="{{ route(\'books.create\') }}" class="bg-green-500 text-white px-4 py-2 rounded">新規登録</a>
+        <a href="{{ route(\'books.export\', request()->query()) }}" class="bg-gray-500 text-white px-4 py-2 rounded">CSVエクスポート</a>
     </div>
 </div>
 ```
 
-## 4. 先輩エンジニアの思考プロセスと「調べ方」
+## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
 
 ### 思考1：検索ロジックはDRYに保つ
 
-> 「CSVエクスポートの対象データは、一覧表示の検索結果と完全に同じだよね。ということは、`index`メソッドとほぼ同じ検索ロジックが必要になる。ここでコピペするのはDRY（Don't Repeat Yourself）原則に反する。本当は`Book`モデルに**ローカルスコープ**を定義してロジックを共通化するのがベストプラクティスだけど、今回は学習のためにコントローラー内にロジックを再記述してみよう。リファクタリングの機会があれば、スコープ化は最優先候補だね。」
+> 「CSVエクスポートの対象データは、一覧表示の検索結果と完全に同じだよね。ということは、`index`メソッドとほぼ同じ検索ロジックが必要になる。ここでコピペするのはDRY（Don\'t Repeat Yourself）原則に反する。本当は`Book`モデルに**ローカルスコープ**を定義してロジックを共通化するのがベストプラクティスだけど、今回は学習のためにコントローラー内にロジックを再記述してみよう。リファクタリングの機会があれば、スコープ化は最優先候補だね。」
 
 ### 思考2：大量データを扱うなら`StreamedResponse`と`chunk()`を検討する
 
@@ -132,17 +141,8 @@ class BookController extends Controller
 
 ### 思考4：ダウンロードリンクには検索条件を引き継がせる
 
-### How to: この実装にたどり着くための調べ方
+> 「CSVダウンロードボタンを押したとき、現在の検索条件（キーワードやジャンル）がエクスポート処理に引き継がれないと意味がない。`index`画面のビューで、`route(\'books.export\', request()->query())`のように、`request()->query()`をルートの第二引数に渡すのが簡単で確実。これで現在表示されているページのURLのクエリパラメータ（`?keyword=...`など）が、そのままエクスポート用のURLにも引き継がれる。」
 
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **CSVをダウンロードさせたい** | `laravel csv download` / `laravel response csv` | レスポンスのドキュメントに`streamDownload`というメソッドが見つかる。クロージャ内で`fopen`や`fputcsv`を使ってファイル内容を書き込んでいく方法がわかる。 |
-| **大量のデータを扱いたい** | `laravel csv export large data` / `laravel chunk memory` | `chunk()`メソッドや`cursor()`メソッドを使うことで、DBから一度に全件取得するのではなく、少しずつ処理できることがわかる。メモリ消費を抑えるための基本的なテクニックとして紹介されている。 |
-| **CSVが文字化けする** | `laravel csv export excel 文字化け` | BOM（バイトオーダーマーク）をファイルの先頭に書き込むことで解決できるという情報が見つかる。具体的なコード`fwrite($handle, "\xEF\xBB\xBF");`も多くの記事で紹介されている。 |
-| **ダウンロードURLにパラメータを渡したい** | `laravel route parameter query` | `route()`ヘルパの第二引数に連想配列を渡すことでクエリパラメータを付与できることがわかる。`request()->query()`を使えば現在のURLの全クエリパラメータをそのまま渡せることもわかる。 |
-
-> 「CSVダウンロードボタンを押したとき、現在の検索条件（キーワードやジャンル）がエクスポート処理に引き継がれないと意味がない。`index`画面のビューで、`route('books.export', request()->query())`のように、`request()->query()`をルートの第二引数に渡すのが簡単で確実。これで現在表示されているページのURLのクエリパラメータ（`?keyword=...`など）が、そのままエクスポート用のURLにも引き継がれる。」
-
-## 5. まとめ
+## 6. まとめ
 
 このChapterでは、CSVエクスポート機能の実装方法を学びました。今回は模範解答に合わせて`get()`でデータを取得しましたが、実務における大量データ処理の重要性と、その解決策である`StreamedResponse`と`chunk()`の組み合わせについても理解を深めました。常にパフォーマンスを意識することは、プロのエンジニアとして非常に大切なスキルです。

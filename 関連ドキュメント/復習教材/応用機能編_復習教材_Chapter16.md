@@ -14,9 +14,19 @@
 | **情報自動入力** | 取得した書籍情報（タイトル、著者、出版日、説明、書影URL）を、フォームの各入力欄に自動でセットする。 |
 | **エラーハンドリング** | 書籍が見つからない場合や、API通信に失敗した場合には、ユーザーに適切なエラーメッセージを表示する。 |
 
-## 3. 実装
+## 3. How to: この実装にたどり着くための調べ方
 
-### 3.1. APIキーの設定
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **外部APIを叩きたい** | `laravel http client` | HTTPクライアントのドキュメントに`Http`ファサードの使い方が詳しく書かれている。`Http::get()`でGETリクエストを送り、`json()`メソッドでレスポンスを配列として受け取れることがわかる。 |
+| **APIのURLに変数を埋め込みたい** | `laravel http client query parameters` | `Http::get()`の第二引数に連想配列を渡すことで、クエリパラメータを安全に追加できることがわかる。`'q' => 'isbn:' . $isbn`のように。 |
+| **APIのレスポンスが複雑** | （APIのドキュメントを読む） | Google Books APIのドキュメントを読むと、レスポンスのJSON構造がわかる。`items[0].volumeInfo.title`のように、多階層のデータから必要な情報を取り出す必要があることに気づく。 |
+| **API通信が失敗した場合** | `laravel http client error handling` | `Http`ファサードのレスポンスオブジェクトが持つ`successful()`や`failed()`、`status()`といったメソッドで、通信が成功したか、ステータスコードは何かを判別できることがわかる。 |
+| **フロントと連携したい** | `laravel javascript fetch` / `axios laravel` | `fetch` APIを使って非同期リクエストを送信する方法が見つかる。`await`を使ってレスポンスを待ち、`response.json()`でJSONデータを受け取るのが基本的な流れだとわかる。 |
+
+## 4. 実装
+
+### 4.1. APIキーの設定
 
 まず、Google Books APIを利用するためのAPIキーを取得し、Laravelプロジェクトに設定します。
 
@@ -41,7 +51,7 @@
     ];
     ```
 
-### 3.2. ルートの定義
+### 4.2. ルートの定義
 
 APIリクエストを処理するためのエンドポイントを`routes/web.php`に追加します。
 
@@ -56,7 +66,7 @@ Route::middleware('auth')->group(function () {
 });
 ```
 
-### 3.3. BookControllerの実装
+### 4.3. BookControllerの実装
 
 `BookController`に、APIからのリクエストを処理する`fetch`メソッドを追加します。
 
@@ -113,7 +123,7 @@ class BookController extends Controller
 }
 ```
 
-### 3.4. ビューとJavaScriptの実装
+### 4.4. ビューとJavaScriptの実装
 
 書籍登録・編集画面（`resources/views/books/create.blade.php`と`edit.blade.php`）に、ISBN検索のUIとJavaScriptを追加します。ここでは`create.blade.php`を例に示します。
 
@@ -177,7 +187,7 @@ class BookController extends Controller
 @endsection
 ```
 
-## 4. 先輩エンジニアの思考プロセスと「調べ方」
+## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
 
 ### 思考1：機密情報は`.env`ファイルで管理する
 
@@ -197,18 +207,8 @@ class BookController extends Controller
 
 ### 思考5：フロントエンドはモダンな`fetch`と`async/await`で
 
-### How to: この実装にたどり着くための調べ方
-
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **外部APIを叩きたい** | `laravel http client` | HTTPクライアントのドキュメントに`Http`ファサードの使い方が詳しく書かれている。`Http::get()`でGETリクエストを送り、`json()`メソッドでレスポンスを配列として受け取れることがわかる。 |
-| **APIのURLに変数を埋め込みたい** | `laravel http client query parameters` | `Http::get()`の第二引数に連想配列を渡すことで、クエリパラメータを安全に追加できることがわかる。`'q' => 'isbn:' . $isbn`のように。 |
-| **APIのレスポンスが複雑** | （APIのドキュメントを読む） | Google Books APIのドキュメントを読むと、レスポンスのJSON構造がわかる。`items[0].volumeInfo.title`のように、多階層のデータから必要な情報を取り出す必要があることに気づく。 |
-| **API通信が失敗した場合** | `laravel http client error handling` | `Http`ファサードのレスポンスオブジェクトが持つ`successful()`や`failed()`、`status()`といったメソッドで、通信が成功したか、ステータスコードは何かを判別できることがわかる。 |
-| **フロントと連携したい** | `laravel javascript fetch` / `axios laravel` | `fetch` APIを使って非同期リクエストを送信する方法が見つかる。`await`を使ってレスポンスを待ち、`response.json()`でJSONデータを受け取るのが基本的な流れだとわかる。 |
-
 > 「昔はAjaxといえばjQueryの`$.ajax`が主流だったけど、今はブラウザ標準の`fetch` APIを使うのが一般的。さらに`async/await`構文を使えば、非同期処理が同期処理のように直感的に書ける。`try...catch`でエラーハンドリングもできるし、コードがすごくスッキリする。この書き方はモダンなフロントエンド開発の必須スキルだよ。」
 
-## 5. まとめ
+## 6. まとめ
 
 このChapterでは、外部APIと連携する機能の実装を通して、多くの実践的な知識を学びました。APIキーの安全な管理、バックエンドとフロントエンドの適切な役割分担、LaravelのHTTPクライアントの活用、そして堅牢なエラーハンドリング。これらはすべて、実務で即戦力となるための重要なスキルセットです。

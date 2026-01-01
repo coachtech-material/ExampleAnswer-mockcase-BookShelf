@@ -13,9 +13,19 @@
 | **書籍一覧取得API** | `/api/v1/books` | GET | 書籍の一覧をJSON形式で返す。ページネーションに対応する。 |
 | **書籍詳細取得API** | `/api/v1/books/{book}` | GET | 指定されたIDの書籍詳細情報をJSON形式で返す。 |
 
-## 3. 実装
+## 3. How to: この実装にたどり着くための調べ方
 
-### 3.1. API用のルート定義
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **API用のルーティングを定義したい** | `laravel api routes` | `routes/api.php`にルートを定義すること、URLに自動で`/api/`プレフィックスが付与されることなどがわかる。 |
+| **APIのバージョンを管理したい** | `laravel api versioning` | ルートグループを使って`/api/v1/`のようにURLでバージョンを分ける方法が一般的だとわかる。 |
+| **JSONを返却したい** | `laravel return json response` | `response()->json()`ヘルパを使うことで、配列やコレクションを簡単にJSON形式でレスポンスできることがわかる。ステータスコードの指定方法もわかる。 |
+| **APIのレスポンス形式を統一したい** | `laravel api resources` | APIリソースのドキュメントが見つかる。モデルのデータを特定のJSON構造に変換するための専用クラスを作成できることを知る。ネストしたリソースや、条件に応じた属性の追加方法など、高度な整形も可能。 |
+| **APIの認証をしたい** | `laravel api authentication sanctum` | Laravel Sanctumを使ったAPI認証の方法が見つかる。SPA認証とAPIトークン認証の2種類があることを理解する。 |
+
+## 4. 実装
+
+### 4.1. API用のルート定義
 
 APIのエンドポイントは、通常のWeb画面用のルートとは別のファイル`routes/api.php`に定義するのがLaravelの慣習です。これにより、ミドルウェアの適用などをWeb用とAPI用で分離できます。
 
@@ -30,13 +40,13 @@ use App\Http\Controllers\Api\V1\BookController;
 use Illuminate\Support\Facades\Route;
 
 // API v1 - 認証不要の公開API
-Route::prefix('v1')->group(function () {
-    Route::get('/books', [BookController::class, 'index']);
-    Route::get('/books/{book}', [BookController::class, 'show']);
+Route::prefix("v1")->group(function () {
+    Route::get("/books", [BookController::class, "index"]);
+    Route::get("/books/{book}", [BookController::class, "show"]);
 });
 ```
 
-### 3.2. API用コントローラーの作成
+### 4.2. API用コントローラーの作成
 
 API用のコントローラーは、Web用とは別のディレクトリに配置するのが整理しやすくて良いでしょう。`app/Http/Controllers/Api/V1`ディレクトリを作成し、そこに`BookController`を作成します。
 
@@ -69,13 +79,13 @@ class BookController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = $request->input('query');
+        $query = $request->input("query");
 
         $books = Book::query()
-            ->with('genres')
+            ->with("genres")
             ->when($query, function ($q, $query): void {
-                $q->where('title', 'like', "%{$query}%")
-                  ->orWhere('author', 'like', "%{$query}%");
+                $q->where("title", "like", "%{$query}%")
+                  ->orWhere("author", "like", "%{$query}%");
             })
             ->latest()
             ->paginate(10);
@@ -91,14 +101,14 @@ class BookController extends Controller
      */
     public function show(Book $book): JsonResponse
     {
-        $book->load(['genres', 'reviews.user']);
+        $book->load(["genres", "reviews.user"]);
 
         return response()->json($book);
     }
 }
 ```
 
-## 4. 先輩エンジニアの思考プロセスと「調べ方」
+## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
 
 ### 思考1：APIのルートは`routes/api.php`に書く
 
@@ -106,7 +116,7 @@ class BookController extends Controller
 
 ### 思考2：APIにはバージョニングが不可欠
 
-> 「APIは一度公開すると、自分たち以外の誰か（スマホアプリとか）が使い始める可能性がある。もし後からAPIのレスポンス形式をガラッと変えちゃうと、そのAPIを使っていたアプリが全部動かなくなって大混乱になる。それを防ぐために、`/api/v1/`のようにURLにバージョン番号を含めるのが一般的。将来、大きな変更が必要になったら、古いv1は残したまま、新しく`/api/v2/`を作る。これで後方互換性を保てるんだ。`Route::prefix('v1')->group(...)`を使うと、このバージョニングが簡単に実現できる。」
+> 「APIは一度公開すると、自分たち以外の誰か（スマホアプリとか）が使い始める可能性がある。もし後からAPIのレスポンス形式をガラッと変えちゃうと、そのAPIを使っていたアプリが全部動かなくなって大混乱になる。それを防ぐために、`/api/v1/`のようにURLにバージョン番号を含めるのが一般的。将来、大きな変更が必要になったら、古いv1は残したまま、新しく`/api/v2/`を作る。これで後方互換性を保てるんだ。`Route::prefix("v1")->group(...)`を使うと、このバージョニングが簡単に実現できる。」
 
 ### 思考3：コントローラーもバージョンごとに分ける
 
@@ -118,19 +128,9 @@ class BookController extends Controller
 
 ### 思考5：APIレスポンスの整形には「APIリソース」を検討する
 
-### How to: この実装にたどり着くための調べ方
-
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **API用のルーティングを定義したい** | `laravel api routes` | `routes/api.php`にルートを定義すること、URLに自動で`/api/`プレフィックスが付与されることなどがわかる。 |
-| **APIのバージョンを管理したい** | `laravel api versioning` | ルートグループを使って`/api/v1/`のようにURLでバージョンを分ける方法が一般的だとわかる。 |
-| **JSONを返却したい** | `laravel return json response` | `response()->json()`ヘルパを使うことで、配列やコレクションを簡単にJSON形式でレスポンスできることがわかる。ステータスコードの指定方法もわかる。 |
-| **APIのレスポンス形式を統一したい** | `laravel api resources` | APIリソースのドキュメントが見つかる。モデルのデータを特定のJSON構造に変換するための専用クラスを作成できることを知る。ネストしたリソースや、条件に応じた属性の追加方法など、高度な整形も可能。 |
-| **APIの認証をしたい** | `laravel api authentication sanctum` | Laravel Sanctumを使ったAPI認証の方法が見つかる。SPA認証とAPIトークン認証の2種類があることを理解する。 |
-
 > 「今回はEloquentモデルを直接JSONに変換したけど、実務ではもっと複雑な要件が出てくる。『このカラムはAPIに含めたくない』とか、『ユーザーの役割によって返す情報を変えたい』とかね。そういうときは**APIリソース**（`php artisan make:resource`）を使うのがベスト。モデルとAPIレスポンスの間に一層を挟むことで、レスポンスの構造を柔軟に、かつ一元的に管理できるようになる。小規模なAPIなら直接変換でもいいけど、本格的なAPIを作るならAPIリソースは必須テクニックだよ。」
 
-## 5. 動作確認
+## 6. 動作確認
 
 APIが正しく動作するか、ブラウザやAPIクライアントツール（Postman、Insomniaなど）を使って確認してみましょう。
 
@@ -140,6 +140,6 @@ APIが正しく動作するか、ブラウザやAPIクライアントツール�
 
 期待通りのJSONデータが返ってくれば成功です。
 
-## 6. まとめ
+## 7. まとめ
 
 このChapterでは、Laravelで公開APIを開発するための基本的な流れを学びました。ルートの分離、バージョニングの重要性、APIコントローラーの実装パターンなど、API開発の第一歩となる知識を習得しました。実務では、ここからさらに認証（SanctumやPassport）、APIリソース、テストなどを組み合わせて、より堅牢で実用的なAPIを構築していくことになります。
