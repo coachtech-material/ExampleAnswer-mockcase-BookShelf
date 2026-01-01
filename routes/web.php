@@ -35,13 +35,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 
     // Favorite management
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
-    Route::delete('/books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
+    Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
 
     // Review Like management
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'store'])->name('likes.store');
-    Route::delete('/reviews/{review}/unlike', [ReviewLikeController::class, 'destroy'])->name('likes.destroy');
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 
     // Profile management
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
