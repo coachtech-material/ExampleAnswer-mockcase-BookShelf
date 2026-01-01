@@ -35,8 +35,8 @@
     
     return [
         // ...
-        \"google\" => [
-            \"books_api_key\" => env(\"GOOGLE_BOOKS_API_KEY\"),
+        'google' => [
+            'books_api_key' => env('GOOGLE_BOOKS_API_KEY'),
         ],
     ];
     ```
@@ -49,9 +49,9 @@ APIリクエストを処理するためのエンドポイントを`routes/web.ph
 // routes/web.php
 
 // ...
-Route::middleware(\'auth\')->group(function () {
+Route::middleware('auth')->group(function () {
     // ...
-    Route::get(\'/books/fetch\', [BookController::class, \'fetch\'])->name(\'books.fetch\');
+    Route::get('/books/fetch', [BookController::class, 'fetch'])->name('books.fetch');
     // ...
 });
 ```
@@ -76,13 +76,13 @@ class BookController extends Controller
      */
     public function fetch(Request $request): JsonResponse
     {
-        $isbn = $request->input(\'isbn\');
+        $isbn = $request->input('isbn');
 
         if (!$isbn || strlen($isbn) !== 13) {
-            return response()->json([\'error\' => \'ISBNは13桁で入力してください。\'], 400);
+            return response()->json(['error' => 'ISBNは13桁で入力してください。'], 400);
         }
 
-        $apiKey = config(\'services.google.books_api_key\');
+        $apiKey = config('services.google.books_api_key');
         $url = "https://www.googleapis.com/books/v1/volumes?q=isbn:{$isbn}";
 
         if ($apiKey) {
@@ -93,22 +93,21 @@ class BookController extends Controller
             $response = Http::get($url);
             $data = $response->json();
 
-            if (!isset($data[\'items\'][0])) {
-                return response()->json([\'error\' => \'書籍が見つかりませんでした。\'], 404);
+            if (!isset($data['items'][0])) {
+                return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
             }
 
-            $volumeInfo = $data[\'items\'][0][\'volumeInfo\'];
+            $volumeInfo = $data['items'][0]['volumeInfo'];
 
             return response()->json([
-                \'title\' => $volumeInfo[\'title\'] ?? \'\',
-                \'author\' => isset($volumeInfo[\'authors\']) ? implode(\
-, \', $volumeInfo[\'authors\']) : \'\',
-                \'published_date\' => $volumeInfo[\'publishedDate\'] ?? \'\',
-                \'description\' => $volumeInfo[\'description\'] ?? \'\',
-                \'image_url\' => $volumeInfo[\'imageLinks\'][\'thumbnail\'] ?? \'\',
+                'title' => $volumeInfo['title'] ?? '',
+                'author' => isset($volumeInfo['authors']) ? implode(', ', $volumeInfo['authors']) : '',
+                'published_date' => $volumeInfo['publishedDate'] ?? '',
+                'description' => $volumeInfo['description'] ?? '',
+                'image_url' => $volumeInfo['imageLinks']['thumbnail'] ?? '',
             ]);
         } catch (\Exception $e) {
-            return response()->json([\'error\' => \'API通信エラーが発生しました。\'], 500);
+            return response()->json(['error' => 'API通信エラーが発生しました。'], 500);
         }
     }
 }
@@ -121,9 +120,9 @@ class BookController extends Controller
 ```html
 <!-- resources/views/books/create.blade.php -->
 
-@extends(\'layouts.app\')
+@extends('layouts.app')
 
-@section(\'content\')
+@section('content')
     <div class="container mx-auto">
         <h1 class="text-2xl font-bold mb-4">書籍登録</h1>
 
@@ -137,51 +136,37 @@ class BookController extends Controller
             <p id="isbn-search-error" class="text-red-500 text-sm mt-1"></p>
         </div>
 
-        <form action="{{ route(\'books.store\') }}" method="POST">
+        <form action="{{ route('books.store') }}" method="POST">
             @csrf
-            @include(\'books._form\', [\'book\' => null])
+            @include('books._form', ['book' => null])
         </form>
     </div>
 
-@push(\'scripts\')
+@push('scripts')
 <script>
-    document.getElementById(\'isbn-search-button\').addEventListener(\'click\
-
-', async () => {
-        const isbn = document.getElementById(\'isbn-search\').value;
-        const errorElement = document.getElementById(\'isbn-search-error\');
-        errorElement.textContent = \'\
-
-';
+    document.getElementById('isbn-search-button').addEventListener('click', async () => {
+        const isbn = document.getElementById('isbn-search').value;
+        const errorElement = document.getElementById('isbn-search-error');
+        errorElement.textContent = '';
 
         if (!isbn) {
-            errorElement.textContent = \'ISBNを入力してください。\';
+            errorElement.textContent = 'ISBNを入力してください。';
             return;
         }
 
         try {
-            const response = await fetch(`{{ route(\'books.fetch\') }}?isbn=${isbn}`);
+            const response = await fetch(`{{ route('books.fetch') }}?isbn=${isbn}`);
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || \'エラーが発生しました。\');
+                throw new Error(data.error || 'エラーが発生しました。');
             }
 
-            document.querySelector(\'[name="title"]\').value = data.title || \'\
-
-';
-            document.querySelector(\'[name="author"]\').value = data.author || \'\
-
-';
-            document.querySelector(\'[name="published_date"]\').value = data.published_date || \'\
-
-';
-            document.querySelector(\'[name="description"]\').value = data.description || \'\
-
-';
-            document.querySelector(\'[name="image_url"]\').value = data.image_url || \'\
-
-';
+            document.querySelector('[name="title"]').value = data.title || '';
+            document.querySelector('[name="author"]').value = data.author || '';
+            document.querySelector('[name="published_date"]').value = data.published_date || '';
+            document.querySelector('[name="description"]').value = data.description || '';
+            document.querySelector('[name="image_url"]').value = data.image_url || '';
 
         } catch (error) {
             errorElement.textContent = error.message;
@@ -208,7 +193,7 @@ class BookController extends Controller
 
 ### 思考4：堅牢なエラーハンドリングを心がける
 
-> 「外部API連携は『失敗する可能性』を常に考慮しないといけない。通信エラー、APIからのエラーレスポンス、期待したデータ形式じゃない、など。`try...catch`ブロックで通信例外を捕捉するのはもちろん、APIのレスポンスをちゃんとチェックして（`!isset($data[\'items\'][0])`）、想定外のデータが来てもエラーにならないようにする。ユーザーに『書籍が見つかりませんでした』とか『通信エラーです』とか、何が起きたかちゃんと伝えることが重要だ。」
+> 「外部API連携は『失敗する可能性』を常に考慮しないといけない。通信エラー、APIからのエラーレスポンス、期待したデータ形式じゃない、など。`try...catch`ブロックで通信例外を捕捉するのはもちろん、APIのレスポンスをちゃんとチェックして（`!isset($data['items'][0])`）、想定外のデータが来てもエラーにならないようにする。ユーザーに『書籍が見つかりませんでした』とか『通信エラーです』とか、何が起きたかちゃんと伝えることが重要だ。」
 
 ### 思考5：フロントエンドはモダンな`fetch`と`async/await`で
 

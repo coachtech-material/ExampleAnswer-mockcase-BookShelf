@@ -27,28 +27,12 @@ APIのエンドポイントは、通常のWeb画面用のルートとは別の�
 <?php
 
 use App\Http\Controllers\Api\V1\BookController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-Route::middleware(\'auth:sanctum\')->get(\'/user\', function (Request $request) {
-    return $request->user();
-});
-
-// API v1
-Route::prefix(\'v1\')->group(function () {
-    Route::get(\'/books\', [BookController::class, \'index\']);
-    Route::get(\'/books/{book}\', [BookController::class, \'show\']);
+// API v1 - 認証不要の公開API
+Route::prefix('v1')->group(function () {
+    Route::get('/books', [BookController::class, 'index']);
+    Route::get('/books/{book}', [BookController::class, 'show']);
 });
 ```
 
@@ -79,16 +63,19 @@ class BookController extends Controller
 {
     /**
      * 書籍一覧を取得
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
-        $query = $request->input(\'query\');
+        $query = $request->input('query');
 
         $books = Book::query()
-            ->with(\'genres\')
+            ->with('genres')
             ->when($query, function ($q, $query): void {
-                $q->where(\'title\', \'like\', "%{$query}%")
-                  ->orWhere(\'author\', \'like\', "%{$query}%");
+                $q->where('title', 'like', "%{$query}%")
+                  ->orWhere('author', 'like', "%{$query}%");
             })
             ->latest()
             ->paginate(10);
@@ -98,10 +85,13 @@ class BookController extends Controller
 
     /**
      * 書籍詳細を取得
+     *
+     * @param Book $book
+     * @return JsonResponse
      */
     public function show(Book $book): JsonResponse
     {
-        $book->load([\'genres\', \'reviews.user\']);
+        $book->load(['genres', 'reviews.user']);
 
         return response()->json($book);
     }
@@ -116,7 +106,7 @@ class BookController extends Controller
 
 ### 思考2：APIにはバージョニングが不可欠
 
-> 「APIは一度公開すると、自分たち以外の誰か（スマホアプリとか）が使い始める可能性がある。もし後からAPIのレスポンス形式をガラッと変えちゃうと、そのAPIを使っていたアプリが全部動かなくなって大混乱になる。それを防ぐために、`/api/v1/`のようにURLにバージョン番号を含めるのが一般的。将来、大きな変更が必要になったら、古いv1は残したまま、新しく`/api/v2/`を作る。これで後方互換性を保てるんだ。`Route::prefix(\'v1\')->group(...)`を使うと、このバージョニングが簡単に実現できる。」
+> 「APIは一度公開すると、自分たち以外の誰か（スマホアプリとか）が使い始める可能性がある。もし後からAPIのレスポンス形式をガラッと変えちゃうと、そのAPIを使っていたアプリが全部動かなくなって大混乱になる。それを防ぐために、`/api/v1/`のようにURLにバージョン番号を含めるのが一般的。将来、大きな変更が必要になったら、古いv1は残したまま、新しく`/api/v2/`を作る。これで後方互換性を保てるんだ。`Route::prefix('v1')->group(...)`を使うと、このバージョニングが簡単に実現できる。」
 
 ### 思考3：コントローラーもバージョンごとに分ける
 
