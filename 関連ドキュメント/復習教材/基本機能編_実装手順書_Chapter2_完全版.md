@@ -22,54 +22,85 @@
 >     - 書籍とジャンルの関係は？ 1冊の書籍は1つのジャンルにしか属せないのか、それとも複数のジャンルに属せるのか？（例：「技術書」かつ「プログラミング」）
 >     - レビューは1ユーザーにつき1書籍に1回しか投稿できないのか？ それとも複数回投稿できるのか？
 >     - 「お気に入り」や「いいね」は、誰がどの書籍/レビューに対して行ったかを記録する必要がある。これはどういうテーブル構造にすべきか？
+>     - ISBNの桁数は？ 文字列型で良いのか、数値型か？
+>     - 書籍の概要（description）は必須か？ NULLを許容すべきか？
 
-### Step 2: PM（コーチ）へのヒアリング
+### Step 2: PM（コーチ）へのヒアリング（具体例とコツ）
 
 洗い出した不明点を元に、PM（この教材ではコーチ）にヒアリングを行います。重要なのは、**ただ質問するのではなく、「自分はこう考えたのですが、この認識で合っていますか？」という仮説ベースで確認する**ことです。
 
-> **ヒアリングの例文**
+> **ヒアリングの例文（良い例・悪い例）**
 > 
-> 「PM（コーチ）、データベース設計についてご相談です。要件定義書とUIを拝見し、以下のように考えたのですが、認識合わせをさせていただけますでしょうか？」
-> 
-> 1.  **書籍とジャンルの関係について**：「1冊の書籍が『技術書』であり『デザイン』でもある、といったケースを考慮し、書籍とジャンルは**多対多**の関係になると考えました。そのために、`books`テーブルと`genres`テーブルの間に`book_genre`という中間テーブルを設ける設計でいかがでしょうか？」
-> 
-> 2.  **レビューの投稿回数について**：「現状、1ユーザーが1つの書籍に複数レビューを投稿できる仕様に見えますが、これは意図したものでしょうか？ もし1回に制限する場合、`reviews`テーブルに`user_id`と`book_id`の複合ユニークキー制約を追加する必要があります。」
-> 
-> 3.  **お気に入り・いいね機能について**：「『ユーザー』と『書籍』、『ユーザー』と『レビュー』の関係も多対多になると考え、それぞれ`favorites`テーブルと`review_likes`テーブルという中間テーブルで管理する設計を想定しています。これにより、誰が何をお気に入り/いいねしたかを記録できます。」
+> **【書籍とジャンルの関係について】**
+> - **悪い例**: 「書籍とジャンルの関係はどうしますか？」
+>   - *なぜ悪いか: 相手にゼロから考えさせてしまう「丸投げ」の質問。エンジニアとしての思考が放棄されている。*
+> - **良い例**: 「1冊の書籍が『技術書』であり『デザイン』でもある、といったケースを考慮し、書籍とジャンルは**多対多**の関係になると考えました。そのために、`books`テーブルと`genres`テーブルの間に`book_genre`という中間テーブルを設ける設計でいかがでしょうか？」
+>   - *なぜ良いか: 自分の考察と具体的な設計案を提示しているため、PMは「はい、その方向でお願いします」と答えるだけで済む。*
 
-このように、具体的な設計案を提示しながら質問することで、PMは「Yes/No」や具体的なフィードバックを返しやすくなり、コミュニケーションが円滑に進みます。
+> **【レビューの投稿回数について】**
+> - **悪い例**: 「レビューって何回も投稿できますか？」
+> - **良い例**: 「現状、1ユーザーが1つの書籍に複数レビューを投稿できる仕様に見えますが、これは意図したものでしょうか？ もし1回に制限する場合、`reviews`テーブルに`user_id`と`book_id`の複合ユニークキー制約を追加する必要がありますが、どちらの仕様が望ましいですか？」
+>   - *なぜ良いか: 仕様の選択肢と、それに伴う技術的な実装（複合ユニークキー）をセットで提示できている。*
 
-### Step 3: ヒアリング結果を元にER図へ落とし込む
+> **【その他のヒアリング例】**
+> - **データ型と制約について**: 「ISBNは13桁の文字列として`varchar(13)`で定義し、ユニークキー制約を付けようと思いますが、問題ないでしょうか？ また、書籍の概要（description）は未入力の場合も想定し、NULLを許容する想定です。」
+> - **外部キー制約について**: 「ユーザーが退会した場合、そのユーザーが登録した書籍やレビューも一緒に削除するのが一般的かと思います。`books`や`reviews`テーブルの`user_id`に`onDelete(\'cascade\')`（連鎖削除）の外部キー制約を設定する方針でよろしいでしょうか？」
+> - **エッジケースについて**: 「要件に『紐付く書籍がない場合に限り、ジャンルを削除できる』とありますが、もし紐付く書籍がある場合に削除しようとした場合、エラーメッセージを表示して削除を中止させる、という挙動で合っていますか？」
 
-PMとのヒアリングで仕様が固まったら、それをER図（エンティティ関連図）に落とし込みます。ER図は、テーブル（エンティティ）、カラム（属性）、テーブル間の関係（リレーションシップ）を視覚的に表現したものです。
+このように、**具体的な実装をイメージしながら質問を組み立てる**ことで、手戻りの少ない、精度の高い設計が可能になります。
 
-> **思考プロセス（ER図作成）**
-> 
-> 1.  **エンティティの洗い出し**: ヒアリングで固まった「ユーザー」「書籍」「ジャンル」「レビュー」を四角で囲み、テーブルとして定義する。
-> 
-> 2.  **属性（カラム）の定義**: 各テーブルが持つべき情報をカラムとして列挙する。`id` (主キー), `created_at`, `updated_at` はLaravelの慣習として必ず含める。
-> 
-> 3.  **リレーションシップの定義**: テーブル間を線で結び、関係性を定義する。
->     - **1対多**: `users`と`books`（1人のユーザーが多数の書籍を登録）。線の記号は `||--o{` のように表現する。
->     - **多対多**: `books`と`genres`。間に`book_genre`中間テーブルを配置し、`books`と`book_genre`、`genres`と`book_genre`をそれぞれ1対多で結ぶ。線の記号は `}|--|{` のように表現する。
-> 
-> このプロセスを経て、最終的なデータベースの設計図であるER図が完成します。
+### Step 3: テーブル定義書の作成
 
----
+PMとのヒアリングで仕様が固まったら、それをドキュメントに落とし込みます。ER図の前に、まず各テーブルの詳細な情報を一覧化した**テーブル定義書**を作成します。これにより、ER図では表現しきれないデータ型や制約を明確に定義できます。
 
-## 2-2. データベース設計とER図
+| No. | テーブル名 | カラム名 | 型 | PRIMARY KEY | UNIQUE KEY | NOT NULL | FOREIGN KEY | 備考 |
+|:---:|:---|:---|:---|:---:|:---:|:---:|:---|:---|
+| 1 | **users** | | | | | | | | 
+| | | id | unsigned bigint | ○ | | ○ | | | 
+| | | name | varchar(255) | | | ○ | | | 
+| | | email | varchar(255) | | ○ | ○ | | | 
+| | | email_verified_at | timestamp | | | | | | 
+| | | password | varchar(255) | | | ○ | | | 
+| | | remember_token | varchar(100) | | | | | | 
+| | | created_at | timestamp | | | | | | 
+| | | updated_at | timestamp | | | | | | 
+| 2 | **genres** | | | | | | | | 
+| | | id | unsigned bigint | ○ | | ○ | | | 
+| | | name | varchar(255) | | ○ | ○ | | | 
+| | | created_at | timestamp | | | | | | 
+| | | updated_at | timestamp | | | | | | 
+| 3 | **books** | | | | | | | | 
+| | | id | unsigned bigint | ○ | | ○ | | | 
+| | | user_id | unsigned bigint | | | ○ | users(id) | | 
+| | | title | varchar(255) | | | ○ | | | 
+| | | author | varchar(255) | | | ○ | | | 
+| | | isbn | varchar(13) | | ○ | ○ | | | 
+| | | published_date | date | | | ○ | | | 
+| | | description | text | | | | | | 
+| | | image_url | varchar(255) | | | | | | 
+| | | created_at | timestamp | | | | | | 
+| | | updated_at | timestamp | | | | | | 
+| 4 | **reviews** | | | | | | | | 
+| | | id | unsigned bigint | ○ | | ○ | | | 
+| | | user_id | unsigned bigint | | | ○ | users(id) | | 
+| | | book_id | unsigned bigint | | | ○ | books(id) | | 
+| | | rating | tinyint unsigned | | | ○ | | 1〜5の整数 | 
+| | | comment | text | | | ○ | | | 
+| | | created_at | timestamp | | | | | | 
+| | | updated_at | timestamp | | | | | | 
+| 5 | **book_genre** | | | | | | | 中間テーブル | 
+| | | book_id | unsigned bigint | ○ | | ○ | books(id) | | 
+| | | genre_id | unsigned bigint | ○ | | ○ | genres(id) | | 
+| 6 | **favorites** | | | | | | | 中間テーブル | 
+| | | user_id | unsigned bigint | ○ | | ○ | users(id) | | 
+| | | book_id | unsigned bigint | ○ | | ○ | books(id) | | 
+| 7 | **review_likes** | | | | | | | 中間テーブル | 
+| | | user_id | unsigned bigint | ○ | | ○ | users(id) | | 
+| | | review_id | unsigned bigint | ○ | | ○ | reviews(id) | | 
 
-上記の思考プロセスを経て、今回のアプリケーションに必要なテーブルとリレーションシップを設計します。
+### Step 4: ER図への落とし込み
 
-- **Usersテーブル**: ユーザー情報
-- **Booksテーブル**: 書籍情報 (`user_id`を持つ)
-- **Genresテーブル**: ジャンル情報
-- **Reviewsテーブル**: レビュー情報 (`user_id`, `book_id`を持つ)
-- **book_genreテーブル**: 書籍とジャンルの**多対多**関係を表現する中間テーブル
-- **favoritesテーブル**: ユーザーと書籍の「お気に入り」関係（**多対多**）を表現する中間テーブル
-- **review_likesテーブル**: ユーザーとレビューの「いいね」関係（**多対多**）を表現する中間テーブル
-
-### ER図
+テーブル定義書で詳細な仕様を固めた後、全体像を視覚的に把握するためにER図を作成します。
 
 ```mermaid
 erDiagram
@@ -139,12 +170,15 @@ erDiagram
     REVIEWS }|--|{ REVIEW_LIKES : "is liked by"
 ```
 
-## 2-3. マイグレーションファイルの作成
+---
 
-設計が固まったら、Artisanコマンドでマイグレーションファイルを生成します。
+## 2-2. マイグレーションファイルの作成と実装
+
+設計が固まったら、Artisanコマンドでマイグレーションファイルを生成し、テーブル構造をコードに落とし込んでいきます。
+
+### マイグレーションファイルの作成
 
 ```bash
-# ... (マイグレーションファイル作成コマンドは変更なし)
 sail artisan make:migration create_genres_table
 sail artisan make:migration create_books_table
 sail artisan make:migration create_reviews_table
@@ -153,86 +187,72 @@ sail artisan make:migration create_favorites_table
 sail artisan make:migration create_review_likes_table
 ```
 
-## 2-4. マイグレーションファイルの実装
+### マイグレーションファイルの実装
 
-(ここから先のマイグレーションファイルの実装内容は変更ありません)
-
-### `create_genres_table`
-
-**`database/migrations/..._create_genres_table.php`**
+#### `create_genres_table`
 ```php
-Schema::create("genres", function (Blueprint \$table) {
-    \$table->id();
-    \$table->string("name")->unique();
-    \$table->timestamps();
+Schema::create('genres', function (Blueprint $table) {
+    $table->id();
+    $table->string('name')->unique();
+    $table->timestamps();
 });
 ```
 
-### `create_books_table`
-
-**`database/migrations/..._create_books_table.php`**
+#### `create_books_table`
 ```php
-Schema::create("books", function (Blueprint \$table) {
-    \$table->id();
-    \$table->foreignId("user_id")->constrained()->onDelete("cascade");
-    \$table->string("title");
-    \$table->string("author");
-    \$table->string("isbn", 13)->unique();
-    \$table->date("published_date");
-    \$table->text("description")->nullable();
-    \$table->string("image_url")->nullable();
-    \$table->timestamps();
+Schema::create('books', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->string('title');
+    $table->string('author');
+    $table->string('isbn', 13)->unique();
+    $table->date('published_date');
+    $table->text('description')->nullable();
+    $table->string('image_url')->nullable();
+    $table->timestamps();
 });
 ```
 
-### `create_reviews_table`
-
-**`database/migrations/..._create_reviews_table.php`**
+#### `create_reviews_table`
 ```php
-Schema::create("reviews", function (Blueprint \$table) {
-    \$table->id();
-    \$table->foreignId("user_id")->constrained()->onDelete("cascade");
-    \$table->foreignId("book_id")->constrained()->onDelete("cascade");
-    \$table->unsignedTinyInteger("rating");
-    \$table->text("comment");
-    \$table->timestamps();
+Schema::create('reviews', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->foreignId('book_id')->constrained()->onDelete('cascade');
+    $table->unsignedTinyInteger('rating');
+    $table->text('comment');
+    $table->timestamps();
 });
 ```
 
-### `create_book_genre_table`
-
-**`database/migrations/..._create_book_genre_table.php`**
+#### `create_book_genre_table`
 ```php
-Schema::create("book_genre", function (Blueprint \$table) {
-    \$table->foreignId("book_id")->constrained()->onDelete("cascade");
-    \$table->foreignId("genre_id")->constrained()->onDelete("cascade");
-    \$table->primary(["book_id", "genre_id"]);
+Schema::create('book_genre', function (Blueprint $table) {
+    $table->foreignId('book_id')->constrained()->onDelete('cascade');
+    $table->foreignId('genre_id')->constrained()->onDelete('cascade');
+    $table->primary(['book_id', 'genre_id']);
 });
 ```
 
-### `create_favorites_table`
-
-**`database/migrations/..._create_favorites_table.php`**
+#### `create_favorites_table`
 ```php
-Schema::create("favorites", function (Blueprint \$table) {
-    \$table->foreignId("user_id")->constrained()->onDelete("cascade");
-    \$table->foreignId("book_id")->constrained()->onDelete("cascade");
-    \$table->primary(["user_id", "book_id"]);
+Schema::create('favorites', function (Blueprint $table) {
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->foreignId('book_id')->constrained()->onDelete('cascade');
+    $table->primary(['user_id', 'book_id']);
 });
 ```
 
-### `create_review_likes_table`
-
-**`database/migrations/..._create_review_likes_table.php`**
+#### `create_review_likes_table`
 ```php
-Schema::create("review_likes", function (Blueprint \$table) {
-    \$table->foreignId("user_id")->constrained()->onDelete("cascade");
-    \$table->foreignId("review_id")->constrained()->onDelete("cascade");
-    \$table->primary(["user_id", "review_id"]);
+Schema::create('review_likes', function (Blueprint $table) {
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->foreignId('review_id')->constrained()->onDelete('cascade');
+    $table->primary(['user_id', 'review_id']);
 });
 ```
 
-## 2-5. マイグレーションの実行
+## 2-3. マイグレーションの実行
 
 ```bash
 sail artisan migrate
