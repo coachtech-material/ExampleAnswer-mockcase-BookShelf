@@ -98,7 +98,7 @@ class BookController extends Controller
 }
 ```
 
-## 4. 先輩エンジニアの思考プロセス
+## 4. 先輩エンジニアの思考プロセスと「調べ方」
 
 ### 思考1：APIのルートは`routes/api.php`に書く
 
@@ -117,6 +117,16 @@ class BookController extends Controller
 > 「APIコントローラーのメソッドは、ビューではなくJSONを返す。Eloquentのモデルやコレクションは、そのまま`response()->json()`に渡すだけで、Laravelが自動的にいい感じのJSONに変換してくれる。ページネーションの情報（`total`, `per_page`, `current_page`など）も自動で含めてくれるからすごく便利。戻り値の型ヒントを`: JsonResponse`にしておくのも忘れずに。」
 
 ### 思考5：APIレスポンスの整形には「APIリソース」を検討する
+
+### How to: この実装にたどり着くための調べ方
+
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **API用のルーティングを定義したい** | `laravel api routes` | `routes/api.php`にルートを定義すること、URLに自動で`/api/`プレフィックスが付与されることなどがわかる。 |
+| **APIのバージョンを管理したい** | `laravel api versioning` | ルートグループを使って`/api/v1/`のようにURLでバージョンを分ける方法が一般的だとわかる。 |
+| **JSONを返却したい** | `laravel return json response` | `response()->json()`ヘルパを使うことで、配列やコレクションを簡単にJSON形式でレスポンスできることがわかる。ステータスコードの指定方法もわかる。 |
+| **APIのレスポンス形式を統一したい** | `laravel api resources` | APIリソースのドキュメントが見つかる。モデルのデータを特定のJSON構造に変換するための専用クラスを作成できることを知る。ネストしたリソースや、条件に応じた属性の追加方法など、高度な整形も可能。 |
+| **APIの認証をしたい** | `laravel api authentication sanctum` | Laravel Sanctumを使ったAPI認証の方法が見つかる。SPA認証とAPIトークン認証の2種類があることを理解する。 |
 
 > 「今回はEloquentモデルを直接JSONに変換したけど、実務ではもっと複雑な要件が出てくる。『このカラムはAPIに含めたくない』とか、『ユーザーの役割によって返す情報を変えたい』とかね。そういうときは**APIリソース**（`php artisan make:resource`）を使うのがベスト。モデルとAPIレスポンスの間に一層を挟むことで、レスポンスの構造を柔軟に、かつ一元的に管理できるようになる。小規模なAPIなら直接変換でもいいけど、本格的なAPIを作るならAPIリソースは必須テクニックだよ。」
 

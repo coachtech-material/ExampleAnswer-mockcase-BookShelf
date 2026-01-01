@@ -89,7 +89,7 @@ class BookController extends Controller
 }
 ```
 
-## 4. 先輩エンジニアの思考プロセス
+## 4. 先輩エンジニアの思考プロセスと「調べ方」
 
 なぜこのような実装になっているのか、先輩エンジニアの視点で解説します。
 
@@ -110,6 +110,17 @@ class BookController extends Controller
 > 「並び替えの条件もユーザーの選択によって変わる。`switch`文を使うと、`sort`パラメータの値に応じて処理をきれいに分岐できる。`default`ケースでデフォルトの並び順（今回は`latest()`）を指定しておくのが親切だね。評価順（`rating`）の場合は、`withAvg`で平均評価を計算し、その結果（`reviews_avg_rating`）で`orderByDesc`する必要がある点に注意しよう。」
 
 ### 思考5：ページネーションと検索条件の維持は`withQueryString()`にお任せ
+
+### How to: この実装にたどり着くための調べ方
+
+> 「じゃあ、こういう機能要件から、どうやって`whereHas`や`withQueryString`みたいな具体的なメソッドにたどり着くのか？僕が新人の頃にやっていた思考プロセスはこんな感じだよ」
+
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **タイトルか著者で検索したい** | `laravel query builder where or` | `where`句のパラメータとしてクロージャを渡すことで、`AND (A OR B)`という条件を作れることがわかる。`orWhere`を単純に繋げると`AND A OR B`になってしまう問題点にも気づける。 |
+| **関連テーブルの条件で絞り込みたい** | `laravel eloquent relation where` / `laravel リレーション 絞り込み` | Eloquentの「リレーションの存在クエリ」のセクションに`whereHas`というまさにやりたいこと通りのメソッドが見つかる。 |
+| **評価の高い順で並び替えたい** | `laravel order by relation count` / `laravel リレーション 集計 並び替え` | `withCount`や`withAvg`といったメソッドでリレーション先の集計結果をSELECT句に追加し、そのエイリアス（`reviews_avg_rating`）で`orderBy`できることがわかる。 |
+| **検索条件をページャーに引き継ぎたい** | `laravel pagination query parameter` / `laravel ページネーション 検索条件 維持` | ページネーションのドキュメントに`withQueryString()`という便利なメソッドが紹介されているのを発見する。 |
 
 > 「検索結果が複数ページにわたる場合、2ページ目に移動したときに検索条件が消えてしまったらユーザーはがっかりする。`paginate(10)`の後ろに`withQueryString()`を繋げるだけで、Laravelが自動的にURLのクエリパラメータ（`?keyword=...&genre=...`）をページネーションのリンクに引き継いでくれる。これは本当に便利だから絶対に覚えておこう。」
 
