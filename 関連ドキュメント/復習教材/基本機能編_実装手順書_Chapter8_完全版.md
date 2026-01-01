@@ -1,179 +1,172 @@
-# Chapter 8: 検索機能
 
-このChapterでは、書籍のタイトルや著者名で検索できる機能を実装します。GETリクエストでクエリパラメータを受け取り、それに基づいてデータベースを検索する、Webアプリケーションの基本的な機能です。
+# Chapter 8: ジャンル管理機能 (管理者向け)
 
-## 8-1. 検索フォームの作成
+このChapterでは、管理者のみがアクセスできるジャンル管理機能（CRUD）を実装します。ミドルウェアを使った特定のルートへのアクセス制御が重要なポイントです。
 
-まずは、ユーザーが検索キーワードを入力するためのフォームを、書籍一覧ページに設置します。
+## 8-1. 管理者権限の仕組み
 
-**`resources/views/books/index.blade.php`**
-```blade
-<x-app-layout>
-    {{-- ... header ... --}}
+ユーザーが管理者かどうかを判断する仕組みを実装します。`users`テーブルに`is_admin`のような真偽値カラムを追加するのが一般的です。
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {{-- 検索フォームを追加 --}}
-            <div class="mb-4">
-                <form action="{{ route('books.index') }}" method="GET">
-                    <input type="text" name="keyword" value="{{ request('keyword') }}" placeholder="書籍名や著者名で検索">
-                    <button type="submit">検索</button>
-                </form>
-            </div>
+### Step 1: マイグレーションファイルの作成と実行
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                {{-- ... 書籍一覧 ... --}}
-            </div>
-        </div>
-    </div>
-</x-app-layout>
+`is_admin`カラムを`users`テーブルに追加するためのマイグレーションを作成します。
+
+```bash
+sail artisan make:migration add_is_admin_to_users_table --table=users
 ```
 
-**コードリーディング:**
-- `action="{{ route('books.index') }}"`: フォームの送信先は書籍一覧ページ自身です。
-- `method="GET"`: 検索のような、サーバーの状態を変更しない（冪等性を持つ）操作にはGETメソッドを使うのが一般的です。URLに `?keyword=...` のようにクエリパラメータが付与されます。
-- `value="{{ request('keyword') }}"`: 検索後も入力ボックスに検索キーワードが残るように、リクエストから`keyword`を取得して表示しています。これにより、ユーザーは自分が何で検索したかを再確認できます。
-
-## 8-2. Controllerでの検索ロジックの実装
-
-`BookController`の`index`メソッドを修正し、検索キーワードが渡された場合に結果を絞り込むロジックを追加します。
-
-**`app/Http/Controllers/BookController.php`**
+**`database/migrations/xxxx_xx_xx_xxxxxx_add_is_admin_to_users_table.php`**
 ```php
 <?php
 
-namespace App\Http\Controllers;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use App\Models\Book;
-use Illuminate\Http\Request; // Requestをインポート
-
-class BookController extends Controller
+return new class extends Migration
 {
-    public function index(Request $request) // Requestを受け取る
+    public function up(): void
     {
-        $keyword = $request->input('keyword');
-
-        $query = Book::query();
-
-        if ($keyword) {
-            $query->where(function ($q) use ($keyword) {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
-            });
-        }
-
-        $books = $query->with('genres')->latest()->paginate(10);
-
-        return view('books.index', compact('books'));
+        Schema::table("users", function (Blueprint $table) {
+            $table->boolean("is_admin")->default(false)->after("email");
+        });
     }
 
-    // ... 他のメソッド
-}
+    public function down(): void
+    {
+        Schema::table("users", function (Blueprint $table) {
+            $table->dropColumn("is_admin");
+        });
+    }
+};
 ```
 
-**コードリーディング:**
-- `index(Request $request)`: `index`メソッドに`Request`クラスのインスタンスをDI（依存性注入）することで、リクエスト情報を取得できるようにします。
-- `$keyword = $request->input('keyword');`: リクエストから`keyword`という名前の入力値を取得します。
-- `$query = Book::query();`: まず、Eloquentのクエリビルダインスタンスを生成します。ここから条件を繋げていきます。
-- `if ($keyword)`: `keyword`が存在する場合のみ、絞り込み処理を実行します。
-- `$query->where(function ($q) use ($keyword) { ... });`: `where`句をグループ化するためにクロージャ（無名関数）を使用します。これは、`(A or B) and C` のような複雑な条件を正しく構築するために重要です。
-- `$q->where('title', 'like', "%{$keyword}%")->orWhere('author', 'like', "%{$keyword}%");`: `title` **または** `author` にキーワードが部分一致する書籍を検索します。`%`はSQLの`LIKE`句で「0文字以上の任意の文字列」を表すワイルドカードです。
-- `$books = $query->...->paginate(10);`: 最終的に構築されたクエリを実行し、結果をページネーション付きで取得します。
+マイグレーションを実行します。
 
-## 8-3. ページネーションと検索キーワードの連携
+```bash
+sail artisan migrate
+```
 
-このままでは、検索結果の2ページ目に移動した際に検索キーワードが消えてしまい、全件表示の2ページ目に移動してしまいます。ページネーションリンクに検索キーワードを引き継がせる必要があります。
+> **思考プロセス:**
+> なぜ`is_admin`カラムを追加するのでしょうか？ アプリケーションには、一般ユーザーと管理者という異なる役割（ロール）を持つユーザーが存在します。`is_admin`カラム（フラグ）は、この役割を区別するための最もシンプルな方法です。`default(false)`と設定することで、新規登録ユーザーは自動的に一般ユーザーとなり、意図しない権限昇格を防ぎます。管理者は、開発者がデータベースを直接操作してフラグを`true`に設定することで作成します。より複雑な権限管理が必要な場合は、`laravel-permission`のような専用パッケージを導入することも検討しますが、今回はシンプルな管理者機能なので、この方法が最も手軽で適切です。
 
-### Step 1: `Book`モデルに`scope`を定義 (任意だが推奨)
+## 8-2. 管理者認証ミドルウェアの作成
 
-検索ロジックをControllerからモデルの`scope`に移動させることで、Controllerをよりクリーンに保ち、ロジックを再利用しやすくします。
+管理者ユーザーのみが特定のルートにアクセスできるように、専用のミドルウェアを作成します。
 
-**`app/Models/Book.php`**
+### Step 1: ミドルウェアの生成
+
+```bash
+sail artisan make:middleware AdminMiddleware
+```
+
+### Step 2: ミドルウェアの実装
+
+**`app/Http/Middleware/AdminMiddleware.php`**
 ```php
 <?php
 
-namespace App\Models;
+namespace App\Http\Middleware;
 
-use Illuminate\Database\Eloquent\Builder; // Builderをインポート
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Closure;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\Response;
 
-class Book extends Model
+class AdminMiddleware
 {
-    use HasFactory;
-
-    // ... 他のプロパティやリレーション
-
-    /**
-     * キーワードで検索するスコープ
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string|null $keyword
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeSearch(Builder $query, ?string $keyword)
+    public function handle(Request $request, Closure $next): Response
     {
-        if ($keyword) {
-            return $query->where(function ($q) use ($keyword) {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
-            });
+        if (!Auth::check() || !Auth::user()->is_admin) {
+            abort(403, "管理者権限がありません。");
         }
-        return $query;
+
+        return $next($request);
     }
 }
 ```
 
-**コードリーディング:**
-- `public function scopeSearch(...)`: `scope`で始まるメソッドを定義すると、`Book::search($keyword)`のように呼び出せるようになります。第一引数には自動的にクエリビルダが渡されます。
+> **コード解説:**
+> ミドルウェアは、コントローラのアクションが実行される「前」に割り込んで処理を行うフィルターのようなものです。
+> - `!Auth::check()`: まずリクエストが認証済みユーザーからのものかを確認します。
+> - `!Auth::user()->is_admin`: 認証済みユーザーの`is_admin`プロパティが`true`でない（管理者でない）場合、`abort(403)`を呼び出して処理を中断し、403 Forbidden（アクセス禁止）エラーを返します。
+> - `return $next($request);`: 上記のチェックを通過した場合のみ、`$next($request)`を呼び出してリクエストを次の処理（この場合はコントローラのアクション）へと渡します。
 
-### Step 2: Controllerを`scope`を使うように修正
+### Step 3: ミドルウェアの登録
 
-**`app/Http/Controllers/BookController.php`**
+作成したミドルウェアを`app/Http/Kernel.php`に登録して、ルート定義で使えるように「エイリアス（別名）」を設定します。
+
+**`app/Http/Kernel.php`**
 ```php
-public function index(Request $request)
+protected $routeMiddleware = [
+    // ... 既存のミドルウェア
+    "admin" => \App\Http\Middleware\AdminMiddleware::class, // この行を追加
+];
+```
+
+## 8-3. ジャンル管理機能の実装
+
+管理者専用のジャンル管理機能（CRUD）を実装します。
+
+### Step 1: ControllerとRequestの作成
+
+```bash
+sail artisan make:controller Admin/GenreController
+sail artisan make:request Admin/StoreGenreRequest
+sail artisan make:request Admin/UpdateGenreRequest
+```
+
+> **思考プロセス:**
+> `Admin/GenreController`のようにサブディレクトリを切ることで、管理者向けのコントローラであることがファイル構造から明確になります。これにより、`App\Http\Controllers\Admin`という専用の名前空間が与えられ、一般ユーザー向けのコントローラと区別しやすくなり、大規模なアプリケーションになった際のコードの可読性と保守性が向上します。
+
+### Step 2: ルーティングの設定
+
+管理者用のルートをグループ化し、`admin`ミドルウェアを適用します。
+
+**`routes/web.php`**
+```php
+use App\Http\Controllers\Admin\GenreController as AdminGenreController;
+
+// ... 他のルート
+
+Route::middleware(["auth", "admin"])->prefix("admin")->name("admin.")->group(function () {
+    Route::resource("genres", AdminGenreController::class)->except("show");
+});
+```
+
+> **コード解説:**
+> - `middleware(["auth", "admin"])`: このグループ内のルートにアクセスするには、ログイン認証（`auth`）と管理者認証（`admin`）の両方を通過する必要があります。
+> - `prefix("admin")`: グループ内のURLの先頭に自動的に`/admin`が付きます。（例: `/admin/genres`）
+> - `name("admin.")`: グループ内のルート名の先頭に自動的に`admin.`が付きます。（例: `admin.genres.index`）
+> - `Route::resource(...)`: ジャンル管理に必要なCRUDのルート（index, create, store, edit, update, destroy）をまとめて定義します。`except("show")`で、今回は不要な詳細表示ルートを除外しています。
+
+### Step 3: Controller, Request, Bladeの実装
+
+Controller、Request、Bladeの実装は、これまでのCRUD実装とほぼ同じです。ただし、ルート名やビューのパスに`admin.`や`admin/`といったプレフィックスが付く点に注意してください。
+
+**`app/Http/Controllers/Admin/GenreController.php`**
+```php
+// ... (実装は前述の通り)
+public function destroy(Genre $genre)
 {
-    $keyword = $request->input('keyword');
-
-    $books = Book::search($keyword) // scopeを利用
-        ->with('genres')
-        ->latest()
-        ->paginate(10);
-
-    return view('books.index', compact('books'));
+    if ($genre->books()->exists()) { // exists()の方が効率的
+        return back()->with("error", "このジャンルには書籍が紐付いているため削除できません。");
+    }
+    $genre->delete();
+    return redirect()->route("admin.genres.index")->with("success", "ジャンルを削除しました。");
 }
 ```
 
-### Step 3: ページネーションリンクの修正
-
-`paginate`メソッドの結果に`appends`メソッドをチェーンすることで、ページネーションのリンクに現在のクエリパラメータ（この場合は`keyword`）を自動的に付与できます。
-
-**`app/Http/Controllers/BookController.php`**
-```php
-public function index(Request $request)
-{
-    $keyword = $request->input('keyword');
-
-    $books = Book::search($keyword)
-        ->with('genres')
-        ->latest()
-        ->paginate(10)
-        ->appends($request->all()); // この行を追加
-
-    return view('books.index', compact('books'));
-}
-```
-
-**コードリーディング:**
-- `appends($request->all())`: 現在のリクエストに含まれる全てのクエリパラメータ（`['keyword' => '...']`）を、生成されるページネーションのURLに追加します。これにより、`http://.../books?page=2` ではなく `http://.../books?keyword=...&page=2` というURLが生成されます。
+> **思考プロセス (削除処理):**
+> ジャンルを削除する前に、`$genre->books()->exists()`で紐付く書籍が存在するかをチェックしています。`count() > 0`よりも`exists()`の方が、レコードが1件でも見つかった時点で検索を打ち切るため、パフォーマンス的に有利です。データ整合性を保つため、関連データを持つ親レコードを安易に削除できないようにするのは、実務アプリケーションにおける重要な設計判断です。
 
 ## 8-4. 動作確認
 
-1.  書籍一覧ページに検索フォームが表示されていることを確認します。
-2.  キーワードを入力して検索し、タイトルまたは著者にそのキーワードが含まれる書籍のみが表示されることを確認します。
-3.  検索結果が複数ページにわたる場合、2ページ目に移動しても検索結果が維持されていることを確認します。（URLに`keyword`と`page`の両方が含まれていることを確認）
-4.  キーワードを空にして検索すると、全件が表示されることを確認します。
+1.  データベースで特定のユーザーの`is_admin`を`1`（true）に変更します。
+2.  一般ユーザーでログインし、`/admin/genres`にアクセスして403エラーが表示されることを確認します。
+3.  管理者ユーザーでログインし、`/admin/genres`にアクセスしてジャンル一覧が表示されることを確認します。
+4.  ジャンルの新規作成、編集、削除（紐付く書籍がない場合）、削除（紐付く書籍がある場合のエラー）が正しく動作することを確認します。
 
 ---
 
-これで、実用的な検索機能が完成しました。次のChapterでは、非同期処理について学びます。
+これで、特定の権限を持つユーザーのみが操作できる、安全な管理機能が実装できました。次のChapterでは、検索機能を実装します。

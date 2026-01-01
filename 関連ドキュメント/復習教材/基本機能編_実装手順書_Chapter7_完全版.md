@@ -1,245 +1,215 @@
-# Chapter 7: ジャンル管理機能 (管理者向け)
+'''# Chapter 7: Bladeテンプレートによるフロントエンド実装
 
-このChapterでは、管理者のみがアクセスできるジャンル管理機能（CRUD）を実装します。ミドルウェアを使った特定のルートへのアクセス制御が重要なポイントです。
+このChapterでは、これまでに実装してきたバックエンドの機能と連携するフロントエンドの画面を、Laravelのテンプレートエンジン「Blade」を使って構築します。コンポーネントベースの設計や、パフォーマンスを意識したデータの表示方法が重要なポイントです。
 
-## 7-1. 管理者権限の仕組み
+> **思考プロセス:**
+> なぜHTMLを直接書かずにBladeを使うのでしょうか？ Bladeは、PHPのコードをHTML内に簡潔かつ安全に埋め込むための強力な機能を提供します。
+> 
+> - **可読性**: `<?php echo htmlspecialchars($book->title); ?>` のような冗長な記述は、`{{ $book->title }}` と書くだけで済みます。Bladeが自動的にXSS（クロスサイトスクリプティング）対策のエスケープ処理を行ってくれるため、安全です。
+> - **制御構文**: `@if`, `@foreach`, `@auth` のような直感的なディレクティブを使って、条件分岐やループ、認証状態のチェックをHTML構造を崩さずに記述できます。
+> - **コンポーネントとレイアウト**: アプリケーション全体で共通のヘッダーやフッターを「レイアウト」として定義し、各ページはその中のコンテンツ部分だけを記述すればよくなります。これにより、コードの重複を劇的に削減し、一貫性のあるUIを効率的に構築できます。これを「テンプレートの継承」と呼びます。
 
-ユーザーが管理者かどうかを判断する仕組みを実装します。`users`テーブルに`is_admin`のような真偽値カラムを追加するのが一般的です。
+## 7-1. レイアウトの作成と適用
 
-### Step 1: マイグレーションファイルの作成と実行
+アプリケーション全体の骨格となるレイアウトファイルを作成します。Laravel Breezeをインストールすると、`resources/views/layouts/app.blade.php` に基本的なレイアウトが生成されているので、これを活用します。
 
-`is_admin`カラムを`users`テーブルに追加するためのマイグレーションを作成します。
-
-```bash
-sail artisan make:migration add_is_admin_to_users_table --table=users
-```
-
-**`database/migrations/xxxx_xx_xx_xxxxxx_add_is_admin_to_users_table.php`**
-```php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_admin')->default(false)->after('email');
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('is_admin');
-        });
-    }
-};
-```
-
-マイグレーションを実行します。
-
-```bash
-sail artisan migrate
-```
-
-**思考プロセス:**
-`is_admin`カラムのデフォルト値を`false`に設定しておくことで、既存のユーザーや新規登録されたユーザーは自動的に一般ユーザーとなります。管理者ユーザーは、データベースを直接操作して`is_admin`を`true`に変更する必要があります。
-
-## 7-2. 管理者認証ミドルウェアの作成
-
-管理者ユーザーのみが特定のルートにアクセスできるように、専用のミドルウェアを作成します。
-
-### Step 1: ミドルウェアの生成
-
-```bash
-sail artisan make:middleware AdminMiddleware
-```
-
-### Step 2: ミドルウェアの実装
-
-**`app/Http/Middleware/AdminMiddleware.php`**
-```php
-<?php
-
-namespace App\Http\Middleware;
-
-use Closure;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\Response;
-
-class AdminMiddleware
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        if (!Auth::check() || !Auth::user()->is_admin) {
-            abort(403, '管理者権限がありません。');
-        }
-
-        return $next($request);
-    }
-}
-```
-
-**コードリーディング:**
-- `!Auth::check()`: まずログインしているかを確認します。
-- `!Auth::user()->is_admin`: ログインしているユーザーの`is_admin`プロパティが`true`でない場合（つまり管理者でない場合）をチェックします。
-- `abort(403, ...)`: 条件に一致した場合、403 Forbiddenエラーを返して処理を中断します。
-
-### Step 3: ミドルウェアの登録
-
-作成したミドルウェアを`app/Http/Kernel.php`に登録して、ルートで使えるようにします。
-
-**`app/Http/Kernel.php`**
-```php
-protected $routeMiddleware = [
-    // ... 既存のミドルウェア
-    'admin' => \App\Http\Middleware\AdminMiddleware::class, // この行を追加
-];
-```
-
-## 7-3. ジャンル管理機能の実装
-
-管理者専用のジャンル管理機能（CRUD）を実装します。
-
-### Step 1: ControllerとRequestの作成
-
-```bash
-sail artisan make:controller Admin/GenreController
-sail artisan make:request Admin/StoreGenreRequest
-sail artisan make:request Admin/UpdateGenreRequest
-```
-
-**思考プロセス:**
-`Admin/GenreController`のようにサブディレクトリを切ることで、管理者向けのコントローラであることが明確になります。名前空間も`App\Http\Controllers\Admin`となり、コードの整理に役立ちます。
-
-### Step 2: ルーティングの設定
-
-管理者用のルートをグループ化し、`admin`ミドルウェアを適用します。
-
-**`routes/web.php`**
-```php
-use App\Http\Controllers\Admin\GenreController as AdminGenreController;
-
-// ... 他のルート
-
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::resource('genres', AdminGenreController::class)->except('show');
-});
-```
-
-**コードリーディング:**
-- `middleware(['auth', 'admin'])`: ログイン認証と管理者認証の両方を通過する必要があります。
-- `prefix('admin')`: URLの先頭に`/admin`が付きます。（例: `/admin/genres`）
-- `name('admin.')`: ルート名の先頭に`admin.`が付きます。（例: `admin.genres.index`）
-
-### Step 3: Controllerの実装
-
-`Admin/GenreController`にCRUDロジックを実装します。基本的な構造は通常のCRUDと同じです。
-
-**`app/Http/Controllers/Admin/GenreController.php`**
-```php
-<?php
-
-namespace App\Http\Controllers\Admin;
-
-use App\Http\Controllers\Controller;
-use App\Models\Genre;
-use App\Http\Requests\Admin\StoreGenreRequest;
-use App\Http\Requests\Admin\UpdateGenreRequest;
-
-class GenreController extends Controller
-{
-    public function index()
-    {
-        $genres = Genre::withCount('books')->paginate(10);
-        return view('admin.genres.index', compact('genres'));
-    }
-
-    public function create()
-    {
-        return view('admin.genres.create');
-    }
-
-    public function store(StoreGenreRequest $request)
-    {
-        Genre::create($request->validated());
-        return redirect()->route('admin.genres.index')->with('success', 'ジャンルを作成しました。');
-    }
-
-    public function edit(Genre $genre)
-    {
-        return view('admin.genres.edit', compact('genre'));
-    }
-
-    public function update(UpdateGenreRequest $request, Genre $genre)
-    {
-        $genre->update($request->validated());
-        return redirect()->route('admin.genres.index')->with('success', 'ジャンルを更新しました。');
-    }
-
-    public function destroy(Genre $genre)
-    {
-        if ($genre->books()->exists()) {
-            return back()->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
-        }
-        $genre->delete();
-        return redirect()->route('admin.genres.index')->with('success', 'ジャンルを削除しました。');
-    }
-}
-```
-
-### Step 4: Requestの実装
-
-バリデーションルールを定義します。
-
-**`app/Http/Requests/Admin/StoreGenreRequest.php`**
-```php
-public function rules(): array
-{
-    return [
-        'name' => 'required|string|max:255|unique:genres,name',
-    ];
-}
-```
-
-**`app/Http/Requests/Admin/UpdateGenreRequest.php`**
-```php
-use Illuminate\Validation\Rule;
-
-public function rules(): array
-{
-    return [
-        'name' => ['required', 'string', 'max:255', Rule::unique('genres')->ignore($this->genre)],
-    ];
-}
-```
-
-### Step 5: Bladeテンプレートの作成
-
-`resources/views/admin/genres`ディレクトリを作成し、`index`, `create`, `edit`の各Bladeファイルを作成します。内容は通常のCRUDのビューとほぼ同じですが、URLやルート名が管理者用のもの（`admin.`プレフィックス付き）に変わります。
-
-**`resources/views/admin/genres/index.blade.php`** (抜粋)
+**`resources/views/layouts/app.blade.php` (抜粋)**
 ```blade
-<a href="{{ route('admin.genres.create') }}">新規作成</a>
-...
-<a href="{{ route('admin.genres.edit', $genre) }}">編集</a>
-<form action="{{ route('admin.genres.destroy', $genre) }}" method="POST">
-    ...
-</form>
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        {{-- ... metaタグやCSSの読み込み ... --}}
+    </head>
+    <body class="font-sans antialiased">
+        <div class="min-h-screen bg-gray-100">
+            @include('layouts.navigation')
+
+            <!-- Page Heading -->
+            @if (isset($header))
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{ $header }}
+                    </div>
+                </header>
+            @endif
+
+            <!-- Page Content -->
+            <main>
+                {{ $slot }}
+            </main>
+        </div>
+    </body>
+</html>
 ```
 
-## 7-4. 動作確認
+このレイアウトを各ページで利用するには、以下のように記述します。
 
-1.  データベースで特定のユーザーの`is_admin`を`1`（true）に変更します。
-2.  一般ユーザーでログインし、`/admin/genres`にアクセスして403エラーが表示されることを確認します。
-3.  管理者ユーザーでログインし、`/admin/genres`にアクセスしてジャンル一覧が表示されることを確認します。
-4.  ジャンルの新規作成、編集、削除（紐付く書籍がない場合）、削除（紐付く書籍がある場合のエラー）が正しく動作することを確認します。
+**`resources/views/books/index.blade.php`**
+```blade
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            書籍一覧
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        {{-- この内側が {{ $slot }} に挿入される --}}
+    </div>
+</x-app-layout>
+```
+
+> **コード解説:**
+> - `<x-app-layout>`: `resources/views/components/app-layout.blade.php` をコンポーネントとして呼び出しています。これがレイアウトの本体です。
+> - `<x-slot name="header">`: レイアウトファイル内の `{{ $header }}` の部分に、このスロット内のコンテンツを挿入します。
+> - `<x-app-layout>` タグに囲まれた部分が、レイアウトファイル内の `{{ $slot }}` の部分に挿入されます。
+
+## 7-2. 書籍一覧・詳細ページの作成
+
+`BookController`の`index`と`show`アクションに対応するビューを作成します。
+
+### 書籍一覧 (`books.index`)
+
+**`resources/views/books/index.blade.php`**
+```blade
+<x-app-layout>
+    {{-- ... headerスロット ... --}}
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900">
+                    @foreach ($books as $book)
+                        <div class="mb-4 p-4 border-b">
+                            <h3 class="text-lg font-bold">
+                                <a href="{{ route('books.show', $book) }}">{{ $book->title }}</a>
+                            </h3>
+                            <p class="text-gray-600">著者: {{ $book->author }}</p>
+                            <div>
+                                @foreach ($book->genres as $genre)
+                                    <span class="text-sm text-white bg-gray-500 px-2 py-1 rounded">{{ $genre->name }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                    {{ $books->links() }} {{-- ページネーションリンク --}}
+                </div>
+            </div>
+        </div>
+    </div>
+</x-app-layout>
+```
+
+> **思考プロセス (N+1問題の回避):**
+> このループの中で `$book->genres` にアクセスしています。もし`BookController@index`で `Book::latest()->paginate(10)` のようにデータを取得していた場合、書籍の数だけジャンルを取得するクエリが追加で発行され、パフォーマンスが著しく悪化します（これがN+1問題です）。
+> 
+> `Book::with('genres')->latest()->paginate(10)` のように **Eager Loading (事前読み込み)** を行うことで、書籍を取得するクエリと、それら全ての書籍に関連するジャンルを取得するクエリの、合計2つのクエリで済むようになります。データを表示する際には、そのデータがどのように取得されているかを常に意識することが、パフォーマンスの良いアプリケーションを作る上で非常に重要です。
+
+### 書籍詳細 (`books.show`)
+
+書籍の詳細情報に加え、レビューの一覧と投稿フォームを表示します。
+
+**`resources/views/books/show.blade.php`**
+```blade
+<x-app-layout>
+    {{-- ... 書籍詳細情報 ... --}}
+
+    {{-- レビュー投稿フォーム --}}
+    @auth
+    <div class="mt-8">
+        <h2 class="text-xl font-bold">レビューを投稿する</h2>
+        <form action="{{ route('reviews.store', $book) }}" method="POST">
+            @csrf
+            {{-- ... フォーム項目 (rating, comment) ... --}}
+            <button type="submit">投稿</button>
+        </form>
+    </div>
+    @endauth
+
+    {{-- レビュー一覧 --}}
+    <div class="mt-8">
+        <h2 class="text-xl font-bold">レビュー一覧</h2>
+        @forelse ($book->reviews as $review)
+            <div class="border-t py-4">
+                <p><strong>{{ $review->user->name }}</strong> (評価: {{ $review->rating }})</p>
+                <p>{{ $review->comment }}</p>
+                @can('delete', $review)
+                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm(\'本当に削除しますか？\');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit">削除</button>
+                    </form>
+                @endcan
+            </div>
+        @empty
+            <p>まだレビューはありません。</p>
+        @endforelse
+    </div>
+</x-app-layout>
+```
+
+> **コード解説:**
+> - `@forelse ... @empty ... @endforelse`: `@foreach` と似ていますが、コレクションが空の場合に `@empty` の部分が表示される便利なディレクティブです。
+> - `@can('delete', $review)`: Chapter 5で実装した`ReviewPolicy`を呼び出しています。認可されたユーザー（この場合はレビューの投稿者本人）にのみ、削除ボタンが表示されます。
+
+## 7-3. 書籍登録・編集フォームの作成
+
+登録と編集のフォームは非常によく似ているため、共通の部分を部分テンプレートとして切り出します。
+
+### フォーム部分テンプレート (`_form.blade.php`)
+
+**`resources/views/books/_form.blade.php`**
+```blade
+@csrf
+<div class="mb-4">
+    <label for="title">タイトル</label>
+    <input type="text" name="title" id="title" value="{{ old('title', $book->title ?? '') }}">
+</div>
+{{-- ... author, isbnなどの他のフォーム項目 ... --}}
+<div class="mb-4">
+    <label>ジャンル</label>
+    @foreach ($genres as $genre)
+        <input type="checkbox" name="genres[]" value="{{ $genre->id }}" 
+            @if(in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
+        {{ $genre->name }}
+    @endforeach
+</div>
+```
+
+> **コード解説:**
+> - `old('title', $book->title ?? '')`: `old()`ヘルパーは、バリデーションエラーでリダイレクトされた際に、直前の入力値を復元します。第二引数はデフォルト値で、編集画面の場合は既存の書籍データ (`$book->title`) が表示されます。`?? ''` は、`$book`が存在しない（つまり新規登録画面の）場合にエラーになるのを防ぐためのNull合体演算子です。
+> - `@if(in_array(...)) checked @endif`: チェックボックスのチェック状態を復元・表示するためのロジックです。少し複雑ですが、`old('genres')`（バリデーション失敗時の入力値）または `$book->genres->pluck('id')->toArray()`（編集画面の既存データ）の中に現在のジャンルIDが含まれていれば`checked`属性を付与します。
+
+### 登録・編集ページの作成
+
+作成した部分テンプレートを`@include`で読み込みます。
+
+**`resources/views/books/create.blade.php`**
+```blade
+<x-app-layout>
+    {{-- ... header ... --}}
+    <form action="{{ route('books.store') }}" method="POST">
+        @include('books._form')
+        <button type="submit">登録</button>
+    </form>
+</x-app-layout>
+```
+
+**`resources/views/books/edit.blade.php`**
+```blade
+<x-app-layout>
+    {{-- ... header ... --}}
+    <form action="{{ route('books.update', $book) }}" method="POST">
+        @method('PUT')
+        @include('books._form')
+        <button type="submit">更新</button>
+    </form>
+</x-app-layout>
+```
+
+> **思考プロセス (DRY原則):**
+> 登録と編集のフォームはほぼ同じコードの繰り返しになります。このような場合、共通部分を`@include`で読み込める部分テンプレートに切り出すのが定石です。これにより、**DRY (Don't Repeat Yourself)** の原則を守り、修正が必要になった場合も1箇所の変更で済むため、保守性が大幅に向上します。
 
 ---
 
-これで、特定の権限を持つユーザーのみが操作できる、安全な管理機能が実装できました。次のChapterでは、検索機能を実装します。
+これで、ユーザーがブラウザを通して書籍やレビューを操作するための基本的な画面が整いました。次のChapterでは、ユーザーエンゲージメントを高める「お気に入り」と「いいね」機能を実装します。'''

@@ -1,200 +1,228 @@
-# Chapter 3: 書籍のCRUD機能
+'''# Chapter 3: Eloquentモデルとリレーションシップ
 
-このChapterでは、アプリケーションの中核機能である書籍のCRUD（作成、読み取り、更新、削除）を実装します。
+このChapterでは、前のChapterで作成したデータベーステーブルを操作するためのEloquent（エロクエント）モデルを作成し、モデル間の関連性（リレーションシップ）を定義します。
 
-## 3-1. ControllerとRequestの作成
+## 3-1. Eloquent ORMとは？
 
-まず、書籍情報の操作を担うControllerと、入力値のバリデーションを行うRequestクラスを作成します。
+> **思考プロセス:**
+> なぜモデルが必要なのでしょうか？ データベースを操作するには、通常「SQL」という言語を使います。例えば、`SELECT * FROM books WHERE id = 1` のようなコードです。しかし、アプリケーションの機能が複雑になるにつれて、書くべきSQLも長大で複雑になり、管理が大変になります。
+> 
+> ここで登場するのが**ORM (Object-Relational Mapping)** です。ORMは、データベースのテーブルと、PHPの「オブジェクト（クラスのインスタンス）」を対応付け（マッピング）してくれる技術です。Laravelに搭載されているORMが**Eloquent**です。
+> 
+> Eloquentを使うと、以下のようなメリットがあります。
+> 
+> - **直感的な操作**: `Book::find(1)` のように、まるでPHPのオブジェクトを操作するかのように直感的にデータベースを扱えます。SQLを直接書く必要はほとんどありません。
+> - **安全性の向上**: Eloquentは、SQLインジェクションなどの一般的な脆弱性からアプリケーションを保護する仕組みを内蔵しています。
+> - **コードの可読性・保守性の向上**: `->where(...)`, `->orderBy(...)` のようにメソッドチェーンでクエリを組み立てられるため、何をしているかが分かりやすく、後からの修正も容易です。
+> - **リレーションシップ**: `book->user->name` のように、テーブル間の関連をオブジェクトのプロパティのように簡単にたどることができます。これがEloquentの最も強力な機能の一つです。
 
-### Step 1: BookControllerの作成
+## 3-2. モデルの作成
 
-`--resource` オプションを付けて、CRUDの基本的なメソッドが用意されたControllerを作成します。
+Artisanコマンドを使って、`Book`, `Genre`, `Review`の3つのモデルを生成します。
 
 ```bash
-sail artisan make:controller BookController --resource
+sail artisan make:model Book
+sail artisan make:model Genre
+sail artisan make:model Review
 ```
 
-### Step 2: Form Requestの作成
+これにより、`app/Models`ディレクトリに3つのファイルが生成されます。
 
-書籍の登録・更新時のバリデーションルールを定義するためのRequestクラスを作成します。
+## 3-3. マスアサインメントの設定
 
-```bash
-sail artisan make:request StoreBookRequest
-sail artisan make:request UpdateBookRequest
-```
+モデルを編集して、`$fillable`プロパティを設定します。これは、`Book::create($request->all())` のように、リクエストのデータを一括でモデルに流し込んで登録・更新（マスアサインメント）する際に、どのカラムの変更を許可するかを指定する、セキュリティのための重要な設定です。
 
-**思考プロセス:**
-バリデーションロジックをController内に書くこともできますが、Requestクラスに分離することで、Controllerは本来の責務（HTTPリクエストの処理）に集中でき、コードの見通しが良くなります。特に、バリデーションルールが複雑になるほど、この分離のメリットは大きくなります。
+> **思考プロセス:**
+> なぜ`$fillable`が必要なのでしょうか？ もしこの設定がないと、悪意のあるユーザーがHTTPリクエストに `is_admin=1` のような、本来変更されるべきでないデータを紛れ込ませて送信してきた場合、意図せず管理者権限を付与してしまう、といった脆弱性が生まれる可能性があります。`$fillable`は、開発者が意図したカラムだけが一括操作の対象となることを保証する「ホワイトリスト」の役割を果たします。
 
-## 3-2. バリデーションルールの定義
-
-作成したRequestクラスに、要件に基づいたバリデーションルールを記述します。
-
-### Step 1: `StoreBookRequest` の編集
-
-**`app/Http/Requests/StoreBookRequest.php`**
+**`app/Models/Book.php`**
 ```php
 <?php
 
-namespace App\Http\Requests;
+namespace App\Models;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
-class StoreBookRequest extends FormRequest
+class Book extends Model
 {
-    public function authorize(): bool
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'title',
+        'author',
+        'isbn',
+        'published_date',
+        'description',
+        'image_url',
+    ];
+}
+```
+
+**`app/Models/Genre.php`**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Genre extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name'];
+}
+```
+
+**`app/Models/Review.php`**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Review extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'book_id',
+        'rating',
+        'comment',
+    ];
+}
+```
+
+## 3-4. リレーションシップの定義
+
+モデル間にER図で設計した通りのリレーションシップを定義します。これにより、`$book->reviews` のように関連するモデルのデータを簡単に取得できるようになります。
+
+### Userモデルのリレーション
+
+`User`モデルはデフォルトで存在するので、ファイルを開いて追記します。
+
+**`app/Models/User.php`**
+```php
+// ... (use文など)
+
+class User extends Authenticatable
+{
+    // ... (既存のコード)
+
+    /**
+     * このユーザーが登録した書籍を取得
+     */
+    public function books()
     {
-        return true; // 誰でも書籍登録をリクエストできるようにtrue
+        return $this->hasMany(Book::class);
     }
 
-    public function rules(): array
+    /**
+     * このユーザーが投稿したレビューを取得
+     */
+    public function reviews()
     {
-        return [
-            'title' => 'required|string|max:255',
-            'author' => 'required|string|max:255',
-            'isbn' => 'required|string|size:13|unique:books,isbn',
-            'description' => 'nullable|string',
-            'genres' => 'required|array',
-            'genres.*' => 'exists:genres,id',
-        ];
+        return $this->hasMany(Review::class);
+    }
+}
+```
+> **リレーション解説:**
+> - `hasMany` (1対多): 1人のユーザーが**多数の**書籍を登録し、**多数の**レビューを投稿できます。`$user->books`のようにアクセスすると、そのユーザーに紐付く`Book`モデルのコレクション（配列のようなもの）が返されます。
+
+### Bookモデルのリレーション
+
+**`app/Models/Book.php`**
+```php
+// ... (use文など)
+
+class Book extends Model
+{
+    // ... ($fillableなど)
+
+    /**
+     * この書籍を登録したユーザーを取得
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * この書籍に紐付くレビューを取得
+     */
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    /**
+     * この書籍が属するジャンルを取得
+     */
+    public function genres()
+    {
+        return $this->belongsToMany(Genre::class);
+    }
+}
+```
+> **リレーション解説:**
+> - `belongsTo` (多対1): 多数の書籍は、それぞれ**1人の**ユーザーに所属します。`$book->user`のようにアクセスすると、その書籍に紐付く`User`モデルが1つ返されます。`hasMany`とは逆の関係です。
+> - `belongsToMany` (多対多): 1冊の書籍は**多数の**ジャンルに属することができ、1つのジャンルも**多数の**書籍を持つことができます。Eloquentは、モデル名（`book`と`genre`）から中間テーブル名（`book_genre`）を自動で推測し、そこを経由して関連データを取得します。`$book->genres`で、その書籍に紐付く`Genre`モデルのコレクションが返されます。
+
+### Reviewモデルのリレーション
+
+**`app/Models/Review.php`**
+```php
+// ... (use文など)
+
+class Review extends Model
+{
+    // ... ($fillableなど)
+
+    /**
+     * このレビューを投稿したユーザーを取得
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * このレビューが紐付く書籍を取得
+     */
+    public function book()
+    {
+        return $this->belongsTo(Book::class);
     }
 }
 ```
 
-**コードリーディング:**
-- `authorize()`: このリクエストが許可される条件を定義します。今回は認証済みのユーザーなら誰でもOKなので `true` を返します。
-- `rules()`: バリデーションルールを配列で定義します。
-- `'isbn' => 'required|string|size:13|unique:books,isbn'`: ISBNは必須、文字列、13文字固定、そして`books`テーブル内でユニークである必要があります。
-- `'genres' => 'required|array'`: ジャンルは必須で、配列である必要があります。
-- `'genres.*' => 'exists:genres,id'`: `genres`配列の各値が、`genres`テーブルの`id`カラムに存在するかをチェックします。
+### Genreモデルのリレーション
 
-### Step 2: `UpdateBookRequest` の編集
-
-**`app/Http/Requests/UpdateBookRequest.php`**
+**`app/Models/Genre.php`**
 ```php
-<?php
+// ... (use文など)
 
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-
-class UpdateBookRequest extends FormRequest
+class Genre extends Model
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    // ... ($fillableなど)
 
-    public function rules(): array
+    /**
+     * このジャンルに属する書籍を取得
+     */
+    public function books()
     {
-        return [
-            'title' => 'required|string|max:255',
-            'author' => 'required|string|max:255',
-            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book->id)],
-            'description' => 'nullable|string',
-            'genres' => 'required|array',
-            'genres.*' => 'exists:genres,id',
-        ];
+        return $this->belongsToMany(Book::class);
     }
 }
 ```
-
-**コードリーディング:**
-- `Rule::unique('books')->ignore($this->book->id)`: ISBNのユニークチェックですが、更新対象の書籍自身のISBNはチェックから除外します。これがないと、「そのISBNは既に使用されています」というエラーが出てしまい、ISBNを変更しない限り更新できなくなってしまいます。
-
-## 3-3. ルーティングの設定
-
-`routes/web.php` に、`BookController` のCRUDアクションに対応するルートを追加します。
-
-**`routes/web.php`**
-```php
-use App\Http\Controllers\BookController;
-
-// ... 他のルート
-
-Route::resource('books', BookController::class);
-```
-
-**思考プロセス:**
-`Route::resource('books', BookController::class)` の一行で、以下の7つのルートが自動的に登録されます。これにより、`index`, `create`, `store`, `show`, `edit`, `update`, `destroy` の各アクションに対応するURLとルート名が規約通りに設定され、記述量を大幅に削減できます。
-
-## 3-4. Controllerの実装
-
-`BookController` の各メソッドに、具体的な処理を実装していきます。
-
-**`app/Http/Controllers/BookController.php`**
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\Book;
-use App\Models\Genre;
-use App\Http\Requests\StoreBookRequest;
-use App\Http\Requests\UpdateBookRequest;
-use Illuminate\Support\Facades\Auth;
-
-class BookController extends Controller
-{
-    public function index()
-    {
-        $books = Book::with('genres')->latest()->paginate(10);
-        return view('books.index', compact('books'));
-    }
-
-    public function create()
-    {
-        $genres = Genre::all();
-        return view('books.create', compact('genres'));
-    }
-
-    public function store(StoreBookRequest $request)
-    {
-        $book = Auth::user()->books()->create($request->only(['title', 'author', 'isbn', 'description']));
-        $book->genres()->sync($request->genres);
-
-        return redirect()->route('books.index')->with('success', '書籍を登録しました。');
-    }
-
-    public function show(Book $book)
-    {
-        return view('books.show', compact('book'));
-    }
-
-    public function edit(Book $book)
-    {
-        $this->authorize('update', $book);
-        $genres = Genre::all();
-        return view('books.edit', compact('book', 'genres'));
-    }
-
-    public function update(UpdateBookRequest $request, Book $book)
-    {
-        $this->authorize('update', $book);
-        $book->update($request->only(['title', 'author', 'isbn', 'description']));
-        $book->genres()->sync($request->genres);
-
-        return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
-    }
-
-    public function destroy(Book $book)
-    {
-        $this->authorize('delete', $book);
-        $book->delete();
-
-        return redirect()->route('books.index')->with('success', '書籍を削除しました。');
-    }
-}
-```
-
-**コードリーディング:**
-- `Book::with('genres')`: N+1問題を回避するためのEager Loading（事前読み込み）です。書籍一覧を表示する際に、各書籍のジャンル情報も一度のクエリでまとめて取得します。
-- `Auth::user()->books()->create(...)`: 認証済みユーザーに紐付いた書籍としてレコードを作成します。`user_id`が自動的に設定されます。
-- `$book->genres()->sync($request->genres)`: 中間テーブルのデータを更新します。引数で渡された配列のIDだけが中間テーブルに残ります。登録・更新処理をシンプルに記述できます。
-- `show(Book $book)`: ルートモデルバインディング。URLのIDに対応する`Book`モデルのインスタンスが自動的にDI（依存性注入）されます。
-- `$this->authorize('update', $book)`: ポリシーによる認可。`BookPolicy`（後ほど作成）の`update`メソッドを呼び出し、このユーザーがこの書籍を更新する権限があるかチェックします。
 
 ---
 
-これで書籍のCRUD機能のバックエンド処理が完成しました。次のChapterでは、これらの機能に対応するビュー（Bladeテンプレート）を作成し、フロントエンドを完成させます。
+これで、データベースのテーブルとアプリケーションのモデルが完全に関連付けられました。SQLを意識することなく、オブジェクト指向の考え方でデータを自在に扱える準備が整いました。次のChapterでは、これらのモデルを使って、最初の機能である書籍の一覧表示を実装します。
+'''

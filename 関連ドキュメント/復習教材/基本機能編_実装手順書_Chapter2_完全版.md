@@ -1,151 +1,251 @@
-# Chapter 2: 認証機能 (Laravel Fortify)
+'''# Chapter 2: データベース設計とマイグレーション
 
-このChapterでは、Laravel Fortifyを導入して、アプリケーションに必須の認証機能（ユーザー登録、ログイン、ログアウト）を実装します。
+このChapterでは、アプリケーションの根幹となるデータベースの設計を行い、Laravelのマイグレーション機能を使ってテーブルを実際に作成します。
 
-## 2-1. Laravel Fortifyのインストール
+## 2-1. データベース設計の考え方
 
-Fortifyは、Laravel公式の認証バックエンド実装です。UIは提供せず、認証ロジックのみを提供するため、フロントエンドを自由に構築したい場合に適しています。
+> **思考プロセス:**
+> 優れたアプリケーションを開発するためには、まず堅牢なデータ構造を設計することが不可欠です。設計を始めるにあたり、まず要件定義書からアプリケーションに必要な「モノ」と「コト」を洗い出します。
+> 
+> - **モノ（エンティティ）**: アプリケーションが管理する主要なデータ。今回は「ユーザー」「書籍」「ジャンル」が該当します。
+> - **コト（イベント、関連）**: 「モノ」と「モノ」の間で発生する出来事や関係性。「ユーザーがレビューを投稿する」「ユーザーが書籍をお気に入りに登録する」「書籍が特定のジャンルに属する」などが該当します。
+> 
+> これらをテーブルとリレーションシップに落とし込んでいきます。
+> 
+> 1.  **Usersテーブル**: ユーザー情報を格納します。Laravelのデフォルトで用意されています。
+> 2.  **Booksテーブル**: 書籍情報を格納します。誰が登録した書籍かを記録するため、`user_id`カラムを持たせ、`users`テーブルと**1対多**の関係を結びます。
+> 3.  **Genresテーブル**: ジャンル名（文学、ビジネスなど）を格納します。
+> 4.  **Reviewsテーブル**: レビュー情報を格納します。誰が(`user_id`)、どの書籍に(`book_id`)投稿したレビューなのかを記録するため、`users`テーブルと`books`テーブルの両方と**1対多**の関係を結びます。
+> 5.  **中間テーブル**: 「書籍」と「ジャンル」の関係は、1冊の書籍が複数のジャンル（例: 「SF」かつ「アドベンチャー」）に属せるため、**多対多**の関係になります。このような関係は、`book_genre`という中間テーブル（ピボットテーブル）を作成して表現します。このテーブルは`book_id`と`genre_id`のペアを保持します。
 
-### Step 1: ComposerでFortifyをインストール
+### ER図
 
-```bash
-sail composer require laravel/fortify
+上記の考え方を元に作成したER図（エンティティ関連図）がこちらです。テーブル間の関係性が一目でわかります。
+
+```mermaid
+erDiagram
+    USERS {
+        bigint id PK
+        string name
+        string email
+        timestamp email_verified_at
+        string password
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    BOOKS {
+        bigint id PK
+        bigint user_id FK
+        string title
+        string author
+        string isbn
+        date published_date
+        text description
+        string image_url
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    REVIEWS {
+        bigint id PK
+        bigint user_id FK
+        bigint book_id FK
+        tinyint rating
+        text comment
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    GENRES {
+        bigint id PK
+        string name
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    BOOK_GENRE {
+        bigint book_id PK, FK
+        bigint genre_id PK, FK
+    }
+
+    USERS ||--o{ BOOKS : "registers"
+    USERS ||--o{ REVIEWS : "writes"
+    BOOKS ||--o{ REVIEWS : "has"
+    BOOKS }|--|{ BOOK_GENRE : "has"
+    GENRES }|--|{ BOOK_GENRE : "belongs to"
 ```
 
-### Step 2: Fortifyのリソースを公開
+## 2-2. マイグレーションファイルの作成
 
-以下のコマンドで、Fortifyの設定ファイル、マイグレーション、ビューなどをプロジェクトにコピーします。
+設計が固まったら、Artisanコマンドでマイグレーションファイルを生成します。マイグレーションは「データベースのバージョン管理システム」のようなもので、テーブルの作成や変更の履歴をコードで管理できます。
 
 ```bash
-sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
+# genresテーブル用
+sail artisan make:migration create_genres_table
+
+# booksテーブル用
+sail artisan make:migration create_books_table
+
+# reviewsテーブル用
+sail artisan make:migration create_reviews_table
+
+# book_genre中間テーブル用
+sail artisan make:migration create_book_genre_table
 ```
 
-### Step 3: データベースマイグレーション
+これにより、`database/migrations`ディレクトリに4つのファイルが生成されます。
 
-Fortifyをインストールすると、`password_resets`テーブルなど、認証に必要な新しいマイグレーションファイルが追加されます。再度マイグレーションを実行して、これらのテーブルをデータベースに作成します。
+## 2-3. マイグレーションファイルの実装
+
+生成された各マイグレーションファイルの`up`メソッドに、テーブルの構造を定義していきます。
+
+### `create_genres_table`
+
+**`database/migrations/xxxx_xx_xx_xxxxxx_create_genres_table.php`**
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('genres', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique(); // ジャンル名は重複しない
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('genres');
+    }
+};
+```
+
+### `create_books_table`
+
+**`database/migrations/xxxx_xx_xx_xxxxxx_create_books_table.php`**
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('books', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 外部キー
+            $table->string('title');
+            $table->string('author');
+            $table->string('isbn', 13)->unique();
+            $table->date('published_date');
+            $table->text('description')->nullable();
+            $table->string('image_url')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('books');
+    }
+};
+```
+> **コード解説:**
+> - `$table->foreignId('user_id')->constrained()->onDelete('cascade');` は非常に重要です。
+>   - `foreignId('user_id')`: `users`テーブルの`id`を参照する`user_id`というカラムを作成します。
+>   - `constrained()`: 外部キー制約を自動的に設定します。
+>   - `onDelete('cascade')`: 参照先の`users`テーブルのレコードが削除された場合、この`books`テーブルの関連レコードも一緒に削除（連鎖削除）されるように設定します。これにより、存在しないユーザーが登録した書籍、という不正なデータが残るのを防ぎます。
+
+### `create_reviews_table`
+
+**`database/migrations/xxxx_xx_xx_xxxxxx_create_reviews_table.php`**
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('reviews', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->unsignedTinyInteger('rating'); // 1-5の評価なので符号なしTINYINT
+            $table->text('comment')->nullable();
+            $table->timestamps();
+
+            $table->unique(['user_id', 'book_id']); // 1ユーザーは1書籍に1レビューまで
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('reviews');
+    }
+};
+```
+> **コード解説:**
+> - `$table->unique(['user_id', 'book_id']);`: 複合ユニークキー制約です。これにより、同一ユーザーが同一書籍に対して複数のレビューを投稿することをデータベースレベルで禁止できます。
+
+### `create_book_genre_table`
+
+**`database/migrations/xxxx_xx_xx_xxxxxx_create_book_genre_table.php`**
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('book_genre', function (Blueprint $table) {
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
+
+            // 主キーをbook_idとgenre_idの複合キーに設定
+            $table->primary(['book_id', 'genre_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('book_genre');
+    }
+};
+```
+> **コード解説:**
+> - 中間テーブルには通常`id`カラムや`timestamps`は不要です。
+> - `$table->primary(['book_id', 'genre_id']);`: 複合主キーを設定することで、`(book_id: 1, genre_id: 1)` という組み合わせの重複を防ぎます。
+
+## 2-4. マイグレーションの実行
+
+すべてのマイグレーションファイルの準備が整ったので、コマンドを実行してデータベースにテーブルを作成します。
 
 ```bash
 sail artisan migrate
 ```
 
-## 2-2. Fortifyのサービスプロバイダ登録
-
-Fortifyをアプリケーションに認識させるために、サービスプロバイダを登録します。
-
-### Step 1: `config/app.php` の編集
-
-`config/app.php` ファイルを開き、`providers` 配列に `App\Providers\FortifyServiceProvider::class` を追加します。
-
-**`config/app.php`**
-```php
-'providers' => [
-    // ... 他のプロバイダ
-
-    /*
-     * Application Service Providers...
-     */
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AuthServiceProvider::class,
-    // App\Providers\BroadcastServiceProvider::class,
-    App\Providers\EventServiceProvider::class,
-    App\Providers\RouteServiceProvider::class,
-    App\Providers\FortifyServiceProvider::class, // この行を追加
-],
-```
-
-## 2-3. 認証ビューのセットアップ
-
-Fortifyはバックエンドのみを提供するため、ログイン画面や登録画面などのUI（ビュー）は自分たちで用意する必要があります。
-
-### Step 1: Tailwind CSSのインストール
-
-認証画面のスタイリングのために、Tailwind CSSをセットアップします。
-
-```bash
-sail npm install -D tailwindcss postcss autoprefixer @tailwindcss/forms
-sail npx tailwindcss init -p
-```
-
-### Step 2: `tailwind.config.js` の編集
-
-TailwindがBladeファイル内のクラスを認識できるように、設定ファイルを編集します。
-
-**`tailwind.config.js`**
-```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php",
-    "./storage/framework/views/*.php",
-    "./resources/views/**/*.blade.php",
-  ],
-
-  theme: {
-    extend: {},
-  },
-
-  plugins: [require('@tailwindcss/forms')],
-};
-```
-
-**思考プロセス:**
-`@tailwindcss/forms` プラグインを追加することで、基本的なフォーム要素にきれいなスタイルが適用されます。認証フォームを素早く整えるのに役立ちます。
-
-### Step 3: `resources/css/app.css` の編集
-
-TailwindのディレクティブをCSSファイルに追加します。
-
-**`resources/css/app.css`**
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
-
-### Step 4: Viteの開発サーバーを起動
-
-CSSの変更をリアルタイムで反映させるため、Viteを起動しておきます。
-
-```bash
-sail npm run dev
-```
-
-### Step 5: 認証関連のビューを作成
-
-Fortifyは、`config/fortify.php` の `views` 設定で指定されたビューを返します。今回は、これらのビューを手動で作成します。
-
-- `resources/views/auth/login.blade.php` (ログイン画面)
-- `resources/views/auth/register.blade.php` (ユーザー登録画面)
-
-(※詳細なBladeコードは、提供された教材ファイルを参照してください)
-
-### Step 6: ルート定義 (`routes/web.php`)
-
-Fortifyが提供する認証ルートをインクルードします。
-
-**`routes/web.php`**
-```php
-<?php
-
-use Illuminate\Support\Facades\Route;
-
-Route::get('/', function () {
-    return view('welcome');
-});
-
-// 認証関連のルート
-require __DIR__.'/auth.php';
-```
-
-**思考プロセス:**
-`routes/web.php`に`require __DIR__.'/auth.php';`を記述することで、Laravel Fortifyが提供する認証関連のルート（ログイン、ログアウト、ユーザー登録、パスワードリセットなど）がアプリケーションに組み込まれます。これにより、自前でこれらのルートを一つ一つ定義する手間が省けます。
-
-## 2-4. 動作確認
-
-1.  ブラウザで `http://localhost/register` にアクセスし、ユーザー登録画面が表示されることを確認します。
-2.  フォームに情報を入力してユーザー登録を行い、ログイン後の画面（通常は `/` にリダイレクトされる）が表示されることを確認します。
-3.  一度ログアウトし、`http://localhost/login` から再度ログインできることを確認します。
+このコマンドを実行すると、まだ実行されていない`up`メソッドが実行され、定義した通りのテーブルがMySQLデータベース内に作成されます。
 
 ---
 
-これで認証機能の基本的なセットアップが完了しました。次のChapterでは、アプリケーションの核となるDB設計とモデル作成に進みます。
+これでアプリケーションの骨格となるデータベース構造が完成しました。次のChapterでは、これらのテーブルを操作するためのEloquentモデルと、モデル間のリレーションシップを定義していきます。
+'''

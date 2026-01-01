@@ -1,179 +1,147 @@
-# Chapter 9: 非同期処理 (Queue)
+'''# Chapter 9: 検索機能
 
-このChapterでは、LaravelのQueue（キュー）を使って、時間のかかる処理をバックグラウンドで非同期に実行する方法を学びます。これにより、ユーザーの待ち時間を短縮し、アプリケーションの応答性を向上させることができます。
+このChapterでは、書籍のタイトルや著者名で検索できる機能を実装します。GETリクエストでクエリパラメータを受け取り、それに基づいてデータベースを検索する、Webアプリケーションの基本的な機能です。
 
-## 9-1. なぜ非同期処理が必要か？
+## 9-1. 検索フォームの作成
 
-例えば、ユーザー登録時に確認メールを送る、動画をアップロードしてエンコードする、大量のデータを処理してレポートを生成する、といった処理は完了までに数秒から数分かかることがあります。これらの処理を通常のWebリクエスト（同期処理）内で行うと、ユーザーはその間ずっと待たされ、UX（ユーザー体験）を著しく損ないます。
+まずは、ユーザーが検索キーワードを入力するためのフォームを、書籍一覧ページに設置します。
 
-**思考プロセス:**
-時間のかかる処理を「ジョブ」としてキューに投入し、Webサーバーとは別の「キューワーカー」というプロセスにバックグラウンドで実行させることで、ユーザーはすぐに次の操作に進むことができます。これが非同期処理の基本的な考え方です。
+**`resources/views/books/index.blade.php`**
+```blade
+<x-app-layout>
+    {{-- ... header ... --}}
 
-## 9-2. キューの設定
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            {{-- 検索フォームを追加 --}}
+            <div class="mb-4">
+                <form action="{{ route('books.index') }}" method="GET">
+                    <input type="text" name="keyword" value="{{ request('keyword') }}" placeholder="書籍名や著者名で検索">
+                    <button type="submit">検索</button>
+                </form>
+            </div>
 
-Laravelでは様々なキューのドライバ（Redis, Amazon SQS, データベースなど）が利用できますが、今回は最も手軽に試せる`database`ドライバを使用します。
-
-### Step 1: キュードライバの変更
-
-`.env`ファイルで、キュードライバを`database`に設定します。
-
-**`.env`**
-```
-QUEUE_CONNECTION=database
-```
-
-### Step 2: キュー用のテーブル作成
-
-キューに投入されたジョブを保存するためのテーブルを作成します。
-
-```bash
-sail artisan queue:table
-sail artisan migrate
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                {{-- ... 書籍一覧 ... --}}
+            </div>
+        </div>
+    </div>
+</x-app-layout>
 ```
 
-これにより、`jobs`テーブルと`failed_jobs`テーブルが作成されます。
+> **思考プロセス:**
+> - **なぜGETメソッドなのか？**: 検索はサーバー上のリソースを「取得」する操作であり、データを変更するものではありません。このような冪等（べきとう）な操作にはGETメソッドを使用するのがHTTPのセマンティクスとして適切です。GETリクエストでは、パラメータはURLの一部（クエリ文字列 `?keyword=...`）として送信されるため、ユーザーは検索結果のURLをブックマークしたり、他人に共有したりできます。
+> - **`request('keyword')`**: 検索を実行した後も、ユーザーが入力したキーワードを検索ボックスに表示し続けるのは、UX（ユーザー体験）を向上させるための重要な配慮です。`request()` ヘルパーは、現在のリクエストから指定されたキーの値を取得する便利な関数です。
 
-## 9-3. Jobの作成
+## 9-2. Controllerでの検索ロジックの実装
 
-非同期で実行したい処理の単位を「Job（ジョブ）」として作成します。ここでは例として、書籍のインポート処理を行うJobを作成します。
+`BookController`の`index`メソッドを修正し、検索キーワードが渡された場合に結果を絞り込むロジックを追加します。
 
-### Step 1: Jobの生成
-
-```bash
-sail artisan make:job ImportBookJob
-```
-
-これにより、`app/Jobs/ImportBookJob.php`が生成されます。
-
-### Step 2: Jobの実装
-
-Jobクラスの`handle`メソッドに、非同期で実行したい処理を記述します。
-
-**`app/Jobs/ImportBookJob.php`**
-```php
-<?php
-
-namespace App\Jobs;
-
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log; // Logファサードをインポート
-
-class ImportBookJob implements ShouldQueue
-{
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected $bookData;
-
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(array $bookData)
-    {
-        $this->bookData = $bookData;
-    }
-
-    /**
-     * Execute the job.
-     */
-    public function handle(): void
-    {
-        // ここに時間のかかる重い処理を記述する
-        // 例: 外部APIから書籍情報を取得、DBに保存するなど
-
-        Log::info("書籍インポート処理を開始します: " . $this->bookData["title"]);
-
-        // 5秒待機して重い処理をシミュレート
-        sleep(5);
-
-        // 本来はここでDBに保存する
-        // Book::create($this->bookData);
-
-        Log::info("書籍インポート処理が完了しました: " . $this->bookData["title"]);
-    }
-}
-```
-
-**コードリーディング:**
-- `implements ShouldQueue`: このインターフェースを実装することで、LaravelはこのJobがキューで非同期に実行されるべきだと認識します。
-- `__construct(array $bookData)`: Jobのインスタンスを作成する際に、処理に必要なデータ（ここでは書籍データ）を受け取ります。
-- `handle()`: このメソッドがキューワーカーによって呼び出され、実際の処理が実行されます。今回は`sleep(5)`で重い処理を擬似的に再現し、ログにメッセージを出力しています。
-
-## 9-4. Jobのディスパッチ（投入）
-
-作成したJobをキューに投入（ディスパッチ）します。これは通常、Controllerなどから行います。
-
-### Step 1: テスト用のControllerとルートを追加
-
-```bash
-sail artisan make:controller TestQueueController
-```
-
-**`routes/web.php`**
-```php
-use App\Http\Controllers\TestQueueController;
-
-Route::get("/test-queue", [TestQueueController::class, "dispatchJob"]);
-```
-
-**`app/Http/Controllers/TestQueueController.php`**
+**`app/Http/Controllers/BookController.php`**
 ```php
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ImportBookJob;
-use Illuminate\Http\Request;
+use App\Models\Book;
+use Illuminate\Http\Request; // Requestをインポート
 
-class TestQueueController extends Controller
+class BookController extends Controller
 {
-    public function dispatchJob()
+    public function index(Request $request) // Requestを受け取る
     {
-        $bookData = [
-            "title" => "非同期で追加された本",
-            "author" => "キュー・ワーカー",
-            // ... 他のデータ
-        ];
+        $keyword = $request->input('keyword');
 
-        ImportBookJob::dispatch($bookData);
+        $query = Book::query();
 
-        return "ジョブをキューに追加しました。";
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
+
+        $books = $query->with('genres')->latest()->paginate(10);
+
+        return view('books.index', compact('books'));
+    }
+
+    // ... 他のメソッド
+}
+```
+
+> **思考プロセス (クエリビルディング):**
+> - **`Book::query()` から始める**: 最初から `Book::where(...)` と書くのではなく、まずクエリビルダのインスタンス `Book::query()` を生成し、変数 (`$query`) に格納します。そして、条件 (`if ($keyword)`) に応じてその変数に `where` 句を繋げていきます。このアプローチにより、条件分岐が複雑になっても、コードの構造をクリーンに保つことができます。
+> - **クロージャによる `where` のグループ化**: `where(function ($q) { ... })` を使うことで、`WHERE (title LIKE ? OR author LIKE ?)` というSQL文を生成できます。もしこれをグループ化しないと `WHERE title LIKE ? OR author LIKE ? AND ...` のようになり、意図しない検索結果になる可能性があります。複数の`OR`条件をまとめる際の定石です。
+> - **`%` (ワイルドカード)**: `"%{$keyword}%"` は、キーワードの前後に任意の文字列が存在することを許容する「部分一致」検索を意味します。
+
+## 9-3. ページネーションと検索キーワードの連携
+
+このままでは、検索結果の2ページ目に移動した際に検索キーワードが消えてしまい、全件表示の2ページ目に移動してしまいます。ページネーションリンクに検索キーワードを引き継がせる必要があります。
+
+### Step 1: `Book`モデルに`scope`を定義 (推奨)
+
+検索ロジックをControllerからモデルの`scope`に移動させることで、Controllerをよりクリーンに保ち、ロジックを再利用しやすくします。
+
+**`app/Models/Book.php`**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder; // Builderをインポート
+// ...
+
+class Book extends Model
+{
+    // ...
+
+    public function scopeSearch(Builder $query, ?string $keyword)
+    {
+        if ($keyword) {
+            return $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
+        return $query;
     }
 }
 ```
 
-**コードリーディング:**
-- `ImportBookJob::dispatch($bookData)`: `dispatch`ヘルパーメソッドを使ってJobをキューに投入します。引数に渡したデータは、Jobクラスのコンストラクタに渡されます。このメソッドは即座に処理を返し、実際の重い処理はバックグラウンドに任せられます。
+> **思考プロセス (ロジックの再利用性):**
+> 「キーワードで検索する」というロジックは、このアプリケーションの他の場所でも必要になるかもしれません。このロジックを`scopeSearch`としてモデルに定義しておくことで、`Book::search($keyword)->...` のように、どこからでも直感的かつ一貫した方法で呼び出すことができます。Controllerは「何をするか」を簡潔に記述し、「どのようにするか」という具体的な実装はモデルに委ねる、という責務の分離が実現できます。
 
-## 9-5. キューワーカーの実行
+### Step 2: Controllerとページネーションの修正
 
-キューに投入されたジョブを処理するために、キューワーカーを起動します。
+`paginate`メソッドの結果に`appends`メソッドをチェーンすることで、ページネーションのリンクに現在のクエリパラメータを自動的に付与できます。
 
-```bash
-sail artisan queue:work
+**`app/Http/Controllers/BookController.php`**
+```php
+public function index(Request $request)
+{
+    $keyword = $request->input('keyword');
+
+    $books = Book::with('genres')
+        ->search($keyword) // scopeを利用
+        ->latest()
+        ->paginate(10)
+        ->appends($request->all()); // この行を追加
+
+    return view('books.index', compact('books'));
+}
 ```
 
-このコマンドを実行すると、ワーカーは`jobs`テーブルを監視し、新しいジョブが投入されるとそれを取り出して`handle`メソッドを実行します。
+> **コード解説:**
+> - `appends($request->all())`: 現在のリクエストに含まれる全てのクエリパラメータ（この場合は `['keyword' => '...']`）を、生成されるページネーションのURL（例: `/books?page=2`）に追加します。これにより、`http://.../books?keyword=...&page=2` という、検索条件を維持した正しいURLが生成されます。
 
-## 9-6. 動作確認
+## 9-4. 動作確認
 
-1.  ターミナルで`sail artisan queue:work`を実行し、キューワーカーを起動したままにします。
-2.  ブラウザで`/test-queue`にアクセスします。すぐに「ジョブをキューに追加しました。」というメッセージが表示されることを確認します。
-3.  キューワーカーを実行しているターミナルを見ると、`ImportBookJob`が処理され、ログメッセージが出力されるのが確認できます。
-
-    ```
-    [...][INFO] Processing: App\Jobs\ImportBookJob
-    [...][INFO] 書籍インポート処理を開始します: 非同期で追加された本
-    (5秒後)
-    [...][INFO] 書籍インポート処理が完了しました: 非同期で追加された本
-    [...][INFO] Processed:  App\Jobs\ImportBookJob
-    ```
-
-4.  `storage/logs/laravel.log`ファイルにも、Jobから出力したログが記録されていることを確認します。
+1.  書籍一覧ページに検索フォームが表示されていることを確認します。
+2.  キーワードを入力して検索し、タイトルまたは著者にそのキーワードが含まれる書籍のみが表示されることを確認します。
+3.  検索結果が複数ページにわたる場合、2ページ目に移動しても検索結果が維持されていることを確認します。（URLに`keyword`と`page`の両方が含まれていることを確認）
+4.  キーワードを空にして検索すると、全件が表示されることを確認します。
 
 ---
 
-これで、時間のかかる処理を非同期化し、ユーザー体験を向上させる基本的な方法を習得しました。次のChapterでは、これまでの総まとめとして、いくつかの応用的なテクニックについて解説します。
+これで、実用的な検索機能が完成しました。次のChapterでは、レビューの平均評価に基づいたランキング機能を実装します。'''

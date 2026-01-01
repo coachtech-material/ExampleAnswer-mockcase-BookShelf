@@ -1,168 +1,196 @@
-# Chapter 4: 認可機能 (Policy)
+'''# Chapter 4: 書籍のCRUD機能 (ルーティング・コントローラ編)
 
-このChapterでは、LaravelのPolicy（ポリシー）を使って、特定のユーザーが特定のアクション（更新や削除など）を実行できるかを制御する「認可」機能を実装します。
+このChapterでは、アプリケーションの中核機能である書籍のCRUD（作成、読み取り、更新、削除）のバックエンド部分を実装します。具体的には、ルーティング、バリデーション、そしてコントローラのロジックを構築します。
 
-## 4-1. Policyとは？ なぜ必要か？
+## 4-1. ルーティングの設計 (Routing)
 
-認可は「誰が何をして良いか」を定義することです。例えば、「自分の投稿は編集・削除できるが、他人の投稿はできない」といったルールです。
+まず、書籍CRUD機能に関するURLと、それに対応する処理（コントローラのアクション）を紐付けます。
 
-**思考プロセス:**
-このロジックをControllerに直接書くこともできますが、アプリケーションが複雑になるにつれてControllerが肥大化し、可読性やメンテナンス性が低下します。Policyとして認可ロジックを分離することで、再利用性が高まり、コードがクリーンになります。
+**`routes/web.php`**
+```php
+<?php
 
-## 4-2. BookPolicyの作成と登録
+use App\Http\Controllers\BookController;
+use Illuminate\Support\Facades\Route;
 
-書籍（Book）に関する認可ロジックをまとめるための`BookPolicy`を作成します。
+// ... (他のルート)
 
-### Step 1: Policyの生成
+Route::resource('books', BookController::class)->middleware('auth');
+```
 
-`--model=Book` オプションを付けることで、`Book`モデルに対する基本的なメソッド（`viewAny`, `view`, `create`, `update`, `delete`, `restore`, `forceDelete`）の雛形が生成されます。
+> **思考プロセス:**
+> なぜ `Route::resource` を使うのでしょうか？ 書籍のCRUDには、一覧表示(GET /books)、登録画面(GET /books/create)、登録処理(POST /books)、詳細表示(GET /books/{book})、編集画面(GET /books/{book}/edit)、更新処理(PUT /books/{book})、削除処理(DELETE /books/{book}) の計7つのアクションが必要です。これらを `Route::get(...)`, `Route::post(...)` のように一つずつ定義するのは非常に冗長です。
+> 
+> `Route::resource('books', BookController::class)` は、この7つのルートを**規約（Convention）**に基づいて自動的に生成してくれる便利なメソッドです。これにより、コードの記述量を大幅に削減し、誰が見ても分かりやすい標準的なURL設計を実現できます。
+> 
+> また、`->middleware('auth')` をチェーンすることで、これら7つのルートすべてに認証ミドルウェアを適用し、「ログインしているユーザーのみがアクセスできる」という制限を簡単に設けることができます。
+
+## 4-2. バリデーションの設計 (Form Request)
+
+ユーザーからの入力値を検証（バリデーション）するロジックを、専用のForm Requestクラスに分離して実装します。
 
 ```bash
-sail artisan make:policy BookPolicy --model=Book
+# 登録用と更新用のForm Requestをそれぞれ作成
+sail artisan make:request StoreBookRequest
+sail artisan make:request UpdateBookRequest
 ```
 
-### Step 2: Policyの登録
+> **思考プロセス:**
+> なぜバリデーションロジックをコントローラから分離するのでしょうか？ コントローラの主な責務は、リクエストを受け取り、ビジネスロジック（モデル）を呼び出し、レスポンスを返すことです。ここにバリデーションのような定型的なロジックが混在すると、コントローラが肥大化し、可読性や保守性が低下します。
+> 
+> Form Requestクラスを作成することで、バリデーションルールと認可ロジック（後述）をカプセル化できます。これにより、コントローラは `StoreBookRequest $request` のようにタイプヒントするだけで、バリデーション済みで安全なデータを受け取れるようになり、本来の責務に集中できます。同じバリデーションルールを複数の箇所で再利用する際にも便利です。
 
-作成したPolicyをLaravelに認識させるため、`AuthServiceProvider`に登録します。
+### 登録処理のバリデーション (`StoreBookRequest`)
 
-**`app/Providers/AuthServiceProvider.php`**
+**`app/Http/Requests/StoreBookRequest.php`**
 ```php
 <?php
 
-namespace App\Providers;
+namespace App\Http\Requests;
 
-use App\Models\Book;
-use App\Policies\BookPolicy;
-use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Foundation\Http\FormRequest;
 
-class AuthServiceProvider extends ServiceProvider
+class StoreBookRequest extends FormRequest
 {
-    protected $policies = [
-        Book::class => BookPolicy::class, // この行を追加
-    ];
-
-    public function boot(): void
+    public function authorize(): bool
     {
-        $this->registerPolicies();
+        return true; // ログインしていれば誰でも登録リクエストは可能
+    }
+
+    public function rules(): array
+    {
+        return [
+            'title' => 'required|string|max:255',
+            'author' => 'required|string|max:255',
+            'isbn' => 'required|string|size:13|unique:books,isbn',
+            'published_date' => 'required|date',
+            'description' => 'nullable|string',
+            'image_url' => 'nullable|url',
+            'genres' => 'required|array',
+            'genres.*' => 'exists:genres,id',
+        ];
     }
 }
 ```
 
-**コードリーディング:**
-- `$policies`プロパティに、モデルとポリシーのクラスをマッピングします。これにより、Laravelは`Book`モデルに関する認可チェックを行う際に、自動的に`BookPolicy`を使用するようになります。
+### 更新処理のバリデーション (`UpdateBookRequest`)
 
-## 4-3. Policyへのロジック実装
-
-`BookPolicy`の各メソッドに、具体的な認可ルールを実装します。
-
-**`app/Policies/BookPolicy.php`**
+**`app/Http/Requests/UpdateBookRequest.php`**
 ```php
 <?php
 
-namespace App\Policies;
+namespace App\Http\Requests;
 
-use App\Models\Book;
-use App\Models\User;
-use Illuminate\Auth\Access\Response;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class BookPolicy
+class UpdateBookRequest extends FormRequest
 {
-    /**
-     * Determine whether the user can update the model.
-     */
-    public function update(User $user, Book $book): bool
+    public function authorize(): bool
     {
-        return $user->id === $book->user_id;
+        return true; // 認可はポリシーに任せるため、ここではtrue
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
-    public function delete(User $user, Book $book): bool
+    public function rules(): array
     {
-        return $user->id === $book->user_id;
+        return [
+            'title' => 'required|string|max:255',
+            'author' => 'required|string|max:255',
+            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book->id)],
+            'published_date' => 'required|date',
+            'description' => 'nullable|string',
+            'image_url' => 'nullable|url',
+            'genres' => 'required|array',
+            'genres.*' => 'exists:genres,id',
+        ];
     }
 }
 ```
+> **コード解説:**
+> - `Rule::unique('books')->ignore($this->book->id)`: 更新時のISBNユニークチェックは、登録時と少し異なります。自分自身のISBNはユニークチェックの対象から除外しないと、「そのISBNは既に使用されています」というエラーが出てしまい、ISBNを変更しない限り更新できなくなってしまいます。`ignore`メソッドで更新対象の書籍IDを指定することで、この問題を解決します。`$this->book` は、ルートモデルバインディングによって注入された`Book`インスタンスを指します。
 
-**コードリーディング:**
-- `update(User $user, Book $book)`: 第一引数には現在認証中のユーザー、第二引数には対象となるモデル（この場合は書籍）のインスタンスが渡されます。
-- `return $user->id === $book->user_id;`: ユーザーのIDと、書籍に紐付いている`user_id`が一致する場合にのみ`true`を返します。これにより、「書籍を登録した本人」だけが更新・削除できるというルールを実現します。
+## 4-3. コントローラの作成と実装
 
-## 4-4. ControllerとBladeでの認可チェック
+`Route::resource`に対応する`BookController`を作成し、各メソッドに処理を実装します。
 
-実装したPolicyを使って、ControllerのアクションとBladeテンプレートの両方で認可チェックを行います。
-
-### Step 1: Controllerでの利用
-
-Controllerでは`authorize`メソッドを使います。このメソッドは、認可に失敗した場合、自動的に403 Forbiddenレスポンスを返します。
+```bash
+sail artisan make:controller BookController --resource --model=Book
+```
+> **思考プロセス:**
+> `--resource` に加えて `--model=Book` オプションを付けることで、各メソッドの引数に `Book` モデルがタイプヒントされ、ルートモデルバインディングが自動で設定された状態のコントローラが生成されます。細かい部分ですが、こうしたArtisanのオプション活用が開発効率を高めます。
 
 **`app/Http/Controllers/BookController.php`**
 ```php
-// ... (use文は省略)
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Http\Requests\StoreBookRequest;
+use App\Http\Requests\UpdateBookRequest;
+use Illuminate\Support\Facades\Auth;
 
 class BookController extends Controller
 {
-    // ... (index, create, store, showは省略)
+    public function index()
+    {
+        $books = Book::with('genres')->latest()->paginate(10);
+        return view('books.index', compact('books'));
+    }
+
+    public function create()
+    {
+        $genres = Genre::all();
+        return view('books.create', compact('genres'));
+    }
+
+    public function store(StoreBookRequest $request)
+    {
+        $book = Auth::user()->books()->create($request->validated());
+        $book->genres()->sync($request->genres);
+
+        return redirect()->route('books.index')->with('success', '書籍を登録しました。');
+    }
+
+    public function show(Book $book)
+    {
+        $book->load(['reviews.user', 'genres']);
+        return view('books.show', compact('book'));
+    }
 
     public function edit(Book $book)
     {
-        $this->authorize("update", $book); // 認可チェックを追加
+        $this->authorize('update', $book);
         $genres = Genre::all();
-        return view("books.edit", compact("book", "genres"));
+        return view('books.edit', compact('book', 'genres'));
     }
 
     public function update(UpdateBookRequest $request, Book $book)
     {
-        $this->authorize("update", $book); // 認可チェックを追加
-        $book->update($request->only(["title", "author", "isbn", "description"]));
+        $this->authorize('update', $book);
+        $book->update($request->validated());
         $book->genres()->sync($request->genres);
 
-        return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
+        return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
     }
 
     public function destroy(Book $book)
     {
-        $this->authorize("delete", $book); // 認可チェックを追加
+        $this->authorize('delete', $book);
         $book->delete();
 
-        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
+        return redirect()->route('books.index')->with('success', '書籍を削除しました。');
     }
 }
 ```
-
-### Step 2: Bladeテンプレートでの利用
-
-Bladeでは`@can`ディレクティブを使います。これにより、権限のないユーザーには編集ボタンや削除ボタンそのものを表示しないようにできます。
-
-**`resources/views/books/show.blade.php`**
-```blade
-{{-- ... 書籍詳細情報 ... --}}
-
-@can("update", $book)
-    <a href="{{ route("books.edit", $book) }}">編集</a>
-@endcan
-
-@can("delete", $book)
-    <form action="{{ route("books.destroy", $book) }}" method="POST" onsubmit="return confirm(\'本当に削除しますか？\');">
-        @csrf
-        @method("DELETE")
-        <button type="submit">削除</button>
-    </form>
-@endcan
-```
-
-**思考プロセス:**
-Controllerでの認可（バックエンド）とBladeでの認可（フロントエンド）は、両方実装することが重要です。Bladeでボタンを隠すだけでは、URLを直接叩かれた場合に対応できません。逆にControllerだけで制御すると、権限のないユーザーにもボタンが見えてしまい、UX（ユーザー体験）を損ないます。両方でチェックすることで、セキュアで使いやすいアプリケーションになります。
-
-## 4-5. 動作確認
-
-1.  ユーザーAでログインし、書籍Aを登録します。
-2.  ユーザーBでログインし、書籍Aの詳細ページにアクセスします。
-3.  書籍Aの詳細ページで、編集・削除ボタンが表示されていないことを確認します。
-4.  ユーザーBで、書籍Aの編集ページのURL（例: `/books/1/edit`）に直接アクセスし、「403 This action is unauthorized.」というエラーページが表示されることを確認します。
-5.  ユーザーAでログインし直し、書籍Aの編集・削除ができることを確認します。
+> **コード解説:**
+> - `index()`: `with('genres')` でジャンル情報をEager Loading（事前読み込み）しています。これがないと、一覧表示で各書籍のジャンルを表示するたびにクエリが発行される「N+1問題」が発生し、パフォーマンスが著しく低下します。
+> - `store()`: `Auth::user()->books()->create(...)` とすることで、現在ログインしているユーザーのIDを`user_id`として自動的に設定し、書籍を登録します。`$request->validated()` は、Form Requestでバリデーション済みのデータを配列として取得するメソッドです。
+> - `sync($request->genres)`: 多対多リレーションを更新する便利なメソッドです。中間テーブル（`book_genre`）のレコードを、引数で渡された`genres`のID配列と完全に同期させます。古い関連付けは削除され、新しい関連付けが追加されます。
+> - `show(Book $book)`: これは「ルートモデルバインディング」という機能です。URLの `{book}` 部分のIDをもとに、Laravelが自動で`Book`モデルのインスタンスを検索し、メソッドに注入（DI）してくれます。`Book::findOrFail($id)` を書く必要がありません。
+> - `edit()`, `update()`, `destroy()`: `$this->authorize(...)` は、次のChapterで作成する「ポリシー（Policy）」を使った認可処理です。「このユーザーがこの書籍を更新/削除する権限があるか？」をチェックします。
 
 ---
 
-これで、アプリケーションに堅牢な認可機能を実装できました。次のChapterでは、レビュー機能の実装に進みます。
+これで書籍CRUDの心臓部が完成しました。次のChapterでは、このバックエンドロジックを保護するための「認可」の仕組みを実装します。'''
