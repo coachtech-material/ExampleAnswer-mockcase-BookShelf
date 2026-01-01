@@ -107,45 +107,68 @@
 
 それでは、実際に手を動かして開発環境を構築し、DB設計をコードに落とし込んでいきましょう。
 
-### 1. プロジェクトのセットアップ
+### 1. Laravelプロジェクトの新規作成
+
+まず、Docker環境でLaravelプロジェクトを新規作成します。以下のコマンドを順番に実行してください。
 
 ```bash
-# 1. リポジトリをクローン
-git clone https://github.com/coachtech-material/ExampleAnswer-mockcase-BookShelf.git
+# 1. curlを使ってLaravelプロジェクトを新規作成（Docker環境）
+# "book-review-app"の部分は任意のプロジェクト名に変更可能
+curl -s "https://laravel.build/book-review-app?with=mysql" | bash
 
 # 2. プロジェクトディレクトリに移動
-cd ExampleAnswer-mockcase-BookShelf
+cd book-review-app
 
-# 3. .envファイルの準備
-cp .env.example .env
-
-# 4. Laravel Sailのエイリアスを設定 (任意)
+# 3. Laravel Sailのエイリアスを設定（任意だが推奨）
+# これにより、"./vendor/bin/sail"の代わりに"sail"と短く入力できる
 alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
 
-# 5. Dockerコンテナを起動
+# 4. Dockerコンテナをバックグラウンドで起動
 sail up -d
 
-# 6. PHPの依存関係をインストール
-sail composer install
-
-# 7. .envのAPP_KEYを生成
-sail artisan key:generate
-
-# 8. npmの依存関係をインストール
+# 5. npmの依存関係をインストール
 sail npm install
 
-# 9. フロントエンドのアセットをビルド
+# 6. フロントエンドのアセットをビルド（開発モード）
 sail npm run dev
 ```
 
-### 2. データベースのマイグレーション
+**思考プロセス**: なぜ`curl -s "https://laravel.build/..."`を使うのか？
+このコマンドは、Laravel公式が提供するDocker環境（Laravel Sail）を含んだプロジェクトを一発で作成してくれます。ローカルにPHPやComposerをインストールする必要がなく、チーム全員が同じ環境で開発できるため、現場では非常によく使われる方法です。
+
+### 2. Bladeテンプレートの配置
+
+今回のプロジェクトでは、UIとなるBladeテンプレートが事前に用意されています。PMから提供されたBladeファイル一式を`resources/views/`ディレクトリに配置してください。
+
+```
+resources/views/
+├── layouts/
+│   └── app.blade.php
+├── books/
+│   ├── index.blade.php
+│   ├── show.blade.php
+│   ├── create.blade.php
+│   └── edit.blade.php
+├── reviews/
+│   └── edit.blade.php
+├── genres/
+│   ├── index.blade.php
+│   ├── create.blade.php
+│   └── edit.blade.php
+├── ranking/
+│   └── index.blade.php
+└── favorites/
+    └── index.blade.php
+```
+
+### 3. データベースのマイグレーション
 
 次に、先ほど設計したDBをLaravelのマイグレーション機能を使って作成します。`database/migrations`ディレクトリに以下のファイルを作成・編集していきます。
 
 **思考プロセス**: なぜこの順番で作成するのか？
 Laravelのマイグレーションはファイル名のタイムスタンプ順に実行されます。外部キー制約を設定する場合、参照先のテーブル（例: `users`）が参照元のテーブル（例: `books`）より先に作成されている必要があります。そのため、依存関係のないテーブルから順に作成するのが基本です。
 
-#### 2-1. `genres`テーブル
+#### 3-1. `genres`テーブル
 
 ```bash
 # genresテーブルのマイグレーションファイルを作成
@@ -166,7 +189,7 @@ public function up(): void
 }
 ```
 
-#### 2-2. `books`テーブル
+#### 3-2. `books`テーブル
 
 ```bash
 sail artisan make:migration create_books_table
@@ -190,7 +213,7 @@ public function up(): void
 }
 ```
 
-#### 2-3. `reviews`テーブル
+#### 3-3. `reviews`テーブル
 
 ```bash
 sail artisan make:migration create_reviews_table
@@ -211,7 +234,7 @@ public function up(): void
 }
 ```
 
-#### 2-4. 中間テーブル (`book_genre`, `favorites`, `review_likes`)
+#### 3-4. 中間テーブル (`book_genre`, `favorites`, `review_likes`)
 
 ```bash
 sail artisan make:migration create_book_genre_table
@@ -244,15 +267,13 @@ Schema::create('review_likes', function (Blueprint $table) {
 });
 ```
 
-### 3. マイグレーションの実行
+### 4. マイグレーションの実行
 
 すべてのマイグレーションファイルが準備できたら、以下のコマンドでデータベースにテーブルを作成します。
 
 ```bash
-# データベースのテーブルを一度リセットし、再作成して、シーダーを実行する
-sail artisan migrate:fresh --seed
+# データベースのテーブルを作成
+sail artisan migrate
 ```
-
-`--seed`オプションを付けることで、`database/seeders`に定義されたテストデータも同時に投入されます。
 
 これで、アプリケーションを動かすための土台がすべて整いました。次のChapterから、いよいよ機能実装に入っていきます。
