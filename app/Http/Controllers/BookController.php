@@ -2,58 +2,52 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Book;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
-use App\Models\Book;
 use App\Models\Genre;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BookController extends Controller
 {
     /**
-     * 書籍一覧を表示（検索機能付き）
+     * 書籍一覧を表示（検索機能付き - 応用機能）
      */
     public function index(Request $request): View
     {
-        $keyword = $request->input('keyword');
-        $genreId = $request->input('genre');
-        $sort = $request->input('sort', 'newest');
+        $query = Book::with("genres");
 
-        $query = Book::with('genres')->withAvg('reviews', 'rating');
-
-        // キーワード検索
-        if ($keyword) {
+        // キーワード検索（応用機能）
+        if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('title', 'like', "%{$keyword}%")
                   ->orWhere('author', 'like', "%{$keyword}%");
             });
         }
 
-        // ジャンル絞り込み
-        if ($genreId) {
+        // ジャンル絞り込み（応用機能）
+        if ($genreId = $request->input('genre')) {
             $query->whereHas('genres', function ($q) use ($genreId) {
                 $q->where('genres.id', $genreId);
             });
         }
 
-        // 並び順
-        switch ($sort) {
+        // 並び順（応用機能）
+        switch ($request->input('sort')) {
             case 'oldest':
                 $query->oldest();
-                break;
-            case 'rating':
-                $query->orderByDesc('reviews_avg_rating');
                 break;
             case 'title':
                 $query->orderBy('title');
                 break;
-            case 'newest':
+            case 'rating':
+                $query->withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating');
+                break;
             default:
                 $query->latest();
                 break;
@@ -62,91 +56,57 @@ class BookController extends Controller
         $books = $query->paginate(10)->withQueryString();
         $genres = Genre::orderBy('name')->get();
 
-        return view('books.index', compact('books', 'genres', 'keyword', 'genreId', 'sort'));
+        return view("books.index", compact("books", "genres"));
     }
 
-    /**
-     * 書籍検索
-     */
-    public function search(Request $request): View
-    {
-        return $this->index($request);
-    }
-
-    /**
-     * 書籍登録フォームを表示
-     */
     public function create(): View
     {
-        $genres = Genre::orderBy('name')->get();
-        return view('books.create', compact('genres'));
+        $genres = Genre::all();
+        return view("books.create", compact("genres"));
     }
 
-    /**
-     * 書籍を登録
-     */
     public function store(StoreBookRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $bookData = collect($validated)->except('genres')->toArray();
+        $book = $request->user()->books()->create($bookData);
+        $book->genres()->attach($validated['genres']);
 
-        DB::transaction(function () use ($validated, $request) {
-            $bookData = collect($validated)->except('genres')->toArray();
-            $book = $request->user()->books()->create($bookData);
-            $book->genres()->attach($validated['genres']);
-        });
-
-        return redirect()->route('books.index')->with('success', '書籍を登録しました。');
+        return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
 
-    /**
-     * 書籍詳細を表示
-     */
     public function show(Book $book): View
     {
-        $book->load(['genres', 'reviews.user', 'reviews.likedByUsers']);
-        return view('books.show', compact('book'));
+        $book->load(["reviews.user", "reviews.likedByUsers", "genres"]);
+        return view("books.show", compact("book"));
     }
 
-    /**
-     * 書籍編集フォームを表示
-     */
     public function edit(Book $book): View
     {
-        $this->authorize('update', $book);
-        $genres = Genre::orderBy('name')->get();
-        return view('books.edit', compact('book', 'genres'));
+        $this->authorize("update", $book);
+        $genres = Genre::all();
+        return view("books.edit", compact("book", "genres"));
     }
 
-    /**
-     * 書籍を更新
-     */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
-        $this->authorize('update', $book);
-        $validated = $request->validated();
+        $this->authorize("update", $book);
+        $book->update($request->validated());
+        $book->genres()->sync($request->genres);
 
-        DB::transaction(function () use ($validated, $book) {
-            $bookData = collect($validated)->except('genres')->toArray();
-            $book->update($bookData);
-            $book->genres()->sync($validated['genres']);
-        });
-
-        return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
+        return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
 
-    /**
-     * 書籍を削除
-     */
     public function destroy(Book $book): RedirectResponse
     {
-        $this->authorize('delete', $book);
+        $this->authorize("delete", $book);
         $book->delete();
 
-        return redirect()->route('books.index')->with('success', '書籍を削除しました。');
+        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
     }
 
     /**
-     * 書籍一覧をCSVでエクスポート
+     * 書籍一覧をCSVでエクスポート（応用機能）
      */
     public function exportCsv(Request $request): StreamedResponse
     {
@@ -155,7 +115,6 @@ class BookController extends Controller
 
         $query = Book::with('genres');
 
-        // キーワード検索
         if ($keyword) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('title', 'like', "%{$keyword}%")
@@ -163,7 +122,6 @@ class BookController extends Controller
             });
         }
 
-        // ジャンル絞り込み
         if ($genreId) {
             $query->whereHas('genres', function ($q) use ($genreId) {
                 $q->where('genres.id', $genreId);
@@ -179,15 +137,10 @@ class BookController extends Controller
 
         return response()->stream(function () use ($books) {
             $handle = fopen('php://output', 'w');
-
-            // BOM for Excel UTF-8
             fwrite($handle, "\xEF\xBB\xBF");
-
-            // ヘッダー行
             fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
 
-            // データ行
-            $books->each(function ($book) use ($handle) {
+            foreach ($books as $book) {
                 fputcsv($handle, [
                     $book->id,
                     $book->title,
@@ -197,14 +150,14 @@ class BookController extends Controller
                     $book->genres->pluck('name')->implode(', '),
                     $book->created_at->format('Y-m-d H:i:s'),
                 ]);
-            });
+            }
 
             fclose($handle);
         }, 200, $headers);
     }
 
     /**
-     * ISBN検索（Google Books API）
+     * ISBN検索（Google Books API）（応用機能）
      */
     public function fetch(Request $request): JsonResponse
     {

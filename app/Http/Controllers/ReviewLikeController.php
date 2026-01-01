@@ -3,25 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\Review;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ReviewLikeController extends Controller
 {
-    public function toggle(Request $request, Review $review): JsonResponse
+    public function toggle(Review $review)
     {
-        $user = $request->user();
-        $isLiked = $review->likedByUsers()->where('user_id', $user->id)->exists();
-
-        if ($isLiked) {
-            $review->likedByUsers()->detach($user->id);
+        $user = Auth::user();
+        
+        if ($user->likedReviews()->where('review_id', $review->id)->exists()) {
+            $user->likedReviews()->detach($review->id);
         } else {
-            $review->likedByUsers()->attach($user->id);
+            $user->likedReviews()->attach($review->id);
         }
+        
+        return back();
+    }
 
-        return response()->json([
-            'is_liked' => !$isLiked,
-            'likes_count' => $review->likedByUsers()->count(),
-        ]);
+    public function store(Review $review)
+    {
+        Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
+        return back();
+    }
+
+    public function destroy(Review $review)
+    {
+        Auth::user()->likedReviews()->detach($review->id);
+        return back();
     }
 }
