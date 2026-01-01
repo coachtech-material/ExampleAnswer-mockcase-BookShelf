@@ -1,112 +1,117 @@
-# Chapter 1: 環境構築
+# Chapter 1: 環境構築とプロジェクト作成
 
-このChapterでは、書籍レビューアプリケーションを開発するための環境を構築します。DockerとLaravel Sailを使い、再現性の高いモダンな開発環境をゼロから立ち上げる手順を学びます。
+このChapterでは、Laravel 10.xを使用した開発環境をゼロから構築します。Docker（Laravel Sail）を使用することで、OSに依存しない統一された開発環境を実現します。
 
-## 1-1. なぜDockerとLaravel Sailを使うのか？
+---
 
-> **思考プロセス:**
-> プロジェクトを始める際、開発環境の選定は非常に重要です。かつてはローカルマシンに直接PHPやMySQLをインストールする方法（例: MAMP, XAMPP）が主流でしたが、これにはいくつかの問題がありました。
-> 
-> - **「私の環境では動くのに…」問題**: 開発者それぞれのPC環境（OSのバージョン、インストールされているライブラリなど）の違いにより、AさんのPCでは動くがBさんのPCでは動かない、といった問題が頻発しました。
-> - **環境構築の複雑化**: プロジェクトが大規模になるほど、必要なソフトウェア（PHP, MySQL, Redis, Node.jsなど）が増え、それらのバージョン管理も煩雑になります。
-> - **本番環境との差異**: ローカル環境と本番サーバーの環境が異なると、デプロイ時に予期せぬエラーが発生する原因となります。
-> 
-> これらの問題を解決するのが**Docker**です。Dockerは「コンテナ」という技術を使い、アプリケーションとそれが動くために必要な環境（OS、ライブラリ、ミドルウェアなど）をひとまとめにして隔離します。これにより、誰がどこで動かしても同じように動作する、軽量で再現性の高い環境を実現できます。
-> 
-> そして**Laravel Sail**は、そのDocker環境をLaravelで簡単に利用できるようにした公式ツールです。本来であれば複雑なDockerの設定ファイル（`compose.yaml`）を手で書く必要がありますが、Sailはいくつかの簡単なコマンドを実行するだけで、Laravel開発に必要なコンテナ（Webサーバー、データベース、キャッシュなど）を自動で構築・起動してくれます。
-> 
-> 現場のチーム開発では、このように環境差異をなくし、新メンバーが迅速に開発に参加できる体制を整えることが極めて重要です。Sailの導入は、そのためのベストプラクティスと言えるでしょう。
+## 1.1. Laravelプロジェクトの作成 (Laravel 10.x)
 
-## 1-2. Laravelプロジェクトの作成
+**注意:** `curl -s "https://laravel.build/..."` は最新版のLaravelをインストールするため、今回は使用しません。
 
-まず、Dockerを使ってLaravelのプロジェクトを作成します。ローカルにPHPやComposerがインストールされていなくても問題ありません。
+以下のDockerコマンドを実行して、Laravel 10.xを明示的に指定してプロジェクトを作成します。
 
 ```bash
+# Laravel 10.x を指定してプロジェクトを作成
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
     -w /var/www/html \
+    -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
     laravelsail/php82-composer:latest \
     composer create-project laravel/laravel:^10.0 book-review-app
 ```
 
-**コマンド解説:**
-- `docker run`: Dockerコンテナを起動します。
-- `--rm`: コマンド実行後にコンテナを自動で削除します。一時的な利用に便利です。
-- `-u "$(id -u):$(id -g)"`: コンテナ内での操作を、現在のローカルユーザーの権限で実行します。これにより、作成されたファイルの所有者が`root`になってしまい、後から編集できなくなる問題を回避します。
-- `-v "$(pwd):/var/www/html"`: ローカルのカレントディレクトリ（`pwd`）を、コンテナ内の`/var/www/html`にマウント（同期）します。これにより、コンテナ内でのファイル操作がローカルのファイルシステムに反映されます。
-- `-w /var/www/html`: コンテナ内での作業ディレクトリを指定します。
-- `laravelsail/php82-composer:latest`: 使用するDockerイメージを指定します。PHP 8.2とComposerがプリインストールされています。
-- `composer create-project ...`: 実際に実行するコマンドです。Laravelのバージョン10を指定して`book-review-app`という名前のプロジェクトを作成します。
+## 1.2. Laravel Sailのインストール
 
-## 1-3. Laravel Sailのセットアップ
-
-次に、作成したプロジェクトにLaravel Sailを導入します。
+プロジェクト作成後、`book-review-app` ディレクトリに移動し、Laravel Sailをインストールします。
 
 ```bash
 # プロジェクトディレクトリに移動
 cd book-review-app
 
-# Sailをインストール
-composer require laravel/sail --dev
+# Laravel Sailをインストール
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
+    laravelsail/php82-composer:latest \
+    composer require laravel/sail --dev
 
-# Sailの設定ファイルを生成（MySQLを選択）
-php artisan sail:install --with=mysql
+# Sailの設定ファイルをパブリッシュ（MySQLを選択）
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
+    laravelsail/php82-composer:latest \
+    php artisan sail:install --with=mysql
 ```
 
-> **思考プロセス:**
-> - `composer require laravel/sail --dev`: Sailは開発時にのみ使用するツールなので、`--dev`オプションを付けて開発用依存パッケージとしてインストールします。これにより、本番環境には不要なパッケージが含まれなくなります。
-> - `php artisan sail:install --with=mysql`: このコマンドがSailの心臓部です。`compose.yaml`というDockerの設定ファイルを自動生成します。`--with=mysql`オプションにより、Webサーバー（`laravel.test`）コンテナに加えて、`mysql`コンテナも設定に含めるよう指示しています。他にも`redis`や`pgsql`などを指定できます。
+## 1.3. .env ファイルの設定
 
-## 1-4. Sailの起動とエイリアス設定
+`.env` ファイルを開き、データベース接続情報が以下と一致していることを確認します。
 
-Sailを起動し、使いやすくするためのエイリアス（ショートカット）を設定します。
-
-```bash
-# Sailをバックグラウンドで起動
-./vendor/bin/sail up -d
-
-# エイリアスを設定して `sail` だけでコマンドを実行できるようにする
-alias sail=\'[ -f sail ] && bash sail || bash vendor/bin/sail\'
-
-# Sailを使ってアプリケーションキーを生成
-sail artisan key:generate
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=laravel
+DB_USERNAME=sail
+DB_PASSWORD=password
 ```
 
-**コマンド解説:**
-- `./vendor/bin/sail up -d`: `compose.yaml`の内容に基づいてコンテナを起動します。`-d`はバックグラウンドで起動する（デタッチモード）オプションです。
-- `alias sail=...`: `sail`と入力するだけで`./vendor/bin/sail`が実行されるようにします。毎回長いパスを打つ手間が省けます。
-- `sail artisan key:generate`: Sail経由でArtisanコマンドを実行しています。`sail`コマンドは、適切なコンテナ（この場合は`laravel.test`）内で後続のコマンドを実行してくれます。`key:generate`は、アプリケーションの暗号化などに使われるキーを`.env`ファイルに生成する重要なコマンドです。
+**重要:** `DB_HOST` は `localhost` や `127.0.0.1` ではなく、Dockerコンテナ名である `mysql` を指定します。
 
-## 1-5. フロントエンド環境の構築 (Vite & Tailwind CSS)
+## 1.4. フロントエンドのセットアップ (Vite & Tailwind CSS)
 
-Laravelのモダンなフロントエンド開発環境をセットアップします。
+本プロジェクトでは、フロントエンドのスタイリングにTailwind CSSを使用します。以下の手順でセットアップを行ってください。
+
+### 1. NPM依存パッケージのインストール
+
+> **重要:** `sail npm install` を実行する前に、必ずSailコンテナが起動していることを確認してください。
+> コンテナが起動していない場合は、先に `./vendor/bin/sail up -d` を実行してください。
 
 ```bash
-# 必要なNPMパッケージをインストール
 sail npm install
+```
 
-# Tailwind CSSとその関連パッケージをインストール
-sail npm install -D tailwindcss postcss autoprefixer
+> **トラブルシューティング:**
+> 以下のエラーが発生した場合:
+> ```
+> OCI runtime exec failed: exec failed: unable to start container process: current working directory is outside of container mount namespace root
+> ```
+> 
+> **原因:** Sailコンテナが起動していません。
+> 
+> **解決方法:**
+> 1. Sailコンテナを起動: `./vendor/bin/sail up -d`
+> 2. 再度実行: `sail npm install`
 
-# Tailwind CSSの設定ファイルを生成
+### 2. Tailwind CSSのインストール
+
+```bash
+sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer
+```
+
+### 3. 設定ファイルの生成
+
+```bash
 sail npx tailwindcss init -p
 ```
 
-> **思考プロセス:**
-> - **なぜVite?**: Vite（ヴィート）は、非常に高速な開発サーバーとビルドツールです。ファイルの変更を即座にブラウザに反映させるHMR（ホットモジュールリプレイスメント）機能が優れており、開発体験を大幅に向上させます。
-> - **なぜTailwind CSS?**: Tailwind CSSは「ユーティリティファースト」を掲げるCSSフレームワークです。`class="text-red-500 font-bold"`のように、あらかじめ用意された小さなクラス（ユーティリティクラス）をHTMLに直接書き込むことでデザインを構築します。これにより、CSSファイルが肥大化しにくく、コンポーネントベースの開発と非常に相性が良いというメリットがあります。
+### 4. Tailwind CSSのテンプレートパス設定
 
-次に、生成された設定ファイルを編集します。
+`tailwind.config.js` を開き、TailwindがCSSを適用するテンプレートファイル（Bladeファイルなど）のパスを指定します。
 
 **`tailwind.config.js`**
 ```javascript
-/** @type {import(\'tailwindcss\').Config} */
+/** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./resources/**/*.blade.php", // Bladeファイル内のクラスを検知
+    "./resources/**/*.blade.php",
     "./resources/**/*.js",
-    "./vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php", // ページネーションのスタイルも対象に
+    "./resources/**/*.vue",
   ],
   theme: {
     extend: {},
@@ -115,6 +120,10 @@ export default {
 }
 ```
 
+### 5. CSSファイルにTailwindディレクティブを追加
+
+`resources/css/app.css` を開き、中身を以下の3行に置き換えます。
+
 **`resources/css/app.css`**
 ```css
 @tailwind base;
@@ -122,19 +131,63 @@ export default {
 @tailwind utilities;
 ```
 
-> **思考プロセス:**
-> - `tailwind.config.js`の`content`には、Tailwind CSSがスキャンして使用されているクラスを検出するためのファイルパスを指定します。ここにパスを追加しないと、本番用にビルドした際に未使用と判断されたクラスが削除されてしまい、スタイルが崩れる原因になります。ページネーションのBladeファイルも忘れずに追加するのがポイントです。
-> - `app.css`の`@tailwind`ディレクティブは、Tailwindの基本的なスタイル、コンポーネントクラス、ユーティリティクラスを読み込むための記述です。
-
-最後に、Vite開発サーバーを起動します。
+### 6. Vite開発サーバーの起動
 
 ```bash
 # 新しいターミナルを開いて実行
 sail npm run dev
 ```
 
-これで、BladeやJSファイルを変更すると自動的にブラウザがリロードされる、快適な開発環境が整いました。
+> **注意:** `sail npm run dev` は実行したままにしておく必要があります。開発中は常にこのコマンドを実行した状態にしておいてください。
 
----
+## 1.5. phpMyAdminの追加
 
-以上で、全ての開発の土台となる環境構築は完了です。次のChapterでは、このアプリケーションの根幹となるデータベースの設計とモデルの設計に進みます。
+`compose.yaml` を開き、`mysql` サービスの後に以下の設定を追加してください。
+
+**`compose.yaml` に追加する内容:**
+
+```yaml
+    phpmyadmin:
+        image: 'phpmyadmin:latest'
+        ports:
+            - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
+        environment:
+            PMA_HOST: mysql
+            PMA_USER: '${DB_USERNAME}'
+            PMA_PASSWORD: '${DB_PASSWORD}'
+        networks:
+            - sail
+        depends_on:
+            - mysql
+```
+
+## 1.6. Sailの起動とエイリアス設定
+
+```bash
+# Sailをバックグラウンドで起動
+./vendor/bin/sail up -d
+```
+
+> **注意：Dockerボリュームについて**
+> 以前に同じプロジェクト名やポートでDockerを使用したことがある場合、MySQLのデータボリュームに古いデータが残っている可能性があります。後のステップでマイグレーションを実行した際に「Table already exists」エラーが発生した場合は、以下のコマンドでボリュームをクリアしてください：
+> ```bash
+> sail down -v
+> sail up -d
+> sail artisan migrate
+> ```
+
+```bash
+# エイリアスを設定して 'sail' だけでコマンドを実行できるようにする
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
+# または bash の場合
+# echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.bashrc
+
+# シェルを再起動するか、新しいターミナルを開いてエイリアスを有効にする
+exec $SHELL
+```
+
+## 1.7. アプリケーションキーの生成
+
+```bash
+sail artisan key:generate
+```

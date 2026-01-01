@@ -1,276 +1,455 @@
-# Chapter 4: 書籍のCRUD機能 (ルーティング・コントローラ編)
+# Chapter 4: 認証機能の実装 (Fortify)
 
-このChapterでは、アプリケーションの中核機能である書籍のCRUD（作成、読み取り、更新、削除）のバックエンド部分を実装します。具体的には、ルーティング、バリデーション、そしてコントローラのロジックを構築します。
+このChapterでは、Laravelの公式認証パッケージであるFortifyを導入し、アプリケーションに必須のログイン、新規登録、ログアウトといった認証機能を実装します。また、マスタデータとしてジャンルの初期データをSeederで投入します。
 
-## 4-1. 先輩エンジニアの思考プロセス：なぜリレーションの次にCRUDを実装するのか？
+---
 
-Chapter 2でデータベースの「骨格」を作り、Chapter 3でモデルとリレーションという「神経」を通しました。では、なぜ次がCRUD（Create, Read, Update, Delete）なのでしょうか？
+## 4-1. 先輩エンジニアの思考プロセス：なぜ認証機能を先に実装するのか？
 
-> **思考プロセス：土台から着実に積み上げる**
-> 
-> アプリケーション開発は、ビルを建てるプロセスに似ています。
-> 
-> 1.  **基礎工事（Chapter 2: DB設計）**: どんなデータをどこに置くか、土地（DB）の区画整理をしました。
-> 2.  **骨組みの構築（Chapter 3: モデルとリレーション）**: 区画の上に柱（モデル）を立て、柱同士を梁（リレーション）で繋ぎ、建物の構造を固めました。
-> 3.  **内装工事（Chapter 4: CRUD）**: いよいよ、部屋（機能）の中身を作っていきます。データを「表示」したり、「登録」したり、「更新」したりする、アプリケーションの具体的な機能そのものです。
+### 認証機能の位置づけ
 
-> **なぜ他のものから実装してはいけないのか？**
-> 
-> 例えば、いきなりUI（見た目）から作り始めるとどうなるでしょう？「このボタンを押したら、どのデータをどう処理すればいいんだ？」と、結局はデータの構造に立ち返ることになります。また、データの取得方法（リレーション）が決まっていなければ、効率的な表示処理も書けません。
-> 
-> **「データ構造 → 関連付け → データ操作」**
-> 
-> この順番は、アプリケーションの土台から着実に機能を積み上げていくための、最も合理的で手戻りの少ない進め方なのです。CRUDは、ユーザーが直接触れる機能の根幹であり、これまでの設計が正しかったかを最初に検証する場でもあります。
+データベース設計（Chapter 2）とモデル定義（Chapter 3）が完了した今、次に何を実装すべきでしょうか？
 
-## 4-2. ルーティングの設計 (Routing)
+先輩エンジニアは以下のように考えます。
 
-まず、書籍CRUD機能に関するURLと、それに対応する処理（コントローラのアクション）を紐付けます。
+> 「書籍管理アプリでは、『誰が書籍を登録したか』『誰がレビューを書いたか』という情報が必要だ。つまり、ほぼ全ての機能が『ログインしているユーザー』を前提としている。認証機能がなければ、書籍登録もレビュー投稿もテストできない。だから、CRUD機能より先に認証を実装するのが合理的だ。」
 
-**`routes/web.php`**
+### なぜFortifyを選ぶのか？
+
+Laravelには複数の認証パッケージがあります。
+
+| パッケージ | 特徴 |
+|:---|:---|
+| **Laravel Breeze** | シンプルなスターターキット。Bladeテンプレートが自動生成される |
+| **Laravel Jetstream** | 高機能なスターターキット。チーム管理、2FA、APIトークンなどを含む |
+| **Laravel Fortify** | バックエンドのみ。フロントエンドは自分で作成する必要がある |
+
+今回Fortifyを選ぶ理由は以下の通りです。
+
+1. **学習目的**: Bladeテンプレートを自分で書くことで、認証の仕組みを深く理解できる
+2. **柔軟性**: 自分でUIを完全にコントロールできる
+3. **軽量**: 不要な機能が含まれていない
+
+---
+
+## 4.1. Laravel Fortifyのインストール
+
+まず、Composerを使ってFortifyをインストールします。
+
+```bash
+sail composer require laravel/fortify
+sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
+```
+
+---
+
+## 4.2. 認証ルートの作成
+
+レイアウトファイルで `route('login')` や `route('register')` を使用するため、先に認証ルートを定義します。
+
+**`routes/auth.php` を新規作成:**
+
 ```php
 <?php
 
-use App\Http\Controllers\BookController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
-// ... (他のルート)
+Route::middleware("guest")->group(function () {
+    Route::get("/login", function () {
+        return view("auth.login");
+    })->name("login");
 
-Route::resource("books", BookController::class)->middleware("auth");
+    Route::get("/register", function () {
+        return view("auth.register");
+    })->name("register");
+});
+
+Route::middleware("auth")->group(function () {
+    Route::post("/logout", [AuthenticatedSessionController::class, "destroy"])
+        ->name("logout");
+});
 ```
 
-> **思考プロセス：なぜ `Route::resource` を使うのか？**
-> 書籍のCRUDには、一覧表示(index)、登録画面(create)、登録処理(store)、詳細表示(show)、編集画面(edit)、更新処理(update)、削除処理(destroy) の計7つのアクションが必要です。これらを一つずつ `Route::get(...)` や `Route::post(...)` で定義するのは冗長です。
-> 
-> `Route::resource("books", BookController::class)` は、この7つのルートを**規約（Convention）**に基づいて自動的に生成してくれる便利なメソッドです。これにより、コードの記述量を大幅に削減し、誰が見ても分かりやすい標準的なURL設計を実現できます。
-> 
-> また、`->middleware("auth")` をチェーンすることで、これら7つのルートすべてに認証ミドルウェアを適用し、「ログインしているユーザーのみがアクセスできる」という制限を簡単に設けることができます。
+> **重要:** この `auth.php` ファイルは、後のステップで `routes/web.php` から読み込みます。この時点ではファイルを作成するだけで問題ありません。
 
-## 4-3. バリデーションの設計 (Form Request)
+---
 
-ユーザーからの入力値を検証（バリデーション）するロジックを、専用のForm Requestクラスに分離して実装します。
+## 4.3. レイアウトファイルとコンポーネントの作成
+
+Fortifyは認証のバックエンドロジックのみを提供するため、ログイン画面や登録画面などのビューは手動で作成する必要があります。BreezeやJetstreamと異なり、`<x-app-layout>` のようなコンポーネントも存在しないため、自作します。
+
+### 1. レイアウトファイルの作成 (`resources/views/layouts/app.blade.php`)
+
+```html
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+        <title>{{ config("app.name", "Laravel") }}</title>
+
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Scripts -->
+        @vite(["resources/css/app.css", "resources/js/app.js"])
+
+        <!-- Alpine.js -->
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    </head>
+    <body class="font-sans antialiased">
+        <div class="min-h-screen bg-gray-100">
+            @include("layouts.navigation")
+
+            <!-- Page Heading -->
+            @if (isset($header))
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{ $header }}
+                    </div>
+                </header>
+            @endif
+
+            <!-- Page Content -->
+            <main>
+                {{ $slot }}
+            </main>
+        </div>
+    </body>
+</html>
+```
+
+### 2. ナビゲーションファイルの作成 (`resources/views/layouts/navigation.blade.php`)
+
+```html
+<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+    <!-- Primary Navigation Menu -->
+</nav>
+```
+
+*中身は後のステップで実装します。*
+
+### 3. ゲストレイアウトの作成 (`resources/views/layouts/guest.blade.php`)
+
+```html
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+        <title>{{ config('app.name', 'Laravel') }}</title>
+
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    </head>
+    <body class="font-sans text-gray-900 antialiased">
+        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
+            <div>
+                <a href="/">
+                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+                </a>
+            </div>
+
+            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
+                {{ $slot }}
+            </div>
+        </div>
+    </body>
+</html>
+```
+
+### 4. レイアウトコンポーネントクラスの作成
+
+`app/View/Components` ディレクトリを作成し、以下のファイルを作成してください。
 
 ```bash
-# 登録用と更新用のForm Requestをそれぞれ作成
-sail artisan make:request StoreBookRequest
-sail artisan make:request UpdateBookRequest
+mkdir -p app/View/Components
 ```
 
-> **思考プロセス：なぜバリデーションロジックを分離するのか？**
-> コントローラの主な責務は、リクエストを受け取り、ビジネスロジック（モデル）を呼び出し、レスポンスを返すことです。ここにバリデーションのような定型的なロジックが混在すると、コントローラが肥大化し、可読性や保守性が低下します。
-> 
-> Form Requestクラスを作成することで、バリデーションルールをカプセル化できます。これにより、コントローラは `StoreBookRequest $request` のようにタイプヒントするだけで、バリデーション済みで安全なデータを受け取れるようになり、本来の責務に集中できます。
-
-### 登録処理のバリデーション (`StoreBookRequest`)
-
-**`app/Http/Requests/StoreBookRequest.php`**
+**`app/View/Components/AppLayout.php`**
 ```php
-public function rules(): array
+<?php
+
+namespace App\View\Components;
+
+use Illuminate\View\Component;
+use Illuminate\View\View;
+
+class AppLayout extends Component
 {
-    return [
-        "title" => "required|string|max:255",
-        "author" => "required|string|max:255",
-        "isbn" => "required|string|size:13|unique:books,isbn",
-        "published_date" => "required|date",
-        "description" => "nullable|string",
-        "image_url" => "nullable|url",
-        "genres" => "required|array",
-        "genres.*" => "exists:genres,id",
-    ];
+    public function render(): View
+    {
+        return view('layouts.app');
+    }
 }
 ```
 
-### 更新処理のバリデーション (`UpdateBookRequest`)
-
-**`app/Http/Requests/UpdateBookRequest.php`**
+**`app/View/Components/GuestLayout.php`**
 ```php
-use Illuminate\Validation\Rule;
+<?php
 
-public function rules(): array
+namespace App\View\Components;
+
+use Illuminate\View\Component;
+use Illuminate\View\View;
+
+class GuestLayout extends Component
 {
-    return [
-        "title" => "required|string|max:255",
-        "author" => "required|string|max:255",
-        "isbn" => ["required", "string", "size:13", Rule::unique("books")->ignore($this->book->id)],
-        "published_date" => "required|date",
-        "description" => "nullable|string",
-        "image_url" => "nullable|url",
-        "genres" => "required|array",
-        "genres.*" => "exists:genres,id",
-    ];
+    public function render(): View
+    {
+        return view('layouts.guest');
+    }
 }
 ```
-> **コード解説:**
-> - `Rule::unique("books")->ignore($this->book->id)`: 更新時のISBNユニークチェックでは、自分自身のISBNを除外しないと、「そのISBNは既に使用されています」というエラーが出てしまいます。`ignore`メソッドで更新対象の書籍IDを指定することで、この問題を解決します。
 
-## 4-4. コントローラの作成と実装
+### 5. Bladeコンポーネントの作成
 
-`Route::resource`に対応する`BookController`を作成し、各メソッドに処理を実装します。
+認証画面で使用するBladeコンポーネントを手動で作成します。`resources/views/components` ディレクトリに以下のファイルを作成してください。
 
-```bash
-sail artisan make:controller BookController --resource --model=Book
-```
+- `application-logo.blade.php`
+- `dropdown.blade.php`
+- `dropdown-link.blade.php`
+- `nav-link.blade.php`
+- `responsive-nav-link.blade.php`
+- `text-input.blade.php`
+- `input-label.blade.php`
+- `input-error.blade.php`
+- `primary-button.blade.php`
 
-### `index()` メソッド：書籍一覧表示
+*各コンポーネントのコードは元の教材からコピーしてください。*
 
-> **要件 → 実装の思考フロー**
-> 1.  **要件**: 「登録されている書籍を**10件ずつ**のページネーションで一覧表示する」
-> 2.  **思考**: 
->     - まず、`Book`モデルを使って全書籍を取得する必要があるな。`Book::all()` かな？
->     - いや、待てよ。一覧画面では各書籍のジャンルも表示するはずだ（UIテンプレートを確認）。普通に取得すると、書籍の数だけジャンル取得クエリが発行される「**N+1問題**」が発生してしまう。
->     - パフォーマンスを考慮し、`with("genres")` を使って**Eager Loading（事前読み込み）**しよう。
->     - 「10件ずつ」とあるから、`get()`ではなく`paginate(10)`を使う必要がある。
->     - 新しく登録されたものが上に表示されるのが一般的だから、`latest()`で登録日時の降順に並び替えよう。
-> 3.  **実装**: `Book::with("genres")->latest()->paginate(10);`
-> 4.  **思考**: 取得したデータをビューに渡す必要がある。`compact("books")` を使って、`books`という変数名でビューに渡そう。
-> 5.  **実装**: `return view("books.index", compact("books"));`
+---
+
+## 4.4. Fortifyの設定
+
+### 1. Fortifyのビューを無効化
+
+`config/fortify.php` を開き、`views` の値を `false` に変更します。
 
 ```php
-// app/Http/Controllers/BookController.php
-
-public function index()
-{
-    $books = Book::with("genres")->latest()->paginate(10);
-    return view("books.index", compact("books"));
-}
+'views' => false,
 ```
 
-### `create()` / `store()` メソッド：書籍登録
+### 2. Fortifyのサービスプロバイダを登録
 
-> **要件 → 実装の思考フロー**
-> 1.  **要件**: 「書籍のタイトル、著者、...、**ジャンル**を登録できる」
-> 2.  **思考 (`create`)**: 登録フォームにはジャンルを選択するチェックボックスがある。ということは、`genres`テーブルから全ジャンルを取得してビューに渡す必要があるな。
-> 3.  **実装 (`create`)**: `$genres = Genre::all(); return view("books.create", compact("genres"));`
-> 4.  **思考 (`store`)**: 
->     - リクエストデータは`StoreBookRequest`でバリデーション済みだ。
->     - `books`テーブルに保存するデータと、中間テーブル`book_genre`に保存するデータ（`genres`）を分離する必要がある。
->     - `Auth::user()->books()->create(...)` を使えば、`user_id`を自動的にセットして書籍を登録できる。これは便利だ。
->     - 書籍を登録した後、その書籍のIDとリクエストで送られてきたジャンルIDの配列を使って、`attach()`メソッドで中間テーブルにレコードを追加しよう。
-> 5.  **実装 (`store`)**: 
-    ```php
-    $validated = $request->validated();
-    $bookData = collect($validated)->except(["genres"])->toArray();
-    $book = Auth::user()->books()->create($bookData);
-    $book->genres()->attach($validated["genres"]);
-    ```
-> 6.  **思考**: 登録後は一覧ページに戻り、「登録しました」というメッセージを表示するのが親切だ。
-> 7.  **実装**: `return redirect()->route("books.index")->with("success", "書籍を登録しました。");`
+`config/app.php` を開き、`providers` 配列に `FortifyServiceProvider` を追加します。
 
 ```php
-// app/Http/Controllers/BookController.php
-
-public function create()
-{
-    $genres = Genre::all();
-    return view("books.create", compact("genres"));
-}
-
-public function store(StoreBookRequest $request)
-{
-    $validated = $request->validated();
-    $bookData = collect($validated)->except(["genres"])->toArray();
-
-    $book = Auth::user()->books()->create($bookData);
-    $book->genres()->attach($validated["genres"]);
-
-    return redirect()->route("books.index")->with("success", "書籍を登録しました。");
-}
+'providers' => ServiceProvider::defaultProviders()->merge([
+    // ...
+    App\Providers\FortifyServiceProvider::class, // ← これを追加
+    // ...
+])->toArray(),
 ```
 
-### `show()` メソッド：書籍詳細表示
+### 3. Fortifyのビューを設定
 
-> **要件 → 実装の思考フロー**
-> 1.  **要件**: 「特定の書籍の詳細情報と、その書籍に紐付く**レビューの一覧**を表示する」
-> 2.  **思考**: 
->     - ルートモデルバインディング（`show(Book $book)`）のおかげで、IDに一致する`$book`インスタンスは自動的に取得できる。
->     - 詳細ページでは、レビュー本文だけでなく、**レビュー投稿者の名前**や、**レビューへの「いいね」**も表示する必要があるはずだ（UIテンプレートを確認）。
->     - これもN+1問題の温床だ。`$book`に紐付くリレーション（`reviews`とその先の`user`、`reviews`と`likedByUsers`、そして書籍自体の`genres`）をまとめてEager Loadingしよう。
->     - 既に取得済みのモデルに後からリレーションを読み込むには`load()`メソッドが使える。
-> 3.  **実装**: `$book->load(["reviews.user", "reviews.likedByUsers", "genres"]);`
-> 4.  **思考**: 取得した`$book`オブジェクトをビューに渡す。
-> 5.  **実装**: `return view("books.show", compact("book"));`
+`app/Providers/FortifyServiceProvider.php` を開き、`boot` メソッド内に以下のコードを追加します。
 
 ```php
-// app/Http/Controllers/BookController.php
+use Laravel\Fortify\Fortify;
 
-public function show(Book $book)
+// ...
+
+public function boot(): void
 {
-    $book->load(["reviews.user", "reviews.likedByUsers", "genres"]);
-    return view("books.show", compact("book"));
-}
-```
+    // ...
 
-### `edit()` / `update()` メソッド：書籍更新
-
-> **要件 → 実装の思考フロー**
-> 1.  **要件**: 「**自分が登録した**書籍の情報を編集できる」
-> 2.  **思考 (`edit`)**: 
->     - まず、「自分が登録した書籍か？」をチェックする必要がある。これは**認可（Authorization）**だ。次のChapterで実装する`Policy`を使うことを見越して、`$this->authorize("update", $book);` を書いておこう。
->     - 編集フォームには登録時と同様に全ジャンルの一覧が必要だ。
-> 3.  **実装 (`edit`)**: `$this->authorize("update", $book); $genres = Genre::all(); return view("books.edit", compact("book", "genres"));`
-> 4.  **思考 (`update`)**: 
->     - ここでもまず認可チェックが必要だ。
->     - `store`の時と同様に、`books`テーブルを更新するデータと、中間テーブルを更新する`genres`データを分離する。
->     - 書籍本体の更新は`$book->update()`で行う。
->     - ジャンルの更新は、一度関連を全て削除して新しく登録し直す`sync()`メソッドが最適だ。`attach()`だと重複登録されてしまう。
-> 5.  **実装 (`update`)**: 
-    ```php
-    $this->authorize("update", $book);
-    $validated = $request->validated();
-    $bookData = collect($validated)->except(["genres"])->toArray();
-    $book->update($bookData);
-    $book->genres()->sync($validated["genres"]);
-    ```
-> 6.  **思考**: 更新後は、更新結果が確認できる詳細ページにリダイレクトするのが自然だ。
-> 7.  **実装**: `return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");`
-
-```php
-// app/Http/Controllers/BookController.php
-
-public function edit(Book $book)
-{
-    $this->authorize("update", $book);
-    $genres = Genre::all();
-    return view("books.edit", compact("book", "genres"));
-}
-
-public function update(UpdateBookRequest $request, Book $book)
-{
-    $this->authorize("update", $book);
-    
-    $validated = $request->validated();
-    $bookData = collect($validated)->except(["genres"])->toArray();
-
-    $book->update($bookData);
-    $book->genres()->sync($validated["genres"]);
-
-    return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
-}
-```
-
-### `destroy()` メソッド：書籍削除
-
-> **要件 → 実装の思考フロー**
-> 1.  **要件**: 「**自分が登録した**書籍を削除できる」
-> 2.  **思考**: 
->     - `edit`/`update`と同様に、まず認可チェックが必要だ。`$this->authorize("delete", $book);`
->     - 削除処理はシンプルに`$book->delete()`を呼び出すだけだ。
->     - DB設計時に`onDelete(\'cascade\')`を設定したので、この書籍に紐づくレビューなども自動的に削除されるはずだ。
-> 3.  **実装**: `$this->authorize("delete", $book); $book->delete();`
-> 4.  **思考**: 削除後は一覧ページに戻すのが適切だろう。
-> 5.  **実装**: `return redirect()->route("books.index")->with("success", "書籍を削除しました。");`
-
-```php
-// app/Http/Controllers/BookController.php
-
-public function destroy(Book $book)
-{
-    $this->authorize("delete", $book);
-    $book->delete();
-
-    return redirect()->route("books.index")->with("success", "書籍を削除しました。");
+    // ビューの設定
+    Fortify::loginView(fn () => view("auth.login"));
+    Fortify::registerView(fn () => view("auth.register"));
+    // ... (他のビュー設定は必要に応じて追加)
 }
 ```
 
 ---
 
-これで書籍CRUDの心臓部が完成しました。次のChapterでは、このバックエンドロジックを保護するための「認可」の仕組みを実装します。
+## 4.5. 認証ビューの作成
+
+`resources/views/auth` ディレクトリに、`login.blade.php` と `register.blade.php` を作成します。
+
+### `resources/views/auth/login.blade.php`
+
+```html
+<x-guest-layout>
+    <form method="POST" action="{{ route('login') }}">
+        @csrf
+        <!-- Email Address -->
+        <div>
+            <x-input-label for="email" :value="__('Email')" />
+            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
+            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        </div>
+
+        <!-- Password -->
+        <div class="mt-4">
+            <x-input-label for="password" :value="__('Password')" />
+            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required />
+            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        </div>
+
+        <div class="flex items-center justify-end mt-4">
+            <x-primary-button class="ml-3">
+                {{ __('Log in') }}
+            </x-primary-button>
+        </div>
+    </form>
+</x-guest-layout>
+```
+
+### `resources/views/auth/register.blade.php`
+
+```html
+<x-guest-layout>
+    <form method="POST" action="{{ route('register') }}">
+        @csrf
+
+        <!-- Name -->
+        <div>
+            <x-input-label for="name" :value="__('Name')" />
+            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus />
+            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+        </div>
+
+        <!-- Email Address -->
+        <div class="mt-4">
+            <x-input-label for="email" :value="__('Email')" />
+            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required />
+            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        </div>
+
+        <!-- Password -->
+        <div class="mt-4">
+            <x-input-label for="password" :value="__('Password')" />
+            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required />
+            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="mt-4">
+            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+            <x-text-input id="password_confirmation" class="block mt-1 w-full" type="password" name="password_confirmation" required />
+            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+        </div>
+
+        <div class="flex items-center justify-end mt-4">
+            <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('login') }}">
+                {{ __('Already registered?') }}
+            </a>
+
+            <x-primary-button class="ml-4">
+                {{ __('Register') }}
+            </x-primary-button>
+        </div>
+    </form>
+</x-guest-layout>
+```
+
+---
+
+## 4.6. マスタデータの準備 (ジャンルSeeder)
+
+書籍を登録する際にジャンルを選択できるように、あらかじめデータベースにジャンルの初期データを投入しておきます。
+
+### Seederファイルの作成
+
+```bash
+sail artisan make:seeder GenreSeeder
+```
+
+### Seederの実装
+
+作成された `database/seeders/GenreSeeder.php` を開き、`run` メソッドに初期ジャンルを登録する処理を記述します。
+
+**`database/seeders/GenreSeeder.php`**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Genre;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
+
+class GenreSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $genres = [
+            '小説',
+            'ビジネス',
+            '技術書',
+            '自己啓発',
+            'エッセイ',
+            '歴史',
+            '科学',
+            '芸術',
+            '料理',
+            '旅行',
+        ];
+
+        foreach ($genres as $genre) {
+            Genre::firstOrCreate(['name' => $genre]);
+        }
+    }
+}
+```
+
+### DatabaseSeederへの登録
+
+`database/seeders/DatabaseSeeder.php` の `run` メソッド内で `GenreSeeder` を呼び出します。
+
+**`database/seeders/DatabaseSeeder.php`**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $this->call([
+            GenreSeeder::class,
+        ]);
+    }
+}
+```
+
+### データベースへのデータ投入
+
+以下のコマンドを実行して、データベースに初期ジャンルデータを投入します。
+
+```bash
+sail artisan migrate:fresh --seed
+```
+
+このコマンドにより、すべてのテーブルが再作成され、`DatabaseSeeder` が実行されます。phpMyAdminで `genres` テーブルにデータが登録されていることを確認してください。
+
+---
+
+## 4.7. 動作確認
+
+ここまで設定が完了したら、動作確認を行いましょう。
+
+1. `sail up -d` と `sail npm run dev` が実行されていることを確認します。
+2. ブラウザで `http://localhost/register` にアクセスし、新規ユーザーを登録します。
+3. 登録後、自動的にログイン状態になり、トップページにリダイレクトされれば成功です。
+4. ヘッダーの「ログアウト」ボタンをクリックし、正常にログアウトできることを確認します。
+5. `http://localhost/login` にアクセスし、先ほど登録した情報でログインできることを確認します。
+
+これで、アプリケーションの基本的な認証機能とマスタデータの準備が完成しました。
