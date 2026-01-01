@@ -40,7 +40,6 @@ class ReportController extends Controller
             'summary' => $this->generateSummary($reviews),
             'rating_distribution' => $this->generateRatingDistribution($reviews),
             'genre_stats' => $this->generateGenreStats($reviews),
-            'monthly_activity' => $this->generateMonthlyActivity($reviews),
             'favorite_genres' => $this->generateFavoriteGenres($favoriteBooks),
             'top_rated_books' => $this->getTopRatedBooks($reviews),
             'reading_streak' => $this->calculateReadingStreak($reviews),
@@ -108,30 +107,6 @@ class ReportController extends Controller
             ->sortByDesc('count')
             // 上位10件を取得
             ->take(10)
-            ->values();
-    }
-
-    /**
-     * 月別アクティビティを生成
-     * 使用: groupBy(), map(), sortKeys()
-     */
-    private function generateMonthlyActivity(Collection $reviews): Collection
-    {
-        return $reviews
-            // 年月でグループ化
-            ->groupBy(fn (Review $review) => $review->created_at->format('Y-m'))
-            // 各月の統計を計算
-            ->map(function (Collection $monthReviews, string $month) {
-                return [
-                    'month' => $month,
-                    'count' => $monthReviews->count(),
-                    'average_rating' => round($monthReviews->avg('rating'), 1),
-                ];
-            })
-            // 月順でソート
-            ->sortKeys()
-            // 直近12ヶ月を取得
-            ->take(-12)
             ->values();
     }
 

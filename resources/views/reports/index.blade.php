@@ -128,33 +128,6 @@
                 </div>
             </div>
 
-            <!-- 月別アクティビティ -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold mb-4">📅 月別アクティビティ</h3>
-                    @if($stats['monthly_activity']->isNotEmpty())
-                        <div class="overflow-x-auto">
-                            <div class="flex items-end space-x-2 h-40">
-                                @php
-                                    $maxCount = $stats['monthly_activity']->max('count') ?: 1;
-                                @endphp
-                                @foreach($stats['monthly_activity'] as $month)
-                                    @php
-                                        $height = ($month['count'] / $maxCount) * 100;
-                                    @endphp
-                                    <div class="flex flex-col items-center">
-                                        <div class="bg-blue-400 rounded-t" style="height: {{ max($height, 5) }}%; width: 40px;" title="{{ $month['count'] }}件"></div>
-                                        <div class="text-xs text-gray-500 mt-1 transform -rotate-45 origin-top-left">{{ \Carbon\Carbon::parse($month['month'])->format('Y/m') }}</div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @else
-                        <p class="text-gray-500">アクティビティがありません。</p>
-                    @endif
-                </div>
-            </div>
-
             <!-- 高評価書籍 -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
                 <div class="p-6">
