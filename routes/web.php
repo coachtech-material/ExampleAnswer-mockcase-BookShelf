@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
 
