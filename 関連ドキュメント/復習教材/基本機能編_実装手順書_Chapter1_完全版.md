@@ -1,292 +1,120 @@
 # Chapter 1: 環境構築
 
-このChapterでは、Laravelの開発環境を構築します。Docker、Laravel Sail、Tailwind CSSを使用して、モダンな開発環境を整えていきます。
+このChapterでは、Laravelの開発環境を構築します。DockerとLaravel Sailを使い、指定されたバージョンのPHPとLaravelでプロジェクトをセットアップします。
 
-## 1-1. 要件定義書の確認
+## 1-1. 要件の確認
 
-まず、詳細度50%の要件定義書を確認し、環境構築に必要な情報を把握します。
+まず、今回のプロジェクトで求められている技術的な要件を確認します。
 
-### 要件定義書から読み取れる情報
+- **PHPバージョン**: 8.2
+- **Laravelバージョン**: 10.x
+- **データベース**: MySQL 8.0
+- **開発環境**: Docker, Laravel Sail
 
-- **フレームワーク**: Laravel
-- **データベース**: MySQL
-- **フロントエンド**: Tailwind CSS
-- **開発環境**: Docker（Laravel Sail）
-
-### この段階でPMに確認すべきこと
-
-環境構築を始める前に、以下の点をPMに確認しておくと良いでしょう。
-
-1. **PHPのバージョン**: 特に指定がなければ最新の安定版を使用
-2. **MySQLのバージョン**: 特に指定がなければ8.0を使用
-3. **Node.jsのバージョン**: フロントエンドビルドに必要
+**思考プロセス:**
+実務では、プロジェクトを開始する前に必ずバージョン要件を確認します。これにより、開発環境と本番環境の差異による問題を未然に防ぐことができます。
 
 ## 1-2. Laravelプロジェクトの作成
 
-### Step 1: Dockerを使用してLaravelプロジェクトを作成
+指定されたバージョンのLaravelプロジェクトを作成します。
 
-以下のコマンドを実行して、Laravel Sailを含むプロジェクトを作成します。
+### Step 1: Dockerコンテナの準備
+
+Dockerがインストールされていることを確認してください。
+
+### Step 2: Laravelプロジェクトの作成
+
+以下のコマンドを実行して、PHP 8.2環境でLaravel 10.xのプロジェクトを作成します。
 
 ```bash
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
     -w /var/www/html \
-    laravelsail/php83-composer:latest \
-    composer create-project --prefer-dist laravel/laravel book-review-app
+    laravelsail/php82-composer:latest \
+    composer create-project laravel/laravel:^10.0 book-review-app
 ```
 
 **コードリーディング:**
-- `docker run --rm`: Dockerコンテナを一時的に起動し、終了後に自動削除します。
-- `-u "$(id -u):$(id -g)"`: 現在のユーザーIDとグループIDでコンテナ内のプロセスを実行します。これにより、作成されるファイルの所有者が現在のユーザーになります。
-- `-v "$(pwd):/var/www/html"`: 現在のディレクトリをコンテナ内の `/var/www/html` にマウントします。
-- `-w /var/www/html`: コンテナ内の作業ディレクトリを設定します。
-- `laravelsail/php83-composer:latest`: PHP 8.3とComposerがインストールされたDockerイメージを使用します。
-- `composer create-project --prefer-dist laravel/laravel book-review-app`: Laravelプロジェクトを `book-review-app` ディレクトリに作成します。
+- `docker run --rm`: Dockerコンテナを一時的に起動し、コマンド終了後に自動でコンテナを削除します。クリーンな環境で一度きりのコマンドを実行する際に便利です。
+- `-u "$(id -u):$(id -g)"`: コンテナ内のプロセスを、現在操作しているユーザーのIDとグループIDで実行します。これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。
+- `-v "$(pwd):/var/www/html"`: 現在のディレクトリ（`pwd`）を、コンテナ内の `/var/www/html` ディレクトリにマウント（同期）します。これにより、ホストマシンとコンテナでファイルを共有できます。
+- `-w /var/www/html`: コンテナ内での作業ディレクトリを指定します。このディレクトリで後続のコマンドが実行されます。
+- `laravelsail/php82-composer:latest`: PHP 8.2とComposerがプリインストールされた公式のDockerイメージです。バージョン要件に合わせてイメージを選択します。
+- `composer create-project laravel/laravel:^10.0 book-review-app`: Composerを使い、`laravel/laravel` パッケージのバージョン `10.0` 以上 `11.0` 未満を `book-review-app` という名前のディレクトリにインストールします。
 
-### Step 2: プロジェクトディレクトリに移動
+### Step 3: プロジェクトディレクトリへの移動
+
+作成されたプロジェクトのディレクトリに移動します。
 
 ```bash
 cd book-review-app
 ```
 
-### Step 3: Laravel Sailのインストール
+これ以降のコマンドは、すべてこの `book-review-app` ディレクトリ内で実行します。
+
+## 1-3. Laravel Sailのセットアップ
+
+Laravel Sailは、Dockerを利用したLaravelのローカル開発環境を簡単に構築・操作するためのツールです。
+
+### Step 1: Laravel Sailのインストール
+
+Composerを使って、開発環境用の依存パッケージとしてLaravel Sailをプロジェクトに追加します。
 
 ```bash
-docker run --rm \
-    -u "$(id -u):$(id -g)" \
-    -v "$(pwd):/var/www/html" \
-    -w /var/www/html \
-    laravelsail/php83-composer:latest \
-    composer require laravel/sail --dev
+composer require laravel/sail --dev
 ```
 
-### Step 4: Sailの設定ファイルを生成
+### Step 2: Sailの設定ファイルを生成
+
+Artisanコマンドを使い、Sailの設定ファイル（`docker-compose.yml`）を生成します。`--with=mysql` オプションを付けることで、MySQLサービスも一緒にセットアップされます。
 
 ```bash
-docker run --rm \
-    -u "$(id -u):$(id -g)" \
-    -v "$(pwd):/var/www/html" \
-    -w /var/www/html \
-    laravelsail/php83-composer:latest \
-    php artisan sail:install --with=mysql
+php artisan sail:install --with=mysql
 ```
 
-このコマンドを実行すると、`docker-compose.yml` ファイルが生成されます。`--with=mysql` オプションにより、MySQLコンテナも一緒にセットアップされます。
+### Step 3: Sailエイリアスの設定
 
-### Step 5: Sailエイリアスの設定
-
-毎回 `./vendor/bin/sail` と入力するのは面倒なので、エイリアスを設定します。
+毎回 `./vendor/bin/sail` と入力するのは手間がかかるため、`sail` という短いコマンドで実行できるようにエイリアス（別名）を設定しておくと便利です。
 
 ```bash
-alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
+alias sail=\'bash vendor/bin/sail\'
 ```
 
-**思考プロセス**: このエイリアスは、現在のディレクトリに `sail` ファイルがあればそれを実行し、なければ `vendor/bin/sail` を実行します。これにより、どのディレクトリからでも `sail` コマンドを使用できます。
+**思考プロセス:**
+このエイリアス設定は、ターミナルのセッションが終了すると消えてしまいます。毎回設定するのが面倒な場合は、お使いのシェルの設定ファイル（例: `~/.bashrc`, `~/.zshrc`）にこの行を追記しておくと、ターミナルを起動するたびに自動でエイリアスが設定されます。
 
-永続化する場合は、`~/.bashrc` または `~/.zshrc` に追加してください。
+### Step 4: Dockerコンテナの起動
 
-### Step 6: Dockerコンテナの起動
+いよいよSailを使ってDockerコンテナを起動します。
 
 ```bash
 sail up -d
 ```
 
 **コードリーディング:**
-- `sail up`: Docker Composeを使用してコンテナを起動します。
-- `-d`: デタッチモード（バックグラウンド）で起動します。
+- `sail up`: `docker-compose.yml` ファイルを元に、定義されたサービス（Webサーバー、データベース等）のコンテナを起動します。
+- `-d`: デタッチモード（バックグラウンド）でコンテナを起動します。これを付けないと、コンテナのログがターミナルに表示され続け、他のコマンドが入力できなくなります。
 
-### Step 7: 動作確認
+### Step 5: 動作確認
 
-ブラウザで `http://localhost` にアクセスし、Laravelのウェルカムページが表示されることを確認してください。
+コンテナが正常に起動したら、ブラウザで `http://localhost` にアクセスしてください。Laravelの初期ウェルカムページが表示されれば、環境構築は成功です。
 
-## 1-3. Tailwind CSSのセットアップ
+## 1-4. データベースマイグレーション
 
-### Step 1: npmパッケージのインストール
+アプリケーションの基本的なテーブルをデータベースに作成します。
 
-```bash
-sail npm install
-```
+### Step 1: マイグレーションの実行
 
-### Step 2: Tailwind CSSのインストール
+以下のコマンドで、Laravelにデフォルトで用意されているマイグレーションファイルを実行し、`users`テーブルなどを作成します。
 
 ```bash
-sail npm install -D tailwindcss postcss autoprefixer
-sail npx tailwindcss init -p
+sail artisan migrate
 ```
 
-**コードリーディング:**
-- `npm install -D`: 開発依存としてパッケージをインストールします。
-- `tailwindcss init -p`: `tailwind.config.js` と `postcss.config.js` を生成します。
-
-### Step 3: Tailwind設定ファイルの編集
-
-**`tailwind.config.js`:**
-
-```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./resources/**/*.blade.php",
-    "./resources/**/*.js",
-    "./resources/**/*.vue",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-```
-
-**コードリーディング:**
-- `content`: Tailwind CSSがクラス名をスキャンするファイルのパターンを指定します。Bladeテンプレート、JavaScript、Vueファイルを対象にしています。
-
-### Step 4: CSSファイルの編集
-
-**`resources/css/app.css`:**
-
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
-
-**コードリーディング:**
-- `@tailwind base`: ブラウザ間の差異を吸収するリセットCSSを読み込みます。
-- `@tailwind components`: Tailwindのコンポーネントクラスを読み込みます。
-- `@tailwind utilities`: Tailwindのユーティリティクラス（`flex`, `mt-4` など）を読み込みます。
-
-### Step 5: Vite設定の確認
-
-**`vite.config.js`:**
-
-```javascript
-import { defineConfig } from 'vite';
-import laravel from 'laravel-vite-plugin';
-
-export default defineConfig({
-    plugins: [
-        laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
-            refresh: true,
-        }),
-    ],
-});
-```
-
-### Step 6: フロントエンドのビルド
-
-開発中は以下のコマンドでViteの開発サーバーを起動します。
-
-```bash
-sail npm run dev
-```
-
-本番用にビルドする場合は以下のコマンドを使用します。
-
-```bash
-sail npm run build
-```
-
-## 1-4. phpMyAdminのセットアップ（任意）
-
-データベースを視覚的に確認できるよう、phpMyAdminを追加します。
-
-### Step 1: docker-compose.ymlの編集
-
-**`docker-compose.yml`** に以下を追加します（`services:` の下に追加）:
-
-```yaml
-    phpmyadmin:
-        image: phpmyadmin/phpmyadmin
-        links:
-            - mysql:mysql
-        ports:
-            - 8080:80
-        environment:
-            MYSQL_USERNAME: '${DB_USERNAME}'
-            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
-            PMA_HOST: mysql
-        networks:
-            - sail
-```
-
-### Step 2: コンテナの再起動
-
-```bash
-sail down
-sail up -d
-```
-
-### Step 3: phpMyAdminへのアクセス
-
-ブラウザで `http://localhost:8080` にアクセスし、以下の情報でログインします。
-
-- **ユーザー名**: `sail`（`.env` の `DB_USERNAME`）
-- **パスワード**: `password`（`.env` の `DB_PASSWORD`）
-
-## 1-5. Bladeテンプレートの配置
-
-PMから提供されたBladeテンプレートを配置します。
-
-### 思考プロセス: Bladeテンプレートの読み解き方
-
-PMからBladeテンプレートが提供された場合、以下の観点で内容を確認します。
-
-1. **ディレクトリ構成**: どのような画面があるか
-2. **変数の使用**: `$books`, `$book`, `$reviews` など、コントローラから渡される変数
-3. **フォームの構成**: `name` 属性、`action` 属性、HTTPメソッド
-4. **リンク先**: `route()` ヘルパーで指定されているルート名
-5. **認証関連**: `@auth`, `@guest`, `Auth::user()` の使用箇所
-
-### Bladeテンプレートの配置先
-
-```
-resources/views/
-├── layouts/
-│   └── app.blade.php        # 共通レイアウト
-├── books/
-│   ├── index.blade.php      # 書籍一覧
-│   ├── show.blade.php       # 書籍詳細
-│   ├── create.blade.php     # 書籍登録フォーム
-│   └── edit.blade.php       # 書籍編集フォーム
-├── reviews/
-│   ├── create.blade.php     # レビュー投稿フォーム
-│   └── edit.blade.php       # レビュー編集フォーム
-├── genres/
-│   ├── index.blade.php      # ジャンル一覧
-│   ├── create.blade.php     # ジャンル登録フォーム
-│   └── edit.blade.php       # ジャンル編集フォーム
-├── favorites/
-│   └── index.blade.php      # お気に入り一覧
-├── ranking/
-│   └── index.blade.php      # ランキング
-└── auth/
-    ├── login.blade.php      # ログインフォーム
-    └── register.blade.php   # ユーザー登録フォーム
-```
-
-### Bladeテンプレートから読み取る情報の例
-
-**`books/index.blade.php` の例:**
-
-```blade
-@foreach ($books as $book)
-    <div>
-        <a href="{{ route('books.show', $book) }}">{{ $book->title }}</a>
-        <p>{{ $book->author }}</p>
-    </div>
-@endforeach
-
-{{ $books->links() }}
-```
-
-**読み取れる情報:**
-- `$books`: コントローラから書籍のコレクションが渡される
-- `$book->title`, `$book->author`: Bookモデルに `title`, `author` プロパティが必要
-- `route('books.show', $book)`: `books.show` という名前のルートが必要
-- `$books->links()`: ページネーションが使用されている → コントローラで `paginate()` を使用
+**思考プロセス:**
+`.env` ファイルには、データベース接続情報（`DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`）が定義されています。`sail artisan migrate` コマンドは、この設定を元にDockerネットワーク内のMySQLコンテナに接続し、テーブルを作成します。
 
 ---
 
-これで環境構築が完了しました。次のChapterでは、DB設計とモデルの作成を行います。
+これで基本的な環境構築は完了です。次のChapterでは、認証機能のセットアップに進みます。
