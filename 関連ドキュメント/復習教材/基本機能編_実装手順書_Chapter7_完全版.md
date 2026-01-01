@@ -7,42 +7,11 @@
 > 
 > - **可読性**: `<?php echo htmlspecialchars($book->title); ?>` のような冗長な記述は、`{{ $book->title }}` と書くだけで済みます。Bladeが自動的にXSS（クロスサイトスクリプティング）対策のエスケープ処理を行ってくれるため、安全です。
 > - **制御構文**: `@if`, `@foreach`, `@auth` のような直感的なディレクティブを使って、条件分岐やループ、認証状態のチェックをHTML構造を崩さずに記述できます。
-> - **コンポーネントとレイアウト**: アプリケーション全体で共通のヘッダーやフッターを「レイアウト」として定義し、各ページはその中のコンテンツ部分だけを記述すればよくなります。これにより、コードの重複を劇的に削減し、一貫性のあるUIを効率的に構築できます。これを「テンプレートの継承」と呼びます。
+> - **コンポーネントとレイアウト**: アプリケーション全体で共通のヘッダーやフッターを「レイアウト」として定義し、各ページはその中のコンテンツ部分だけを記述すればよくなります。これにより、コードの重複を劇的に削減し、一貫性のあるUIを効率的に構築できます。
 
 ## 7-1. レイアウトの作成と適用
 
 アプリケーション全体の骨格となるレイアウトファイルを作成します。Laravel Breezeをインストールすると、`resources/views/layouts/app.blade.php` に基本的なレイアウトが生成されているので、これを活用します。
-
-**`resources/views/layouts/app.blade.php` (抜粋)**
-```blade
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        {{-- ... metaタグやCSSの読み込み ... --}}
-    </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
-
-            <!-- Page Heading -->
-            @if (isset($header))
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endif
-
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
-        </div>
-    </body>
-</html>
-```
-
-このレイアウトを各ページで利用するには、以下のように記述します。
 
 **`resources/views/books/index.blade.php`**
 ```blade
@@ -103,7 +72,7 @@
 > **思考プロセス (N+1問題の回避):**
 > このループの中で `$book->genres` にアクセスしています。もし`BookController@index`で `Book::latest()->paginate(10)` のようにデータを取得していた場合、書籍の数だけジャンルを取得するクエリが追加で発行され、パフォーマンスが著しく悪化します（これがN+1問題です）。
 > 
-> `Book::with('genres')->latest()->paginate(10)` のように **Eager Loading (事前読み込み)** を行うことで、書籍を取得するクエリと、それら全ての書籍に関連するジャンルを取得するクエリの、合計2つのクエリで済むようになります。データを表示する際には、そのデータがどのように取得されているかを常に意識することが、パフォーマンスの良いアプリケーションを作る上で非常に重要です。
+> `Book::with('genres')->latest()->paginate(10)` のように **Eager Loading (事前読み込み)** を行うことで、書籍を取得するクエリと、それら全ての書籍に関連するジャンルを取得するクエリの、合計2つのクエリで済むようになります。
 
 ### 書籍詳細 (`books.show`)
 
@@ -134,7 +103,7 @@
                 <p><strong>{{ $review->user->name }}</strong> (評価: {{ $review->rating }})</p>
                 <p>{{ $review->comment }}</p>
                 @can('delete', $review)
-                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm(\'本当に削除しますか？\');">
+                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm('本当に削除しますか？');">
                         @csrf
                         @method('DELETE')
                         <button type="submit">削除</button>
@@ -170,15 +139,15 @@
     <label>ジャンル</label>
     @foreach ($genres as $genre)
         <input type="checkbox" name="genres[]" value="{{ $genre->id }}" 
-            @if(in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
+            @if(is_array(old('genres', $book->genres->pluck('id')->toArray() ?? [])) && in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
         {{ $genre->name }}
     @endforeach
 </div>
 ```
 
 > **コード解説:**
-> - `old('title', $book->title ?? '')`: `old()`ヘルパーは、バリデーションエラーでリダイレクトされた際に、直前の入力値を復元します。第二引数はデフォルト値で、編集画面の場合は既存の書籍データ (`$book->title`) が表示されます。`?? ''` は、`$book`が存在しない（つまり新規登録画面の）場合にエラーになるのを防ぐためのNull合体演算子です。
-> - `@if(in_array(...)) checked @endif`: チェックボックスのチェック状態を復元・表示するためのロジックです。少し複雑ですが、`old('genres')`（バリデーション失敗時の入力値）または `$book->genres->pluck('id')->toArray()`（編集画面の既存データ）の中に現在のジャンルIDが含まれていれば`checked`属性を付与します。
+> - `old('title', $book->title ?? '')`: `old()`ヘルパーは、バリデーションエラーでリダイレクトされた際に、直前の入力値を復元します。第二引数はデフォルト値で、編集画面の場合は既存の書籍データ (`$book->title`) が表示されます。
+> - `@if(is_array(...) && in_array(...)) checked @endif`: チェックボックスのチェック状態を復元・表示するためのロジックです。`old('genres')`（バリデーション失敗時の入力値）または `$book->genres->pluck('id')->toArray()`（編集画面の既存データ）の中に現在のジャンルIDが含まれていれば`checked`属性を付与します。模範解答では`is_array`のチェックが追加されています。
 
 ### 登録・編集ページの作成
 

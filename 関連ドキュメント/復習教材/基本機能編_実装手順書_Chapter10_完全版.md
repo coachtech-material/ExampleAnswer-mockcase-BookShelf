@@ -1,53 +1,70 @@
-'''# Chapter 10: ランキング機能
+# Chapter 10: ランキング & ジャンル管理機能
 
-このChapterでは、レビューの平均評価が高い順に書籍を並べるランキング機能を実装します。データベースの集計関数や、複雑なロジックをカプセル化するためのServiceクラスの導入がポイントです。
+最終Chapterでは、これまでの応用として「レビュー評価ランキング」と、管理者向けの「ジャンル管理機能」を実装します。データベースの集計関数や、シンプルなCRUDの実装がポイントです。
 
-## 10-1. ランキング表示ページの作成
+## 10-1. ランキング機能の実装
 
-まずは、ランキングを表示するための専用ページと、そこへのルートを定義します。
+レビューの平均評価が高い順に書籍を並べるランキングページを作成します。
 
-### Step 1: ルーティング
+### Step 1: Controllerの作成とルーティング
+
+ランキング表示専用の`RankingController`を作成します。
+
+```bash
+sail artisan make:controller RankingController
+```
 
 **`routes/web.php`**
 ```php
-use App\Http\Controllers\BookController;
+use App\Http\Controllers\RankingController;
 
-// ... 他のルート
-
-Route::get("/ranking", [BookController::class, "ranking"])->name("ranking");
+Route::get("ranking", [RankingController::class, "index"])->name("ranking.index");
 ```
 
-### Step 2: Controllerメソッド
+### Step 2: Controllerの実装
 
-`BookController`に`ranking`メソッドを追加します。
-
-**`app/Http/Controllers/BookController.php`**
+**`app/Http/Controllers/RankingController.php`**
 ```php
-// ...
-class BookController extends Controller
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Book;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class RankingController extends Controller
 {
-    // ...
-
-    public function ranking()
+    public function index()
     {
-        // ランキング取得ロジック (後述)
-        $rankedBooks = []; // 仮
+        $rankedBooks = Book::select("books.*", DB::raw("AVG(reviews.rating) as average_rating"))
+            ->join("reviews", "books.id", "=", "reviews.book_id")
+            ->groupBy("books.id")
+            ->orderByDesc("average_rating")
+            ->take(10)
+            ->get();
 
-        return view("books.ranking", compact("rankedBooks"));
+        return view("ranking.index", compact("rankedBooks"));
     }
 }
 ```
 
-### Step 3: Bladeビュー
+> **思考プロセス:**
+> - **なぜEloquentの`withAvg`を使わないのか？**: 模範解答では、よりSQLに近い柔軟な記述が可能な`DB::raw`と`join`を使用しています。`withAvg`はリレーションに基づいて集計しますが、この方法では`SELECT`句で直接集計結果を`average_rating`という別名で取得し、`orderByDesc`で直接ソートできるため、より直感的で効率的なクエリを組み立てられます。
+> - `DB::raw("AVG(reviews.rating) as average_rating")`: SQLの`AVG()`関数を直接実行し、その結果を`average_rating`という名前のカラムとして取得します。
+> - `join("reviews", ...)`: `books`テーブルと`reviews`テーブルを`book_id`で結合します。
+> - `groupBy("books.id")`: 書籍ごとにレビューをグループ化し、`AVG()`関数が各書籍の平均評価を正しく計算できるようにします。
 
-ランキングを表示するためのビューを作成します。
+### Step 3: Bladeの実装
 
-**`resources/views/books/ranking.blade.php`**
+ランキングを表示するビューを作成します。
+
+**`resources/views/ranking/index.blade.php`**
 ```blade
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            書籍評価ランキング
+            レビュー評価ランキング
         </h2>
     </x-slot>
 
@@ -55,11 +72,13 @@ class BookController extends Controller
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
-                    @foreach ($rankedBooks as $book)
+                    @foreach ($rankedBooks as $index => $book)
                         <div class="mb-4 p-4 border-b">
-                            <h3 class="text-lg font-bold">{{ $loop->iteration }}位: {{ $book->title }}</h3>
-                            <p>平均評価: {{ number_format($book->reviews_avg_rating, 2) }}</p>
-                            {{-- ... 他の情報 ... --}}
+                            <span class="font-bold text-lg">{{ $index + 1 }}位</span>
+                            <h3 class="text-lg font-bold">
+                                <a href="{{ route("books.show", $book) }}">{{ $book->title }}</a>
+                            </h3>
+                            <p>平均評価: {{ number_format($book->average_rating, 2) }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -69,120 +88,102 @@ class BookController extends Controller
 </x-app-layout>
 ```
 
+## 10-2. ジャンル管理機能の実装
+
+管理者（この教材では便宜上、全ユーザーが操作可能）がジャンルを追加・編集・削除できる機能を実装します。
+
+### Step 1: Controllerの作成とルーティング
+
+```bash
+sail artisan make:controller GenreController --resource --model=Genre
+```
+
+**`routes/web.php`**
+```php
+use App\Http\Controllers\GenreController;
+
+Route::resource("genres", GenreController::class)->except(["show"]);
+```
 > **コード解説:**
-> - `$loop->iteration`: Bladeの`@foreach`ループ内で使える特殊な変数で、現在のループが何回目か（1から始まる）を返します。順位表示に便利です。
-> - `number_format($book->reviews_avg_rating, 2)`: `reviews_avg_rating`（後で定義する集計結果）を小数点以下2桁でフォーマットして表示します。
+> - `except(["show"])`: ジャンルには詳細ページが不要なため、`Route::resource`で生成されるルートから`show`アクションを除外しています。
 
-## 10-2. ランキング取得ロジックの実装
+### Step 2: Form Requestの作成
 
-リレーション先のテーブル（`reviews`）の値（`rating`）で集計し、その結果でソートするという、少し複雑なクエリを構築します。
+```bash
+sail artisan make:request StoreGenreRequest
+sail artisan make:request UpdateGenreRequest
+```
 
-### Step 1: Eloquentでの実装
-
-Eloquentには、リレーション先の集計結果を簡単に取得できる`withAvg`メソッドが用意されています。
-
-**`app/Http/Controllers/BookController.php`**
+**`app/Http/Requests/StoreGenreRequest.php`**
 ```php
-public function ranking()
+public function rules(): array
 {
-    $rankedBooks = Book::withAvg("reviews", "rating") // reviewsリレーションのratingカラムの平均値を取得
-        ->orderByDesc("reviews_avg_rating") // 平均評価で降順ソート
-        ->take(10) // 上位10件を取得
-        ->get();
-
-    return view("books.ranking", compact("rankedBooks"));
+    return [
+        "name" => "required|string|max:255|unique:genres,name",
+    ];
 }
 ```
 
-> **コード解説:**
-> - `withAvg("reviews", "rating")`: このメソッドを使うと、`reviews`リレーションの`rating`カラムの平均値を計算し、`{リレーション名}_avg_{カラム名}`という名前の属性（この場合は`reviews_avg_rating`）としてモデルに自動的に追加してくれます。SQLレベルでは、相関サブクエリやJOINを使って効率的に集計が行われます。
-> - `orderByDesc("reviews_avg_rating")`: `withAvg`で追加された`reviews_avg_rating`属性を使って、書籍を降順に並び替えます。
-
-## 10-3. ロジックの分離 (Serviceクラス)
-
-ランキングの取得のような、特定のビジネスロジックはControllerに直接書くよりも、専用の「Serviceクラス」に分離する方が、コードの再利用性や保守性が向上します。
-
-> **思考プロセス:**
-> なぜServiceクラスに分離するのでしょうか？
-> - **責務の分離**: Controllerの責務は「HTTPリクエストを受け取り、適切なレスポンスを返すこと」です。複雑なビジネスロジックはControllerの本来の責務ではありません。ロジックをServiceクラスに移動することで、Controllerは本来の責務に集中でき、コードがスリムで読みやすくなります。
-> - **再利用性**: このランキングロジックを、WebページだけでなくAPIやコマンドラインなど、他の場所でも使いたくなるかもしれません。Serviceクラスにまとめておけば、どこからでも簡単に再利用できます。
-> - **テストの容易性**: Serviceクラスは特定のビジネスロジックに特化しているため、単体テストが非常に書きやすくなります。
-
-### Step 1: Serviceクラスの作成
-
-`app/Services`ディレクトリを作成し、`RankingService.php`を配置します。
-
-**`app/Services/RankingService.php`**
+**`app/Http/Requests/UpdateGenreRequest.php`**
 ```php
-<?php
+use Illuminate\Validation\Rule;
 
-namespace App\Services;
-
-use App\Models\Book;
-
-class RankingService
+public function rules(): array
 {
-    /**
-     * 書籍の評価ランキングを取得する
-     *
-     * @param int $limit
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getBookRanking(int $limit = 10)
+    return [
+        "name" => ["required", "string", "max:255", Rule::unique("genres")->ignore($this->genre->id)],
+    ];
+}
+```
+
+### Step 3: Controllerの実装
+
+**`app/Http/Controllers/GenreController.php`**
+```php
+// ... (use文)
+
+class GenreController extends Controller
+{
+    public function index()
     {
-        return Book::withAvg("reviews", "rating")
-            ->orderByDesc("reviews_avg_rating")
-            ->take($limit)
-            ->get();
+        $genres = Genre::all();
+        return view("genres.index", compact("genres"));
+    }
+
+    public function create()
+    {
+        return view("genres.create");
+    }
+
+    public function store(StoreGenreRequest $request)
+    {
+        Genre::create($request->validated());
+        return redirect()->route("genres.index")->with("success", "ジャンルを追加しました。");
+    }
+
+    public function edit(Genre $genre)
+    {
+        return view("genres.edit", compact("genre"));
+    }
+
+    public function update(UpdateGenreRequest $request, Genre $genre)
+    {
+        $genre->update($request->validated());
+        return redirect()->route("genres.index")->with("success", "ジャンルを更新しました。");
+    }
+
+    public function destroy(Genre $genre)
+    {
+        $genre->delete();
+        return redirect()->route("genres.index")->with("success", "ジャンルを削除しました。");
     }
 }
 ```
 
-### Step 2: ControllerからServiceクラスを呼び出す
+### Step 4: Bladeの実装
 
-ControllerのメソッドにServiceクラスをDI（依存性注入）して利用します。
-
-**`app/Http/Controllers/BookController.php`**
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Services\RankingService; // Serviceをインポート
-// ...
-
-class BookController extends Controller
-{
-    protected $rankingService;
-
-    // コンストラクタでServiceをDI
-    public function __construct(RankingService $rankingService)
-    {
-        $this->rankingService = $rankingService;
-        // ... middlewareなど
-    }
-
-    // ...
-
-    public function ranking()
-    {
-        $rankedBooks = $this->rankingService->getBookRanking();
-
-        return view("books.ranking", compact("rankedBooks"));
-    }
-}
-```
-
-> **コード解説 (DI):**
-> Controllerのコンストラクタで`RankingService`をタイプヒントすると、Laravelのサービスコンテナが自動的に`RankingService`のインスタンスを生成して注入してくれます。これにより、Controller内で`new RankingService()`のように手動でインスタンス化する必要がなくなり、クラス間の依存関係が疎になります。
-
-## 10-4. 動作確認
-
-1.  いくつかの書籍に複数のレビューを登録し、評価がばらけるようにします。
-2.  `/ranking`にアクセスし、平均評価が高い順に書籍が10件表示されることを確認します。
-3.  表示されている平均評価が、実際のレビューの評価の平均値と一致していることを確認します。
+ジャンルの一覧、登録、編集画面を作成します。書籍CRUDと同様の構成になるため、コードは割愛します。
 
 ---
 
-お疲れ様でした！これで基本機能編のすべてのChapterが完了です。これらの実装を通して、Laravelを使ったWebアプリケーション開発の基本的な流れと、その背景にある設計思想を学んできました。ぜひこの知識を元に、さらに機能を追加・改善して、自分だけのアプリケーションを育てていってください。
-'''
+お疲れ様でした！これで基本機能編のすべての機能が実装完了です。この教材を通して、Laravelを使ったWebアプリケーション開発の基本的な流れを体系的に学ぶことができたはずです。ぜひこの知識を土台に、さらに複雑な機能やオリジナルのアプリケーション開発に挑戦してみてください。

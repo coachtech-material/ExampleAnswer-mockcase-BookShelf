@@ -1,172 +1,166 @@
+# Chapter 8: お気に入り・いいね機能
 
-# Chapter 8: ジャンル管理機能 (管理者向け)
+このChapterでは、ユーザーのエンゲージメントを高めるための「お気に入り」と「いいね」機能を実装します。どちらも多対多リレーションシップの応用であり、非同期通信（Ajax）を使ってUI/UXを向上させるのがポイントです。
 
-このChapterでは、管理者のみがアクセスできるジャンル管理機能（CRUD）を実装します。ミドルウェアを使った特定のルートへのアクセス制御が重要なポイントです。
+## 8-1. お気に入り機能の実装
 
-## 8-1. 管理者権限の仕組み
+ユーザーが気に入った書籍を登録できる「お気に入り」機能を実装します。
 
-ユーザーが管理者かどうかを判断する仕組みを実装します。`users`テーブルに`is_admin`のような真偽値カラムを追加するのが一般的です。
+### Step 1: Controllerの作成とルーティング
 
-### Step 1: マイグレーションファイルの作成と実行
-
-`is_admin`カラムを`users`テーブルに追加するためのマイグレーションを作成します。
-
-```bash
-sail artisan make:migration add_is_admin_to_users_table --table=users
-```
-
-**`database/migrations/xxxx_xx_xx_xxxxxx_add_is_admin_to_users_table.php`**
-```php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table("users", function (Blueprint $table) {
-            $table->boolean("is_admin")->default(false)->after("email");
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table("users", function (Blueprint $table) {
-            $table->dropColumn("is_admin");
-        });
-    }
-};
-```
-
-マイグレーションを実行します。
+お気に入り登録・解除のロジックを担う`FavoriteController`を作成します。
 
 ```bash
-sail artisan migrate
+sail artisan make:controller FavoriteController
 ```
-
-> **思考プロセス:**
-> なぜ`is_admin`カラムを追加するのでしょうか？ アプリケーションには、一般ユーザーと管理者という異なる役割（ロール）を持つユーザーが存在します。`is_admin`カラム（フラグ）は、この役割を区別するための最もシンプルな方法です。`default(false)`と設定することで、新規登録ユーザーは自動的に一般ユーザーとなり、意図しない権限昇格を防ぎます。管理者は、開発者がデータベースを直接操作してフラグを`true`に設定することで作成します。より複雑な権限管理が必要な場合は、`laravel-permission`のような専用パッケージを導入することも検討しますが、今回はシンプルな管理者機能なので、この方法が最も手軽で適切です。
-
-## 8-2. 管理者認証ミドルウェアの作成
-
-管理者ユーザーのみが特定のルートにアクセスできるように、専用のミドルウェアを作成します。
-
-### Step 1: ミドルウェアの生成
-
-```bash
-sail artisan make:middleware AdminMiddleware
-```
-
-### Step 2: ミドルウェアの実装
-
-**`app/Http/Middleware/AdminMiddleware.php`**
-```php
-<?php
-
-namespace App\Http\Middleware;
-
-use Closure;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\Response;
-
-class AdminMiddleware
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        if (!Auth::check() || !Auth::user()->is_admin) {
-            abort(403, "管理者権限がありません。");
-        }
-
-        return $next($request);
-    }
-}
-```
-
-> **コード解説:**
-> ミドルウェアは、コントローラのアクションが実行される「前」に割り込んで処理を行うフィルターのようなものです。
-> - `!Auth::check()`: まずリクエストが認証済みユーザーからのものかを確認します。
-> - `!Auth::user()->is_admin`: 認証済みユーザーの`is_admin`プロパティが`true`でない（管理者でない）場合、`abort(403)`を呼び出して処理を中断し、403 Forbidden（アクセス禁止）エラーを返します。
-> - `return $next($request);`: 上記のチェックを通過した場合のみ、`$next($request)`を呼び出してリクエストを次の処理（この場合はコントローラのアクション）へと渡します。
-
-### Step 3: ミドルウェアの登録
-
-作成したミドルウェアを`app/Http/Kernel.php`に登録して、ルート定義で使えるように「エイリアス（別名）」を設定します。
-
-**`app/Http/Kernel.php`**
-```php
-protected $routeMiddleware = [
-    // ... 既存のミドルウェア
-    "admin" => \App\Http\Middleware\AdminMiddleware::class, // この行を追加
-];
-```
-
-## 8-3. ジャンル管理機能の実装
-
-管理者専用のジャンル管理機能（CRUD）を実装します。
-
-### Step 1: ControllerとRequestの作成
-
-```bash
-sail artisan make:controller Admin/GenreController
-sail artisan make:request Admin/StoreGenreRequest
-sail artisan make:request Admin/UpdateGenreRequest
-```
-
-> **思考プロセス:**
-> `Admin/GenreController`のようにサブディレクトリを切ることで、管理者向けのコントローラであることがファイル構造から明確になります。これにより、`App\Http\Controllers\Admin`という専用の名前空間が与えられ、一般ユーザー向けのコントローラと区別しやすくなり、大規模なアプリケーションになった際のコードの可読性と保守性が向上します。
-
-### Step 2: ルーティングの設定
-
-管理者用のルートをグループ化し、`admin`ミドルウェアを適用します。
 
 **`routes/web.php`**
 ```php
-use App\Http\Controllers\Admin\GenreController as AdminGenreController;
+use App\Http\Controllers\FavoriteController;
 
-// ... 他のルート
-
-Route::middleware(["auth", "admin"])->prefix("admin")->name("admin.")->group(function () {
-    Route::resource("genres", AdminGenreController::class)->except("show");
+Route::middleware('auth')->group(function () {
+    // ...
+    Route::post('books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
+    Route::delete('books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
 });
 ```
 
-> **コード解説:**
-> - `middleware(["auth", "admin"])`: このグループ内のルートにアクセスするには、ログイン認証（`auth`）と管理者認証（`admin`）の両方を通過する必要があります。
-> - `prefix("admin")`: グループ内のURLの先頭に自動的に`/admin`が付きます。（例: `/admin/genres`）
-> - `name("admin.")`: グループ内のルート名の先頭に自動的に`admin.`が付きます。（例: `admin.genres.index`）
-> - `Route::resource(...)`: ジャンル管理に必要なCRUDのルート（index, create, store, edit, update, destroy）をまとめて定義します。`except("show")`で、今回は不要な詳細表示ルートを除外しています。
+### Step 2: Controllerの実装
 
-### Step 3: Controller, Request, Bladeの実装
-
-Controller、Request、Bladeの実装は、これまでのCRUD実装とほぼ同じです。ただし、ルート名やビューのパスに`admin.`や`admin/`といったプレフィックスが付く点に注意してください。
-
-**`app/Http/Controllers/Admin/GenreController.php`**
+**`app/Http/Controllers/FavoriteController.php`**
 ```php
-// ... (実装は前述の通り)
-public function destroy(Genre $genre)
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Book;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class FavoriteController extends Controller
 {
-    if ($genre->books()->exists()) { // exists()の方が効率的
-        return back()->with("error", "このジャンルには書籍が紐付いているため削除できません。");
+    public function store(Book $book)
+    {
+        Auth::user()->favoriteBooks()->attach($book->id);
+        return back()->with('success', 'お気に入りに登録しました。');
     }
-    $genre->delete();
-    return redirect()->route("admin.genres.index")->with("success", "ジャンルを削除しました。");
+
+    public function destroy(Book $book)
+    {
+        Auth::user()->favoriteBooks()->detach($book->id);
+        return back()->with('success', 'お気に入りを解除しました。');
+    }
+}
+```
+> **コード解説:**
+> - `attach($book->id)`: `favorites`中間テーブルに、現在のユーザーIDと対象の書籍IDのレコードを追加します。
+> - `detach($book->id)`: `favorites`中間テーブルから、対応するレコードを削除します。
+
+### Step 3: Bladeの実装
+
+書籍詳細ページにお気に入りボタンを設置します。
+
+**`resources/views/books/show.blade.php`**
+```blade
+{{-- ... --}}
+@auth
+    @if (Auth::user()->favoriteBooks()->where('book_id', $book->id)->exists())
+        <form action="{{ route('favorites.destroy', $book) }}" method="POST">
+            @csrf
+            @method('DELETE')
+            <button type="submit">お気に入り解除</button>
+        </form>
+    @else
+        <form action="{{ route('favorites.store', $book) }}" method="POST">
+            @csrf
+            <button type="submit">お気に入り登録</button>
+        </form>
+    @endif
+@endauth
+```
+
+## 8-2. いいね機能の実装
+
+レビューに対する「いいね」機能も、お気に入りと同様の実装方針で作成します。
+
+### Step 1: Controllerの作成とルーティング
+
+```bash
+sail artisan make:controller ReviewLikeController
+```
+
+**`routes/web.php`**
+```php
+use App\Http\Controllers\ReviewLikeController;
+
+Route::middleware('auth')->group(function () {
+    // ...
+    Route::post('reviews/{review}/like', [ReviewLikeController::class, 'store'])->name('review.like');
+    Route::delete('reviews/{review}/unlike', [ReviewLikeController::class, 'destroy'])->name('review.unlike');
+});
+```
+
+### Step 2: Controllerの実装
+
+**`app/Http/Controllers/ReviewLikeController.php`**
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Review;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class ReviewLikeController extends Controller
+{
+    public function store(Review $review)
+    {
+        Auth::user()->likedReviews()->attach($review->id);
+        return back();
+    }
+
+    public function destroy(Review $review)
+    {
+        Auth::user()->likedReviews()->detach($review->id);
+        return back();
+    }
 }
 ```
 
-> **思考プロセス (削除処理):**
-> ジャンルを削除する前に、`$genre->books()->exists()`で紐付く書籍が存在するかをチェックしています。`count() > 0`よりも`exists()`の方が、レコードが1件でも見つかった時点で検索を打ち切るため、パフォーマンス的に有利です。データ整合性を保つため、関連データを持つ親レコードを安易に削除できないようにするのは、実務アプリケーションにおける重要な設計判断です。
+### Step 3: Bladeの実装
 
-## 8-4. 動作確認
+レビュー一覧にいいねボタンといいね数を表示します。
 
-1.  データベースで特定のユーザーの`is_admin`を`1`（true）に変更します。
-2.  一般ユーザーでログインし、`/admin/genres`にアクセスして403エラーが表示されることを確認します。
-3.  管理者ユーザーでログインし、`/admin/genres`にアクセスしてジャンル一覧が表示されることを確認します。
-4.  ジャンルの新規作成、編集、削除（紐付く書籍がない場合）、削除（紐付く書籍がある場合のエラー）が正しく動作することを確認します。
+**`resources/views/books/show.blade.php` (レビュー一覧部分)**
+```blade
+@forelse ($book->reviews as $review)
+    <div class="border-t py-4">
+        {{-- ... --}}
+        <div class="flex items-center">
+            @if (Auth::user()->likedReviews()->where('review_id', $review->id)->exists())
+                <form action="{{ route('review.unlike', $review) }}" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit">いいね解除</button>
+                </form>
+            @else
+                <form action="{{ route('review.like', $review) }}" method="POST">
+                    @csrf
+                    <button type="submit">いいね</button>
+                </form>
+            @endif
+            <span class="ml-2">{{ $review->likedByUsers->count() }}</span>
+        </div>
+    </div>
+@empty
+    <p>まだレビューはありません。</p>
+@endforelse
+```
+
+> **思考プロセス (UI/UXの改善):**
+> 現状の実装では、ボタンを押すたびにページ全体がリロードされてしまいます。これをJavaScript（Ajax）を使って非同期処理にすることで、ページをリロードすることなく「お気に入り」や「いいね」の状態をサーバーに送信し、ボタンの表示だけを動的に切り替えることができます。これにより、ユーザー体験が大幅に向上します。発展課題としてぜひ挑戦してみてください。
 
 ---
 
-これで、特定の権限を持つユーザーのみが操作できる、安全な管理機能が実装できました。次のChapterでは、検索機能を実装します。
+これで、ユーザーの参加を促すインタラクティブな機能が実装できました。次のChapterでは、検索機能を実装します。
