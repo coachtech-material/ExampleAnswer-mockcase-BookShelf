@@ -37,7 +37,7 @@ Laravelのルーティングは、`routes/web.php`の上から順にマッチン
 
 ## 13.2. 最終的な `routes/web.php`
 
-これまでの思考プロセスとリファクタリング（Chapter 10の検索機能統合など）を全て反映した、最終的な`routes/web.php`は以下のようになります。
+これまでの思考プロセスを全て反映した、最終的な`routes/web.php`は以下のようになります。
 
 ```php
 <?php
@@ -48,6 +48,7 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -58,7 +59,7 @@ use Illuminate\Support\Facades\Route;
 
 // == Public Routes (認証不要) ==
 
-// Top page & Book list & Search
+// Top page & Book list
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
 
@@ -76,11 +77,9 @@ Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show')
 Route::middleware('auth')->group(function () {
 
     // Book management (CRUD)
-    // books.index, books.show 以外のリソースルートを定義
     Route::resource('books', BookController::class)->except(['index', 'show']);
 
     // Genre management (CRUD)
-    // genres.show 以外のリソースルートを定義
     Route::resource('genres', GenreController::class)->except(['show']);
 
     // Review management
@@ -91,12 +90,15 @@ Route::middleware('auth')->group(function () {
 
     // Favorite management
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
-    Route::delete('/books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
+    Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
 
     // Review Like management
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'store'])->name('likes.store');
-    Route::delete('/reviews/{review}/unlike', [ReviewLikeController::class, 'destroy'])->name('likes.destroy');
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
+
+    // Profile management
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 // Breeze Authentication Routes
@@ -108,9 +110,9 @@ require __DIR__.'/auth.php';
 
 ## 13.3. 最終構成の解説
 
-- **`books.index`への統合**: Chapter 10のリファクタリングにより、検索機能は`books.index`に統合されました。これにより、`books.search`ルートは不要になり、ルート定義がシンプルになりました。
+- **`toggle`メソッドへの統一**: お気に入り機能といいね機能は、`store`/`destroy`ではなく、単一の`toggle`メソッドで登録・解除を切り替えるように修正しました。これにより、ルート定義がシンプルになり、クライアント側の実装も容易になります。
 - **`Route::resource`の活用**: 書籍管理とジャンル管理のルートは、`Route::resource`でまとめて定義しています。`except()`を使って、既に公開ルートとして定義済みの`index`や`show`アクションを除外することで、ルートの重複を防いでいます。
-- **ルートの順序**: `/books/create`（`Route::resource`に含まれる）が`/books/{book}`よりも先に解釈されるように、`Route::resource('books', ...)`の定義が`Route::get('/books/{book}', ...)`よりも（ファイル上では）後になっていますが、`group`化されているため実質的に先に評価されます。Laravel 9以降ではルートの優先順位付けが改善されましたが、この原則を覚えておくと安全です。
+- **Profileルートの追加**: 模範解答に存在する、Breezeが提供するプロフィール管理機能のルートを追加しました。
 
 これで、アプリケーション全体の機能とURLの対応が明確に定義されました。この`routes/web.php`は、アプリケーションの「目次」のような役割を果たします。
 '''

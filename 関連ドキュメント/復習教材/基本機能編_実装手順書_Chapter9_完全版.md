@@ -1,4 +1,4 @@
-'''
+
 # Chapter 9: ランキング機能（集計とSQL）
 
 このChapterでは、レビューの平均評価が高い書籍をランキング形式で表示する機能を実装します。ここでは、Eloquentリレーションシップだけでは効率的に処理できない「集計処理」を、クエリビルダとSQLを直接使って実装する方法を学びます。
@@ -15,7 +15,7 @@
 
 この要件には、これまでとは異なる性質が含まれています。
 
-- **集計**: 書籍ごとに、複数のレビューの`rating`を**平均（AVG）**する必要がある。
+- **集計**: 書籍ごとに、複数のレビューの`rating`を**平均（AVG）**し、レビュー数を**カウント（COUNT）**する必要がある。
 - **並び替え**: 計算した平均評価で**並び替える（ORDER BY）**必要がある。
 
 > **先輩エンジニアの思考:**
@@ -34,12 +34,12 @@ $allBooks = Book::all();
 // 2. PHP側で各書籍の平均評価を計算
 $booksWithAvg = $allBooks->map(function ($book) {
     // このループ内で、書籍ごとにクエリが発行されてしまう (N+1問題)
-    $book->average_rating = $book->reviews->avg('rating');
+    $book->average_rating = $book->reviews->avg("rating");
     return $book;
 });
 
 // 3. PHP側でソートし、上位10件を取得
-$rankedBooks = $booksWithAvg->sortByDesc('average_rating')->take(10);
+$rankedBooks = $booksWithAvg->sortByDesc("average_rating")->take(10);
 ```
 
 - **問題点**: 書籍が1000冊あれば、1001回（最初の全件取得 + ループ内の1000回）のクエリが発行されてしまいます。これは**N+1問題**の典型例であり、データが増えるにつれてパフォーマンスが致命的に悪化します。
@@ -51,7 +51,8 @@ $rankedBooks = $booksWithAvg->sortByDesc('average_rating')->take(10);
 ```sql
 SELECT
     books.*, -- 書籍の全情報
-    AVG(reviews.rating) as average_rating -- レビュー評価の平均値を `average_rating` という名前で取得
+    AVG(reviews.rating) as average_rating, -- レビュー評価の平均値
+    COUNT(reviews.id) as review_count -- レビュー数
 FROM
     books
 INNER JOIN -- booksテーブルとreviewsテーブルを結合
@@ -83,8 +84,8 @@ sail artisan make:controller RankingController
 誰でも閲覧できる公開ルートとして、ランキングページのルートを定義します。
 
 ```php
-// `routes/web.php` の `Route::middleware('auth')` の外に記述
-Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+// `routes/web.php` の `Route::middleware("auth")` の外に記述
+Route::get("/ranking", [RankingController::class, "index"])->name("ranking.index");
 ```
 
 ### 3. コントローラーの実装 (`RankingController.php`)
@@ -106,26 +107,29 @@ class RankingController extends Controller
     {
         // アプローチB（良い例）の実装
         $rankedBooks = Book::query() // クエリビルダを開始
-            // SELECT books.*, AVG(reviews.rating) as average_rating
-            ->select('books.*', DB::raw('AVG(reviews.rating) as average_rating'))
+            // SELECT books.*, AVG(reviews.rating) as average_rating, COUNT(reviews.id) as review_count
+            ->select("books.*", 
+                DB::raw("AVG(reviews.rating) as average_rating"),
+                DB::raw("COUNT(reviews.id) as review_count")
+            )
             // INNER JOIN reviews ON books.id = reviews.book_id
-            ->join('reviews', 'books.id', '=', 'reviews.book_id')
+            ->join("reviews", "books.id", "=", "reviews.book_id")
             // GROUP BY books.id
-            ->groupBy('books.id')
+            ->groupBy("books.id")
             // ORDER BY average_rating DESC
-            ->orderByDesc('average_rating')
+            ->orderByDesc("average_rating")
             // LIMIT 10
             ->take(10)
             ->get();
 
-        return view('ranking.index', compact('rankedBooks'));
+        return view("ranking.index", compact("rankedBooks"));
     }
 }
 ```
 
 > **【学習のポイント】**
-> - `DB::raw()`: Eloquentのメソッドでは表現できない、複雑なSQLの式（ここでは`AVG()`関数）を直接記述するための機能です。
-> - `groupBy('books.id')`: `AVG()`のような集計関数を使う場合、どの単位で集計するかを`groupBy`で指定する必要があります。今回は「書籍ごと」なので`books.id`でグループ化します。
+> - `DB::raw()`: Eloquentのメソッドでは表現できない、複雑なSQLの式（ここでは`AVG()`や`COUNT()`関数）を直接記述するための機能です。
+> - `groupBy("books.id")`: `AVG()`のような集計関数を使う場合、どの単位で集計するかを`groupBy`で指定する必要があります。今回は「書籍ごと」なので`books.id`でグループ化します。
 > - メソッドチェーン: クエリビルダは、このようにメソッドを繋げていくことで、SQL文を流れるように組み立てることができます。
 
 ---
@@ -147,10 +151,9 @@ class RankingController extends Controller
             @foreach($rankedBooks as $index => $book)
                 <li>
                     <span>{{ $index + 1 }}位</span>
-                    <a href="{{ route('books.show', $book) }}">{{ $book->title }}</a>
+                    <a href="{{ route("books.show", $book) }}">{{ $book->title }}</a>
                     <span>
-                        <!-- `average_rating` はDB::rawで計算した別名 -->
-                        (平均評価: {{ number_format($book->average_rating, 2) }} ★)
+                        (平均評価: {{ number_format($book->average_rating, 2) }} ★ / レビュー数: {{ $book->review_count }}件)
                     </span>
                 </li>
             @endforeach
@@ -160,7 +163,7 @@ class RankingController extends Controller
 ```
 
 > **【学習のポイント】**
-> `$book->average_rating`というプロパティに注目してください。これは`books`テーブルに存在するカラムではありませんが、コントローラーで`DB::raw('...') as average_rating`と別名を付けたことで、あたかもモデルのプロパティであるかのようにアクセスできています。
+> `$book->average_rating`や`$book->review_count`というプロパティに注目してください。これらは`books`テーブルに存在するカラムではありませんが、コントローラーで`DB::raw("...") as ...`と別名を付けたことで、あたかもモデルのプロパティであるかのようにアクセスできています。
 
 ---
 
@@ -168,8 +171,8 @@ class RankingController extends Controller
 
 1.  複数の書籍に、それぞれ異なる評価点（例: 5点、3点、1点など）でレビューをいくつか投稿します。
 2.  `/ranking`にアクセスし、レビューの平均評価が高い順に書籍が並んでいることを確認します。
-3.  ランキングは上位10件までしか表示されないことを確認します。
-4.  書籍名をクリックすると、その書籍の詳細ページに正しく遷移することを確認します。
+3.  レビュー数も正しく表示されていることを確認します。
+4.  ランキングは上位10件までしか表示されないことを確認します。
+5.  書籍名をクリックすると、その書籍の詳細ページに正しく遷移することを確認します。
 
 これで、ランキング機能の実装が完了しました。Eloquentの便利さと、SQLのパワフルさを適切に使い分けるスキルは、高度な機能を実装する上で不可欠です。
-'''
