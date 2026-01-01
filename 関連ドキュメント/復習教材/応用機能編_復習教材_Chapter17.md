@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
 
 ### 4.2. ReportControllerの実装
 
-`ReportController`に、統計データを生成し、ビューに渡すロジックを実装します。ここがCollectionメソッド活用の本番です。
+`ReportController`に、統計データを生成し、提供されているビューに渡すロジックを実装します。ここがCollectionメソッド活用の本番です。
 
 ```php
 // app/Http/Controllers/ReportController.php

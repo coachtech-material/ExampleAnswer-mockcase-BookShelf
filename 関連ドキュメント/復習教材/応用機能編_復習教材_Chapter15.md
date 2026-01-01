@@ -111,7 +111,7 @@ class BookController extends Controller
 
 ### 4.3. ビューの実装
 
-書籍一覧画面（`resources/views/books/index.blade.php`）に、CSVダウンロードボタンを追加します。このとき、現在の検索条件をクエリパラメータとして引き継ぐようにします。
+提供されている書籍一覧画面（`resources/views/books/index.blade.php`）のCSVダウンロードボタンが機能するように、コントローラーからのルートにクエリパラメータを引き継ぎます。
 
 ```html
 <!-- resources/views/books/index.blade.php の一部 -->

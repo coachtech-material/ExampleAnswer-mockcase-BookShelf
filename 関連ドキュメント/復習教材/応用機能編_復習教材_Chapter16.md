@@ -125,7 +125,7 @@ class BookController extends Controller
 
 ### 4.4. ビューとJavaScriptの実装
 
-書籍登録・編集画面（`resources/views/books/create.blade.php`と`edit.blade.php`）に、ISBN検索のUIとJavaScriptを追加します。ここでは`create.blade.php`を例に示します。
+提供されている書籍登録・編集画面（`resources/views/books/create.blade.php`と`edit.blade.php`）のISBN検索機能が動作するように、JavaScriptとコントローラーを連携させます。以下は`create.blade.php`のコード例です。
 
 ```html
 <!-- resources/views/books/create.blade.php -->

@@ -124,7 +124,7 @@ class BookController extends Controller
 
 ## 6. ビューの実装
 
-コントローラーの改修に合わせて、ビューファイル（`resources/views/books/index.blade.php`）に検索フォームを追加します。
+コントローラーの改修に合わせて、提供されているビューファイル（`resources/views/books/index.blade.php`）の検索フォームが機能するようにします。
 
 ```html
 <!-- resources/views/books/index.blade.php の一部 -->
