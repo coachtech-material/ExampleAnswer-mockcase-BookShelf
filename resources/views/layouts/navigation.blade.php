@@ -25,6 +25,9 @@
                     <x-nav-link :href="route('favorites.index')" :active="request()->routeIs('favorites.index')">
                         {{ __('お気に入り') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
+                        {{ __('ジャンル管理') }}
+                    </x-nav-link>
                     @endauth
                 </div>
             </div>
@@ -90,6 +93,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('favorites.index')" :active="request()->routeIs('favorites.index')">
                 {{ __('お気に入り') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
+                {{ __('ジャンル管理') }}
             </x-responsive-nav-link>
             @endauth
         </div>
