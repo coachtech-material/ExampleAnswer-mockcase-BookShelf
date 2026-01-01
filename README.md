@@ -38,9 +38,23 @@
    DB_PASSWORD=password
    ```
 
-3. **Laravel Sailの起動**
+3. **Composer依存パッケージのインストール**
 
-   以下のコマンドでDockerコンテナを起動します。初回はビルドに時間がかかります。
+   プロジェクトの初回セットアップ時は、`vendor` ディレクトリが存在しないため `sail` コマンドを使用できません。
+   以下のDockerコマンドを実行して、コンテナ内で `composer install` を実行します。
+
+   ```bash
+   docker run --rm \
+       -u "$(id -u):$(id -g)" \
+       -v "$(pwd):/var/www/html" \
+       -w /var/www/html \
+       laravelsail/php82-composer:latest \
+       composer install --ignore-platform-reqs
+   ```
+
+4. **Laravel Sailの起動**
+
+   以下のコマンドでDockerコンテナを起動します。
 
    ```bash
    ./vendor/bin/sail up -d
@@ -51,14 +65,8 @@
    > 毎回 `./vendor/bin/sail` と入力するのは手間なので、エイリアスを設定すると便利です。
    > 
    > ```bash
-   > alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
+   > alias sail=\'[ -f sail ] && bash sail || bash vendor/bin/sail\'
    > ```
-
-4. **依存パッケージのインストール**
-
-   ```bash
-   sail composer install
-   ```
 
 5. **アプリケーションキーの生成**
 
