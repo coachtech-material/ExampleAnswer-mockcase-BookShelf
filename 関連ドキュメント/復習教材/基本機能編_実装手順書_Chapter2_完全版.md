@@ -136,7 +136,77 @@ erDiagram
 | レビューいいね | `review_likes` | ユーザーとレビューのいいね関係を格納する中間テーブル |
 | 書籍ジャンル | `book_genre` | 書籍とジャンルの中間テーブル |
 
-(各テーブルの詳細定義は省略)
+#### テーブル定義書（詳細）
+
+**users**
+
+| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
+|:---|:---|:---:|:---:|:---:|:---|:---|
+| id | bigint | ✔ | | | | ユーザーID |
+| name | varchar(255) | | | | | ユーザー名 |
+| email | varchar(255) | | | | | メールアドレス（一意） |
+| email_verified_at | timestamp | | | ✔ | NULL | メール認証日時 |
+| password | varchar(255) | | | | | パスワード |
+| remember_token | varchar(100) | | | ✔ | NULL | ログイン維持用トークン |
+| created_at | timestamp | | | ✔ | NULL | 作成日時 |
+| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
+
+**books**
+
+| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
+|:---|:---|:---:|:---:|:---:|:---|:---|
+| id | bigint | ✔ | | | | 書籍ID |
+| user_id | bigint | | ✔ (users.id) | | | 登録したユーザーのID |
+| title | varchar(255) | | | | | 書籍タイトル |
+| author | varchar(255) | | | | | 著者名 |
+| isbn | varchar(13) | | | | | ISBN（一意） |
+| published_date | date | | | | | 出版日 |
+| description | text | | | ✔ | NULL | 書籍の説明 |
+| image_url | varchar(255) | | | ✔ | NULL | 書影画像のURL |
+| created_at | timestamp | | | ✔ | NULL | 作成日時 |
+| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
+
+**reviews**
+
+| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
+|:---|:---|:---:|:---:|:---:|:---|:---|
+| id | bigint | ✔ | | | | レビューID |
+| user_id | bigint | | ✔ (users.id) | | | 投稿したユーザーのID |
+| book_id | bigint | | ✔ (books.id) | | | レビュー対象の書籍ID |
+| rating | tinyint(unsigned) | | | | | 評価（1〜5） |
+| comment | text | | | | | レビューコメント |
+| created_at | timestamp | | | ✔ | NULL | 作成日時 |
+| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
+
+**genres**
+
+| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
+|:---|:---|:---:|:---:|:---:|:---|:---|
+| id | bigint | ✔ | | | | ジャンルID |
+| name | varchar(255) | | | | | ジャンル名（一意） |
+| created_at | timestamp | | | ✔ | NULL | 作成日時 |
+| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
+
+**favorites** (中間テーブル)
+
+| カラム名 | データ型 | 主キー | 外部キー | 説明 |
+|:---|:---|:---:|:---:|:---|
+| user_id | bigint | ✔ | ✔ (users.id) | ユーザーID |
+| book_id | bigint | ✔ | ✔ (books.id) | 書籍ID |
+
+**review_likes** (中間テーブル)
+
+| カラム名 | データ型 | 主キー | 外部キー | 説明 |
+|:---|:---|:---:|:---:|:---|
+| user_id | bigint | ✔ | ✔ (users.id) | ユーザーID |
+| review_id | bigint | ✔ | ✔ (reviews.id) | レビューID |
+
+**book_genre** (中間テーブル)
+
+| カラム名 | データ型 | 主キー | 外部キー | 説明 |
+|:---|:---|:---:|:---:|:---|
+| book_id | bigint | ✔ | ✔ (books.id) | 書籍ID |
+| genre_id | bigint | ✔ | ✔ (genres.id) | ジャンルID |
 
 ---
 
