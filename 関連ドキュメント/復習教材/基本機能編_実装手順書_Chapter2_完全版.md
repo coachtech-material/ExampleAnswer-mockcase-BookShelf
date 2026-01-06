@@ -48,7 +48,7 @@
 
 > **エンジニア**: 「ユーザーが退会した場合、そのユーザーが登録した書籍やレビューはどう扱いますか？」
 > **PM**: 「ユーザーが退会したら、その人のデータは全て削除してください。」
-> **→ 結果**: 外部キー制約に `onDelete(\'cascade\')` を設定し、親レコード（ユーザー）の削除時に子レコード（書籍、レビューなど）も自動で削除されるように設計する。
+> **→ 結果**: 外部キー制約に `onDelete('cascade')` を設定し、親レコード（ユーザー）の削除時に子レコード（書籍、レビューなど）も自動で削除されるように設計する。
 
 このように、具体的な質問を通じて、必要なテーブルやカラム、設定すべき制約が明確になっていきます。
 
@@ -121,9 +121,10 @@ erDiagram
     USERS ||--o{ BOOKS : "registers"
     USERS ||--o{ REVIEWS : "writes"
     BOOKS ||--o{ REVIEWS : "has"
+
+    BOOKS }|..|{ GENRES : "has (BOOK_GENRE)"
     USERS }|..|{ BOOKS : "favorites (FAVORITES)"
     USERS }|..|{ REVIEWS : "likes (REVIEW_LIKES)"
-    BOOKS }|..|{ GENRES : "has (BOOK_GENRE)"
 ```
 
 #### テーブル定義書
@@ -207,22 +208,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'genres\', function (Blueprint $table) {
+        Schema::create('genres', function (Blueprint $table) {
             $table->id();
-            $table->string(\'name\')->unique(); // ジャンル名は重複しないようにunique制約
+            $table->string('name')->unique(); // ジャンル名は重複しないようにunique制約
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'genres\');
+        Schema::dropIfExists('genres');
     }
 };
 ```
 
 #### `database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
-
 ```php
 <?php
 
@@ -234,25 +234,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'books\', function (Blueprint $table) {
+        Schema::create('books', function (Blueprint $table) {
             $table->id();
             // 設計：どのユーザーが登録した書籍かを記録するため、usersテーブルへの外部キーを設定
-            // onDelete(\'cascade\")：ユーザーが退会したら、そのユーザーが登録した書籍も自動的に削除される
-            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-            $table->string(\'title\');
-            $table->string(\'author\');
+            // onDelete('cascade')：ユーザーが退会したら、そのユーザーが登録した書籍も自動的に削除される
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('title');
+            $table->string('author');
             // 設計：ISBNは書籍を一意に識別するため、unique制約を付与
-            $table->string(\'isbn\', 13)->unique();
-            $table->date(\'published_date\');
-            $table->text(\'description\')->nullable();
-            $table->string(\'image_url\')->nullable();
+            $table->string('isbn', 13)->unique();
+            $table->date('published_date');
+            $table->text('description')->nullable();
+            $table->string('image_url')->nullable();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'books\');
+        Schema::dropIfExists('books');
     }
 };
 ```
@@ -270,19 +270,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'reviews\', function (Blueprint $table) {
+        Schema::create('reviews', function (Blueprint $table) {
             $table->id();
-            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-            $table->foreignId(\'book_id\')->constrained()->onDelete(\'cascade\');
-            $table->unsignedTinyInteger(\'rating\'); // 評価は1-5の整数
-            $table->text(\'comment\');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->unsignedTinyInteger('rating'); // 評価は1-5の整数
+            $table->text('comment');
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'reviews\');
+        Schema::dropIfExists('reviews');
     }
 };
 ```
@@ -300,23 +300,24 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'book_genre\', function (Blueprint $table) {
+        Schema::create('book_genre', function (Blueprint $table) {
             // 設計：書籍とジャンルの「多対多」の関係を実現するための中間テーブル
-            $table->foreignId(\'book_id\')->constrained()->onDelete(\'cascade\');
-            $table->foreignId(\'genre_id\')->constrained()->onDelete(\'cascade\');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
             // 設計：同じ書籍に同じジャンルが複数登録されるのを防ぐため、2つのカラムを複合主キーに設定
-            $table->primary([\'book_id\', \'genre_id\']);
+            $table->primary(['book_id', 'genre_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'book_genre\');
+        Schema::dropIfExists('book_genre');
     }
 };
 ```
 
 #### `database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php` (中間テーブル)
+
 
 ```php
 <?php
@@ -329,16 +330,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'favorites\', function (Blueprint $table) {
-            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-            $table->foreignId(\'book_id\')->constrained()->onDelete(\'cascade\');
-            $table->primary([\'user_id\', \'book_id\']);
+        Schema::create('favorites', function (Blueprint $table) {
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->primary(['user_id', 'book_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'favorites\');
+        Schema::dropIfExists('favorites');
     }
 };
 ```
@@ -356,16 +357,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'review_likes\', function (Blueprint $table) {
-            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-            $table->foreignId(\'review_id\')->constrained()->onDelete(\'cascade\');
-            $table->primary([\'user_id\', \'review_id\']);
+        Schema::create('review_likes', function (Blueprint $table) {
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('review_id')->constrained()->onDelete('cascade');
+            $table->primary(['user_id', 'review_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'review_likes\');
+        Schema::dropIfExists('review_likes');
     }
 };
 ```
