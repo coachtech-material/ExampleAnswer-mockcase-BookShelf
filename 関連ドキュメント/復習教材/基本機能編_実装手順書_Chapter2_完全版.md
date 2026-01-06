@@ -121,9 +121,10 @@ erDiagram
     USERS ||--o{ BOOKS : "registers"
     USERS ||--o{ REVIEWS : "writes"
     BOOKS ||--o{ REVIEWS : "has"
+
+    BOOKS }|..|{ GENRES : "has (BOOK_GENRE)"
     USERS }|..|{ BOOKS : "favorites (FAVORITES)"
     USERS }|..|{ REVIEWS : "likes (REVIEW_LIKES)"
-    BOOKS }|..|{ GENRES : "has (BOOK_GENRE)"
 ```
 
 #### テーブル定義書
@@ -222,7 +223,6 @@ return new class extends Migration
 ```
 
 #### `database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
-
 ```php
 <?php
 
@@ -317,6 +317,7 @@ return new class extends Migration
 ```
 
 #### `database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php` (中間テーブル)
+
 
 ```php
 <?php
