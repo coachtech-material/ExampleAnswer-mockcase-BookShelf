@@ -70,7 +70,56 @@ Route::resource('genres', GenreController::class)->except(['show']);
 - **`app/Http/Requests/StoreGenreRequest.php`**: `name`は必須、文字列、255文字以内、`genres`テーブルでユニーク。
 - **`app/Http/Requests/UpdateGenreRequest.php`**: `name`のユニークチェックで、自分自身の名前は対象外にする。
 
-（コードの詳細は省略します）
+### `app/Http/Requests/StoreGenreRequest.php`
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreGenreRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', 'unique:genres,name'],
+        ];
+    }
+}
+```
+
+### `app/Http/Requests/UpdateGenreRequest.php`
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateGenreRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', Rule::unique('genres')->ignore($this->genre)],
+        ];
+    }
+}
+```
 
 ### 4. コントローラーの完全実装 (`GenreController.php`)
 
@@ -158,7 +207,7 @@ class GenreController extends Controller
 - **`resources/views/genres/create.blade.php`**: 新規登録フォーム
 - **`resources/views/genres/edit.blade.php`**: 編集フォーム
 
-（各ビューのコード詳細は省略します。書籍管理のビューとほぼ同じ構造です）
+各bladeファイルは「Preparedblade-mockcase-BookShelf」を参照してください。
 
 `index.blade.php`では、`withCount`によって追加された`books_count`プロパティを使います。
 

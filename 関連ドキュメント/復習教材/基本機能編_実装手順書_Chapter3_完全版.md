@@ -62,7 +62,39 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    // ... (fillable, hidden, castsは省略)
+        /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
 
     /**
      * このユーザーが登録した書籍。（1対多）
@@ -86,7 +118,7 @@ class User extends Authenticatable
     public function favoriteBooks()
     {
         // 第2引数で中間テーブル名を指定
-        return $this->belongsToMany(Book::class, \'favorites\');
+        return $this->belongsToMany(Book::class, 'favorites');
     }
 
     /**
@@ -95,7 +127,7 @@ class User extends Authenticatable
     public function likedReviews()
     {
         // 第2引数で中間テーブル名を指定
-        return $this->belongsToMany(Review::class, \'review_likes\');
+        return $this->belongsToMany(Review::class, 'review_likes');
     }
 }
 ```
@@ -158,7 +190,7 @@ class Book extends Model
      */
     public function favoritedByUsers()
     {
-        return $this->belongsToMany(User::class, \'favorites\');
+        return $this->belongsToMany(User::class, 'favorites');
     }
 }
 ```
@@ -180,11 +212,7 @@ class Review extends Model
 {
     use HasFactory;
 
-    protected $fillable = [\'user_id\
-, \'book_id\
-, \'rating\
-, \'comment\
-];
+    protected $fillable = ['user_id', 'book_id', 'rating', 'comment'];
 
     /**
      * このレビューを投稿したユーザー。（多対1）
@@ -207,7 +235,7 @@ class Review extends Model
      */
     public function likedByUsers()
     {
-        return $this->belongsToMany(User::class, \'review_likes\');
+        return $this->belongsToMany(User::class, 'review_likes');
     }
 }
 ```
@@ -226,7 +254,7 @@ class Genre extends Model
 {
     use HasFactory;
 
-    protected $fillable = [\'name\'];
+    protected $fillable = ['name'];
 
     /**
      * このジャンルに属する書籍。（多対多）

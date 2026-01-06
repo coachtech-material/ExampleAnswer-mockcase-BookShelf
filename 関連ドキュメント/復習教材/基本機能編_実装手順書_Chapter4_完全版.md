@@ -96,7 +96,7 @@ BreezeやJetstreamと違い、Fortifyには`<x-app-layout>`のような共通レ
 - **`app/View/Components/GuestLayout.php`**: `guest.blade.php`を呼び出すコンポーネントクラス
 - **`resources/views/components/`以下の各種ファイル**: ボタンや入力フォームなどのUI部品
 
-*各ファイルのコードは、実装手順書に記載されている通りに作成してください。ここでは詳細を省略します。*
+各bladeファイルは「Preparedblade-mockcase-BookShelf」を参照してください。
 
 ---
 
@@ -149,7 +149,7 @@ public function boot(): void
 
 これらのファイルには、`x-guest-layout`コンポーネントや、`x-input-label`、`x-text-input`といったUIコンポーネントを組み合わせてフォームを構築します。
 
-*各ファイルのコードは、実装手順書に記載されている通りに作成してください。*
+各bladeファイルは「Preparedblade-mockcase-BookShelf」を参照してください。
 
 ---
 
