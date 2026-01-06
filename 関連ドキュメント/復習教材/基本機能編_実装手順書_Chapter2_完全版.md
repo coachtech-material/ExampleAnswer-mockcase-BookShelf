@@ -163,7 +163,178 @@ sail artisan make:migration create_review_likes_table
 
 ### Step 2: マイグレーションファイルの編集
 
-(各マイグレーションファイルのコードは省略)
+作成された各マイグレーションファイルに、テーブルのカラム定義を追加していきます。
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_genres_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('genres', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('genres');
+    }
+};
+```
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_books_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('books', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 誰が登録した書籍かを記録
+            $table->string('title');
+            $table->string('author');
+            $table->string('isbn', 13)->unique();
+            $table->date('published_date');
+            $table->text('description')->nullable();
+            $table->string('image_url')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('books');
+    }
+};
+```
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_reviews_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('reviews', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->unsignedTinyInteger('rating');
+            $table->text('comment');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('reviews');
+    }
+};
+```
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_book_genre_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('book_genre', function (Blueprint $table) {
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
+            $table->primary(['book_id', 'genre_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('book_genre');
+    }
+};
+```
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_favorites_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('favorites', function (Blueprint $table) {
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->primary(['user_id', 'book_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('favorites');
+    }
+};
+```
+
+#### `database/migrations/xxxx_xx_xx_xxxxxx_create_review_likes_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('review_likes', function (Blueprint $table) {
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('review_id')->constrained()->onDelete('cascade');
+            $table->primary(['user_id', 'review_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('review_likes');
+    }
+};
+```
 
 ### Step 3: マイグレーションの実行
 
