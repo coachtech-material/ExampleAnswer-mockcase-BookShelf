@@ -88,6 +88,23 @@ Route::middleware("auth")->group(function () {
 
 ### 2. レイアウトとコンポーネントの作成
 
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/layouts
+mkdir -p resources/views/components
+mkdir -p app/View/Components
+
+# 空のファイルを作成
+touch resources/views/layouts/app.blade.php
+touch resources/views/layouts/guest.blade.php
+touch app/View/Components/AppLayout.php
+touch app/View/Components/GuestLayout.php
+```
+
+BreezeやJetstreamと違い、Fortifyには`<x-app-layout>`のような共通レイアウトコンポーネントがありません。そのため、手動で作成します。
+
 BreezeやJetstreamと違い、Fortifyには`<x-app-layout>`のような共通レイアウトコンポーネントがありません。そのため、手動で作成します。
 
 - **`resources/views/layouts/app.blade.php`**: ログイン後の画面で使用するメインレイアウト
@@ -141,6 +158,19 @@ public function boot(): void
 ---
 
 ## 4.5. 認証ビューの作成
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/auth
+
+# 空のファイルを作成
+touch resources/views/auth/login.blade.php
+touch resources/views/auth/register.blade.php
+```
+
+実際にユーザーが目にするログイン画面と新規登録画面を作成します。
 
 実際にユーザーが目にするログイン画面と新規登録画面を作成します。
 
