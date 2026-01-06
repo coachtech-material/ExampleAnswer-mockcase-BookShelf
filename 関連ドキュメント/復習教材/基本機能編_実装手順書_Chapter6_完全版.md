@@ -49,6 +49,28 @@ sail artisan make:request UpdateReviewRequest
 sail artisan make:policy ReviewPolicy --model=Review
 ```
 
+レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
+
+```bash
+# ReviewControllerには--resourceは不要。indexやshowは使わないため
+sail artisan make:controller ReviewController
+
+sail artisan make:request StoreReviewRequest
+sail artisan make:request UpdateReviewRequest
+sail artisan make:policy ReviewPolicy --model=Review
+```
+
+レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
+
+```bash
+# ReviewControllerには--resourceは不要。indexやshowは使わないため
+sail artisan make:controller ReviewController
+
+sail artisan make:request StoreReviewRequest
+sail artisan make:request UpdateReviewRequest
+sail artisan make:policy ReviewPolicy --model=Review
+```
+
 ---
 
 ## 6.3. 認可ルールの実装 (Policy)
@@ -238,6 +260,28 @@ class ReviewController extends Controller
 ## 6.7. ビューの実装
 
 ### レビュー編集画面 (`resources/views/reviews/edit.blade.php`)
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/reviews
+
+# 空のファイルを作成
+touch resources/views/reviews/edit.blade.php
+```
+
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/reviews
+
+# 空のファイルを作成
+touch resources/views/reviews/edit.blade.php
+```
+
 
 ```html
 <x-app-layout>
