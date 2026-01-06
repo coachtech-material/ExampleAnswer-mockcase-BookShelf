@@ -103,7 +103,6 @@ erDiagram
         timestamp updated_at
     }
 
-    -- 中間テーブル
     BOOK_GENRE {
         bigint book_id PK, FK
         bigint genre_id PK, FK
@@ -122,12 +121,9 @@ erDiagram
     USERS ||--o{ BOOKS : "registers"
     USERS ||--o{ REVIEWS : "writes"
     BOOKS ||--o{ REVIEWS : "has"
-    USERS ||--|{ FAVORITES : "favorites"
-    BOOKS ||--|{ FAVORITES : "is favorited by"
-    USERS ||--|{ REVIEW_LIKES : "likes"
-    REVIEWS ||--|{ REVIEW_LIKES : "is liked by"
-    BOOKS }|--|{ BOOK_GENRE : "has"
-    GENRES }|--|{ BOOK_GENRE : "belongs to"
+    USERS }|..|{ BOOKS : "favorites (FAVORITES)"
+    USERS }|..|{ REVIEWS : "likes (REVIEW_LIKES)"
+    BOOKS }|..|{ GENRES : "has (BOOK_GENRE)"
 ```
 
 #### テーブル定義書
@@ -157,29 +153,75 @@ erDiagram
 | `description` | `text` | `Nullable` | 書籍の概要 |
 | `image_url` | `varchar` | `Nullable` | 書影のURL |
 
-**`reviews` テーブル**
-
-| カラム名 | データ型 | 制約 | 目的 |
-|:---|:---|:---|:---|
-| `id` | `bigint` | `PK` | 主キー |
-| `user_id` | `bigint` | `FK` | **どのユーザーが投稿したか**を識別するため |
-| `book_id` | `bigint` | `FK` | **どの書籍に対するレビューか**を識別するため |
-| `rating` | `tinyint` | `Not Null` | 5段階評価の星の数 |
-| `comment` | `text` | `Not Null` | レビューコメント |
-
 (他のテーブル定義は省略)
 
 ---
 
-## 2.2. マイグレーションファイルの内容確認
+## 2.2. マイグレーションファイルの作成と実行
 
-上記の設計思想が、Laravelのマイグレーションファイルにどのように落とし込まれているかを確認しましょう。コードは設計思想を表現する手段です。
+設計が固まったら、Laravelのマイグレーション機能を使ってデータベースにテーブルを作成します。
 
-> **【学習のポイント】**
-> ここでは、`sail artisan make:migration` コマンドを**実行しません**。
-> 既にリポジトリに存在する完成形のマイグレーションファイルを読み解き、「なぜこのコードになっているのか？」を設計と照らし合わせながら理解することが目的です。
+### Step 1: マイグレーションファイルの作成
 
-### `database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
+以下のコマンドを実行して、各テーブルのマイグレーションファイルを生成します。
+
+> **【ポイント】**
+> Laravelはマイグレーションファイルのファイル名に含まれるタイムスタンプ順に実行します。依存されるテーブル（例: `users`, `books`）を先に作り、依存するテーブル（例: `reviews`, `favorites`）を後に作るように、ファイル名が自動生成されます。
+
+```bash
+# usersテーブルはLaravelデフォルトで存在
+
+# genresテーブル
+sail artisan make:migration create_genres_table
+
+# booksテーブル
+sail artisan make:migration create_books_table
+
+# reviewsテーブル
+sail artisan make:migration create_reviews_table
+
+# book_genreテーブル (中間テーブル)
+sail artisan make:migration create_book_genre_table
+
+# favoritesテーブル (中間テーブル)
+sail artisan make:migration create_favorites_table
+
+# review_likesテーブル (中間テーブル)
+sail artisan make:migration create_review_likes_table
+```
+
+### Step 2: マイグレーションファイルの編集
+
+生成されたマイグレーションファイルの`up`メソッドに、テーブル定義書の内容をコードとして記述していきます。
+
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_genres_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'genres\', function (Blueprint $table) {
+            $table->id();
+            $table->string(\'name\')->unique(); // ジャンル名は重複しないようにunique制約
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(\'genres\');
+    }
+};
+```
+
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
 
 ```php
 <?php
@@ -195,7 +237,7 @@ return new class extends Migration
         Schema::create(\'books\', function (Blueprint $table) {
             $table->id();
             // 設計：どのユーザーが登録した書籍かを記録するため、usersテーブルへの外部キーを設定
-            // onDelete(\'cascade\')：ユーザーが退会したら、そのユーザーが登録した書籍も自動的に削除される
+            // onDelete(\'cascade\")：ユーザーが退会したら、そのユーザーが登録した書籍も自動的に削除される
             $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
             $table->string(\'title\');
             $table->string(\'author\');
@@ -215,7 +257,37 @@ return new class extends Migration
 };
 ```
 
-### `database/migrations/YYYY_MM_DD_XXXXXX_create_book_genre_table.php` (中間テーブル)
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_reviews_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'reviews\', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
+            $table->foreignId(\'book_id\')->constrained()->onDelete(\'cascade\');
+            $table->unsignedTinyInteger(\'rating\'); // 評価は1-5の整数
+            $table->text(\'comment\');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(\'reviews\');
+    }
+};
+```
+
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_book_genre_table.php` (中間テーブル)
 
 ```php
 <?php
@@ -244,22 +316,68 @@ return new class extends Migration
 };
 ```
 
-> **【重要】マイグレーションの実行順序**
-> `book_genre`テーブルは`books`テーブルと`genres`テーブルに依存しています（外部キー制約）。
-> そのため、Laravelはマイグレーションファイルのタイムスタンプ（ファイル名の先頭部分）を見て、依存関係が解決されるように、`books`と`genres`のテーブルを先に作成してから`book_genre`テーブルを作成します。
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php` (中間テーブル)
 
-(他のマイグレーションファイルも同様に、設計意図とコードを照らし合わせて確認してください)
+```php
+<?php
 
----
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-## 2.3. マイグレーションの実行
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'favorites\', function (Blueprint $table) {
+            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
+            $table->foreignId(\'book_id\')->constrained()->onDelete(\'cascade\');
+            $table->primary([\'user_id\', \'book_id\']);
+        });
+    }
 
-設計の意図を理解した上で、いよいよデータベースにテーブルを作成します。以下のコマンドを実行してください。
+    public function down(): void
+    {
+        Schema::dropIfExists(\'favorites\');
+    }
+};
+```
+
+#### `database/migrations/YYYY_MM_DD_XXXXXX_create_review_likes_table.php` (中間テーブル)
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'review_likes\', function (Blueprint $table) {
+            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
+            $table->foreignId(\'review_id\')->constrained()->onDelete(\'cascade\');
+            $table->primary([\'user_id\', \'review_id\']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(\'review_likes\');
+    }
+};
+```
+
+### Step 3: マイグレーションの実行
+
+全てのマイグレーションファイルの準備が整ったら、以下のコマンドでデータベースにテーブルを作成します。
 
 ```bash
 sail artisan migrate
 ```
 
-このコマンドにより、`database/migrations`ディレクトリ内の全てのマイグレーションファイルが実行され、ER図とテーブル定義書通りのテーブルがデータベース内に作成されます。
+このコマンドにより、`database/migrations`ディレクトリ内の全ての未実行のマイグレーションファイルが実行され、ER図とテーブル定義書通りのテーブルがデータベース内に作成されます。
 
 phpMyAdmin (`http://localhost:8080`) にアクセスし、テーブルが正しく作成されていることを確認してみましょう。
