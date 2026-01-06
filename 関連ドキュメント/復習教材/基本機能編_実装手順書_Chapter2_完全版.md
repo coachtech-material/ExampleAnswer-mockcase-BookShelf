@@ -149,10 +149,15 @@ erDiagram
 ```bash
 # usersテーブルはLaravelデフォルトで存在
 sail artisan make:migration create_genres_table
+sleep 1
 sail artisan make:migration create_books_table
+sleep 1
 sail artisan make:migration create_reviews_table
+sleep 1
 sail artisan make:migration create_book_genre_table
+sleep 1
 sail artisan make:migration create_favorites_table
+sleep 1
 sail artisan make:migration create_review_likes_table
 ```
 
