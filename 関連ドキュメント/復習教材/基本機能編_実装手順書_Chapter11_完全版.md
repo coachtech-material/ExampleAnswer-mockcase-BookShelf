@@ -36,6 +36,14 @@ sail artisan make:controller GenreController
 
 次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
 
+`GenreController`はまだ作成していなかったので、`artisan`コマンドで作成します。
+
+```bash
+sail artisan make:controller GenreController
+```
+
+次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
+
 ```php
 <?php
 
@@ -77,6 +85,18 @@ Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genr
 ```
 
 ### 3. ビューの実装 (`resources/views/genres/show.blade.php`)
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/genres
+
+# 空のファイルを作成
+touch resources/views/genres/show.blade.php
+```
+
+コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
 
 コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
 

@@ -44,6 +44,10 @@
 sail artisan make:controller FavoriteController
 ```
 
+```bash
+sail artisan make:controller FavoriteController
+```
+
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 お気に入り操作のルートを`middleware('auth')`グループ内に追加します。
@@ -133,6 +137,18 @@ class FavoriteController extends Controller
 > `Auth::user()->favoriteBooks`は、ユーザーがお気に入りに登録している`Book`モデルのコレクションです。`->contains($book)`で、そのコレクションの中に今表示している`$book`が含まれているかを判定し、ボタンの文言を出し分けています。
 
 ### お気に入り一覧画面 (`resources/views/favorites/index.blade.php`)
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/favorites
+
+# 空のファイルを作成
+touch resources/views/favorites/index.blade.php
+```
+
+書籍一覧画面とほぼ同じ構成です。コントローラーから渡された`$books`をループして表示します。
 
 書籍一覧画面とほぼ同じ構成です。コントローラーから渡された`$books`をループして表示します。
 

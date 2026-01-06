@@ -52,6 +52,13 @@ sail artisan make:request StoreGenreRequest
 sail artisan make:request UpdateGenreRequest
 ```
 
+`GenreController`はChapter 11で作成済みなので、フォームリクエストのみ作成します。
+
+```bash
+sail artisan make:request StoreGenreRequest
+sail artisan make:request UpdateGenreRequest
+```
+
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 `Route::resource`を使い、認証必須ルートグループ内にジャンル管理のルートを定義します。
@@ -202,6 +209,19 @@ class GenreController extends Controller
 ```
 
 ### 5. ビューの実装
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# 空のファイルを作成
+touch resources/views/genres/index.blade.php
+touch resources/views/genres/create.blade.php
+touch resources/views/genres/edit.blade.php
+```
+
+- **`resources/views/genres/index.blade.php`**: ジャンル一覧と関連書籍数を表示
+- **`resources/views/genres/create.blade.php`**: 新規登録フォーム
+- **`resources/views/genres/edit.blade.php`**: 編集フォーム
 
 - **`resources/views/genres/index.blade.php`**: ジャンル一覧と関連書籍数を表示
 - **`resources/views/genres/create.blade.php`**: 新規登録フォーム

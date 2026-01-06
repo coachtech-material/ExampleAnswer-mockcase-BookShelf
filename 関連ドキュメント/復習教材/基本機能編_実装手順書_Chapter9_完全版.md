@@ -79,6 +79,10 @@ LIMIT 10; -- 上位10件に絞り込む
 sail artisan make:controller RankingController
 ```
 
+```bash
+sail artisan make:controller RankingController
+```
+
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 誰でも閲覧できる公開ルートとして、ランキングページのルートを定義します。
@@ -137,6 +141,18 @@ class RankingController extends Controller
 ## 9.3. ビューの実装
 
 ### ランキング表示画面 (`resources/views/ranking/index.blade.php`)
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/ranking
+
+# 空のファイルを作成
+touch resources/views/ranking/index.blade.php
+```
+
+コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
 
 コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
 

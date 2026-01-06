@@ -55,6 +55,22 @@ sail artisan make:request UpdateBookRequest
 sail artisan make:policy BookPolicy --model=Book
 ```
 
+まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
+
+```bash
+# CRUDの7メソッドを持つコントローラーを作成
+sail artisan make:controller BookController --resource
+
+# 書籍登録用のバリデーションルールを定義するクラスを作成
+sail artisan make:request StoreBookRequest
+
+# 書籍更新用のバリデーションルールを定義するクラスを作成
+sail artisan make:request UpdateBookRequest
+
+# 書籍の認可ロジックを定義するクラスを作成
+sail artisan make:policy BookPolicy --model=Book
+```
+
 ---
 
 ## 5.3. 認可ルールの実装 (Policy)
@@ -305,6 +321,20 @@ class BookController extends Controller
 最後に、ユーザーが操作する画面を作成します。登録画面と編集画面はフォームの内容がほぼ同じなため、共通パーツとして切り出すのが定石です。
 
 ### 共通フォーム部品 (`resources/views/books/_form.blade.php`)
+
+まず、必要なディレクトリと空のファイルを作成します。
+
+```bash
+# ディレクトリを作成
+mkdir -p resources/views/books
+
+# 空のファイルを作成
+touch resources/views/books/_form.blade.php
+touch resources/views/books/create.blade.php
+touch resources/views/books/edit.blade.php
+```
+
+登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
 
 登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
 
