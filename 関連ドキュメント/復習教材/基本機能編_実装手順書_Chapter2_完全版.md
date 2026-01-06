@@ -406,7 +406,23 @@ return new class extends Migration
 };
 ```
 
-### Step 3: マイグレーションの実行
+### Step 3: Dockerコンテナの起動とマイグレーションの実行
+
+マイグレーションを実行してデータベースにテーブルを作成する前に、まずDockerコンテナ（Webサーバー、データベース等）を起動する必要があります。
+
+```bash
+# コンテナをバックグラウンドで起動する
+sail up -d
+
+# MySQLコンテナが完全に起動するまで30秒ほど待機する
+sleep 30
+```
+
+> **【エラー対処】`Connection refused`エラー**
+> `sail up -d`の直後に`sail artisan migrate`を実行すると、「`SQLSTATE[HY000] [2002] Connection refused`」というエラーが発生することがあります。これは、MySQLコンテナの起動が完了する前に、Laravelがデータベースに接続しようとしたために起こります。
+> `sleep 30`コマンドは、コンテナが安定して起動するのを待つための重要な一手です。
+
+コンテナが起動したら、マイグレーションを実行します。
 
 ```bash
 sail artisan migrate
