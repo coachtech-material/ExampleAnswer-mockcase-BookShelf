@@ -415,7 +415,6 @@ return new class extends Migration
 sail up -d
 
 # MySQLコンテナが完全に起動するまで30秒ほど待機する
-sleep 30
 ```
 
 > **【エラー対処】`Connection refused`エラー**
