@@ -103,6 +103,3 @@
 - お気に入り登録・解除
 - レビューへのいいね登録・解除
 - ランキング表示（レビュー数、平均評価）
-
-
-<img width="1920" height="1080" alt="CleanShot 2026-01-08 at 14 59 10" src="https://github.com/user-attachments/assets/572b726e-344e-4826-b06d-d5e0913d9465" />
