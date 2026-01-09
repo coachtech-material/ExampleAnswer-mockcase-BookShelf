@@ -102,8 +102,8 @@ sail artisan make:policy ReviewPolicy --model=Review
 public function rules(): array
 {
     return [
-        \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
-        \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
+        'rating' => ['required', 'integer', 'min:1', 'max:5'],
+        'comment' => ['nullable', 'string', 'max:1000'],
     ];
 }
 ```
@@ -192,8 +192,7 @@ class ReviewController extends Controller
         $review->user_id = $request->user()->id;
         $book->reviews()->save($review);
 
-        return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
-    }
+     return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');  }
 
     /**
      * Update (Form): レビュー編集フォーム表示
@@ -204,9 +203,7 @@ class ReviewController extends Controller
         // 思考：
         // 1. まず`ReviewPolicy`で認可チェックを行う。
         // 2. 許可されれば、編集対象の`$review`オブジェクトをビューに渡す。
-        $this->authorize('update', $review);
-        return view('reviews.edit', compact('review'));
-    }
+        $this->authorize('update', $review);      return view('reviews.edit', compact('review'));  }
 
     /**
      * Update (Store): レビュー更新処理
@@ -223,7 +220,6 @@ class ReviewController extends Controller
         $review->update($request->validated());
 
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
-    }
 
     /**
      * Delete: レビュー削除処理
@@ -235,12 +231,10 @@ class ReviewController extends Controller
         // 1. まず`ReviewPolicy`で認可チェック。
         // 2. 削除後リダイレクトするために、削除前に親のBookモデルを`$book`変数に保持しておく。
         // 3. `delete()`メソッドで削除を実行。
-        $this->authorize('delete', $review);
-        $book = $review->book;
+       $this->authorize('delete', $review);        $book = $review->book;
         $review->delete();
 
         return redirect()->route('books.show', $book)->with('success', 'レビューを削除しました。');
-    }
 }
 ```
 
@@ -264,23 +258,19 @@ touch resources/views/reviews/edit.blade.php
 ```html
 <x-app-layout>
     <x-slot name="header">レビューの編集</x-slot>
-    <form action="{{ route('reviews.update', $review) }}" method="POST">
-        @method('PUT')
-        @csrf
+   <form action="{{ route('reviews.update', $review) }}" method="POST">       @method('PUT')        @csrf
         <div>
             <label for="rating">評価</label>
             <select name="rating" id="rating" required>
                 @for ($i = 1; $i <= 5; $i++)
-                    <option value="{{ $i }}" {{ old('rating', $review->rating) == $i ? 'selected' : '' }}>
-                        {{ $i }}
+               <option value="{{ $i }}" {{ old('rating', $review->rating) == $i ? 'selected' : '' }}>                        {{ $i }}
                     </option>
                 @endfor
             </select>
         </div>
         <div>
             <label for="comment">コメント</label>
-            <textarea name="comment" id="comment">{{ old('comment', $review->comment) }}</textarea>
-        </div>
+           <textarea name="comment" id="comment">{{ old('comment', $review->comment) }}</textarea>        </div>
         <button type="submit">更新する</button>
     </form>
 </x-app-layout>
@@ -292,9 +282,7 @@ touch resources/views/reviews/edit.blade.php
 
 ```html
 <!-- レビュー投稿フォーム -->
-@auth
-<form action="{{ route('reviews.store', $book) }}" method="POST">
-    @csrf
+@auth<form action="{{ route('reviews.store', $book) }}" method="POST">    @csrf
     <!-- 評価とコメントの入力欄 -->
     <button type="submit">レビューを投稿</button>
 </form>
@@ -306,20 +294,17 @@ touch resources/views/reviews/edit.blade.php
     <p>評価: {{ $review->rating }}</p>
     <p>{{ $review->comment }}</p>
     @can('update', $review)
-        <a href="{{ route('reviews.edit', $review) }}">編集</a>
+      <a href="{{ route('reviews.edit', $review) }}">編集</a>
     @endcan
-    @can('delete', $review)
-        <form action="{{ route('reviews.destroy', $review) }}" method="POST">
-            @csrf
-            @method('DELETE')
-            <button type="submit">削除</button>
+   @can('delete', $review)        <form action="{{ route('reviews.destroy', $review) }}" method="POST">           @csrf
+            @method('DELETE')           <button type="submit">削除</button>
         </form>
     @endcan
 @endforeach
 ```
 
 > **【学習のポイント】**
-> `@can('update', $review)`というBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
+> `@can('update', $review)いうBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
 
 ---
 

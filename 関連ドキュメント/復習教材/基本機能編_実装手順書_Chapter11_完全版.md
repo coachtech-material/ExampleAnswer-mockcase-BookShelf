@@ -68,7 +68,7 @@ class GenreController extends Controller
         $books = $genre->books()->with(\'genres\')->latest()->paginate(10);
 
         // ジャンル名と、そのジャンルに属する書籍一覧をビューに渡す
-        return view(\'genres.show\', compact(\'genre\', \'books\'));
+        return view('genres.show', compact('genre', 'books'));
     }
 
     // index, create, storeなどのメソッドは後のChapterで実装
@@ -81,7 +81,7 @@ class GenreController extends Controller
 
 ```php
 // `routes/web.php` の `Route::middleware(\'auth\')` の外に記述
-Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
+Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 ```
 
 ### 3. ビューの実装 (`resources/views/genres/show.blade.php`)
@@ -112,7 +112,7 @@ touch resources/views/genres/show.blade.php
                 <!-- 書籍一覧の表示（books.indexとほぼ同じ） -->
                 @foreach ($books as $book)
                     <div>
-                        <a href="{{ route(\'books.show\', $book) }}">
+                        <a href="{{ route('books.show', $book) }}">
                             <h3>{{ $book->title }}</h3>
                             <p>著者: {{ $book->author }}</p>
                             <div>

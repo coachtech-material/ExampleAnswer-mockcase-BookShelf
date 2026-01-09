@@ -119,14 +119,14 @@ public function rules(): array
 {
     return [
         // ルールは要件定義書通りに記述
-        \_title\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_author\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_isbn\_ => [\_required\_, \_string\_, \_size:13\_, \_unique:books,isbn\_], // booksテーブル内でユニーク
-        \_published_date\_ => [\_required\_, \_date\_],
-        \_description\_ => [\_nullable\_, \_string\_],
-        \_image_url\_ => [\_nullable\_, \_url\_],
-        \_genres\_ => [\_required\_, \_array\_], // ジャンルは必須
-        \_genres.*\_ => [\_exists:genres,id\_], // 配列内の各IDがgenresテーブルに存在するか
+        'title' => ['required', 'string', 'max:255'],
+        'author' => ['required', 'string', 'max:255'],
+        'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
+        'published_date' => ['required', 'date'],
+        'description' => ['nullable', 'string'],
+        'image_url' => ['nullable', 'url'],
+        'genres' => ['required', 'array'], // ジャンルは必須
+        'genres.*' => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
     ];
 }
 ```
@@ -140,12 +140,12 @@ public function rules(): array
 {
     return [
         // ... 他はStoreBookRequestと同じ
-        \_isbn\_ => [
-            \_required\_,
-            \_string\_,
-            \_size:13\_,
+        'isbn' => [
+            'required',
+            'string',
+            'size:13',
             // 更新時は、自分自身のISBNはユニークチェックの対象外にする必要がある
-            Rule::unique(\_books\_)->ignore($this->book),
+            Rule::unique('books')->ignore($this->book),
         ],
         // ...
     ];
@@ -165,26 +165,26 @@ use App\Http\Controllers\BookController;
 use Illuminate\Support\Facades\Route;
 
 // --- Public routes (誰でもアクセス可能) ---
-Route::get(\'/\', [BookController::class, \'index\'])->name(\'home\');
-Route::get(\'/books\', [BookController::class, \'index\'])->name(\'books.index\');
-Route::get(\'/books/{book}\', [BookController::class, \'show\'])->name(\'books.show\');
+Route::get('/', [BookController::class, \'index\'])->name(\'home\');
+Route::get('/books', [BookController::class, \'index\'])->name(\'books.index\');
+Route::get('/books/{book}', [BookController::class, \'show\'])->name(\'books.show\');
 
 // --- Authenticated routes (ログイン必須) ---
-Route::middleware(\'auth\')->group(function () {
+Route::middleware('auth')->group(function () {
     // 書籍登録
-    Route::get(\'/books/create\', [BookController::class, \'create\'])->name(\'books.create\');
-    Route::post(\'/books\', [BookController::class, \'store\'])->name(\'books.store\');
+    Route::get('/books/create', [BookController::class, \'create\'])->name(\'books.create\');
+    Route::post('/books', [BookController::class, \'store\'])->name(\'books.store\');
 
     // 書籍編集
-    Route::get(\'/books/{book}/edit\', [BookController::class, \'edit\'])->name(\'books.edit\');
-    Route::put(\'/books/{book}\', [BookController::class, \'update\'])->name(\'books.update\');
+    Route::get('/books/{book}/edit', [BookController::class, \'edit\'])->name(\'books.edit\');
+    Route::put('/books/{book}', [BookController::class, \'update\'])->name(\'books.update\');
 
     // 書籍削除
-    Route::delete(\'/books/{book}\', [BookController::class, \'destroy\'])->name(\'books.destroy\');
+    Route::delete('/books/{book}', [BookController::class, \'destroy\'])->name(\'books.destroy\');
 });
 
 // 認証関連のルートを読み込む
-require __DIR__.\'/auth.php\';
+require __DIR__.'/auth.php';
 ```
 
 ---
@@ -343,18 +343,18 @@ touch resources/views/books/edit.blade.php
 <!-- Title, Author, ISBN, etc. fields -->
 <div>
     <label for="title">タイトル</label>
-    <input type="text" name="title" id="title" value="{{ old(\'title\', $book->title ?? \'\') }}" required>
-    @error(\'title\')<p>{{ $message }}</p>@enderror
+    <input type="text" name="title" id="title" value="{{ old('title', $book->title ?? '') }}" required>
+    @error('title')<p>{{ $message }}</p>@enderror
 </div>
 <!-- ... other fields ... -->
 <div>
     <label>ジャンル</label>
     @foreach($genres as $genre)
         <input type="checkbox" name="genres[]" value="{{ $genre->id }}" 
-               @if(in_array($genre->id, old(\'genres\', $book->genres->pluck(\'id\')->toArray() ?? []))) checked @endif>
+               @if(in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
         <label>{{ $genre->name }}</label>
     @endforeach
-    @error(\'genres\')<p>{{ $message }}</p>@enderror
+    @error('genres')<p>{{ $message }}</p>@enderror
 </div>
 ```
 
@@ -363,8 +363,8 @@ touch resources/views/books/edit.blade.php
 ```html
 <x-app-layout>
     <x-slot name="header">書籍の登録</x-slot>
-    <form action="{{ route(\'books.store\') }}" method="POST">
-        @include(\'books._form\')
+    <form action="{{ route('books.store') }}" method="POST">
+        @include('books._form')
         <button type="submit">登録する</button>
     </form>
 </x-app-layout>
@@ -375,9 +375,9 @@ touch resources/views/books/edit.blade.php
 ```html
 <x-app-layout>
     <x-slot name="header">書籍の編集</x-slot>
-    <form action="{{ route(\'books.update\', $book) }}" method="POST">
-        @method(\'PUT\')
-        @include(\'books._form\')
+    <form action="{{ route('books.update', $book) }}" method="POST">
+        @method('PUT')
+        @include('books._form')
         <button type="submit">更新する</button>
     </form>
 </x-app-layout>
