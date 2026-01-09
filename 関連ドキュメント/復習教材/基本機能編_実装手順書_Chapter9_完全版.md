@@ -150,8 +150,6 @@ touch resources/views/ranking/index.blade.php
 
 コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
 
-コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
-
 ```html
 <x-app-layout>
     <x-slot name="header">
