@@ -6,8 +6,6 @@
 
 ## 5-1. 先輩エンジニアの思考プロセス：要件をCRUDに分解し、実装に落とし込む
 
-CRUDは「Create（生成）、Read（読み取り）、Update（更新）、Delete（削除）」の頭文字を取ったもので、ほとんどのWebアプリケーションの基本機能です。要件定義書に出てくる「〇〇管理機能」は、ほぼこのCRUDに分解できます。
-
 ### Step 1: 要件定義書からCRUD操作をマッピングする
 
 まず、`基本機能編_要件定義書_基本設計書_詳細度100%.md`の「書籍管理機能」の項目を、CRUDと具体的なアクション（メソッド）にマッピングします。
@@ -38,38 +36,6 @@ CRUDは「Create（生成）、Read（読み取り）、Update（更新）、Del
 ---
 
 ## 5.2. 部品の作成 (Artisanコマンド)
-
-まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
-
-```bash
-# CRUDの7メソッドを持つコントローラーを作成
-sail artisan make:controller BookController --resource
-
-# 書籍登録用のバリデーションルールを定義するクラスを作成
-sail artisan make:request StoreBookRequest
-
-# 書籍更新用のバリデーションルールを定義するクラスを作成
-sail artisan make:request UpdateBookRequest
-
-# 書籍の認可ロジックを定義するクラスを作成
-sail artisan make:policy BookPolicy --model=Book
-```
-
-まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
-
-```bash
-# CRUDの7メソッドを持つコントローラーを作成
-sail artisan make:controller BookController --resource
-
-# 書籍登録用のバリデーションルールを定義するクラスを作成
-sail artisan make:request StoreBookRequest
-
-# 書籍更新用のバリデーションルールを定義するクラスを作成
-sail artisan make:request UpdateBookRequest
-
-# 書籍の認可ロジックを定義するクラスを作成
-sail artisan make:policy BookPolicy --model=Book
-```
 
 まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
 
@@ -125,7 +91,6 @@ sail artisan make:policy BookPolicy --model=Book
 ---
 
 ## 5.4. バリデーションルールの実装 (FormRequest)
-
 **要件**: 「タイトルと著者は必須」「ISBNは13桁で、重複してはならない」など、要件定義書に定められた入力データに関するルールを実装します。
 
 ### `app/Http/Requests/StoreBookRequest.php` (登録用)
@@ -135,14 +100,14 @@ public function rules(): array
 {
     return [
         // ルールは要件定義書通りに記述
-        \_title\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_author\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_isbn\_ => [\_required\_, \_string\_, \_size:13\_, \_unique:books,isbn\_], // booksテーブル内でユニーク
-        \_published_date\_ => [\_required\_, \_date\_],
-        \_description\_ => [\_nullable\_, \_string\_],
-        \_image_url\_ => [\_nullable\_, \_url\_],
-        \_genres\_ => [\_required\_, \_array\_], // ジャンルは必須
-        \_genres.*\_ => [\_exists:genres,id\_], // 配列内の各IDがgenresテーブルに存在するか
+        'title' => ['required', 'string', 'max:255'],
+        'author' => ['required', 'string', 'max:255'],
+        'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
+        'published_date' => ['required', 'date'],
+        'description' => ['nullable', 'string'],
+        'image_url' => ['nullable', 'url'],
+        'genres' => ['required', 'array'], // ジャンルは必須
+        'genres.*' => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
     ];
 }
 ```
@@ -156,12 +121,12 @@ public function rules(): array
 {
     return [
         // ... 他はStoreBookRequestと同じ
-        \_isbn\_ => [
-            \_required\_,
-            \_string\_,
-            \_size:13\_,
+        'isbn' => [
+            'required',
+            'string',
+            'size:13',
             // 更新時は、自分自身のISBNはユニークチェックの対象外にする必要がある
-            Rule::unique(\_books\_)->ignore($this->book),
+            Rule::unique('books')->ignore($this->book),
         ],
         // ...
     ];
@@ -181,32 +146,31 @@ use App\Http\Controllers\BookController;
 use Illuminate\Support\Facades\Route;
 
 // --- Public routes (誰でもアクセス可能) ---
-Route::get(\'/\', [BookController::class, \'index\'])->name(\'home\');
-Route::get(\'/books\', [BookController::class, \'index\'])->name(\'books.index\');
-Route::get(\'/books/{book}\', [BookController::class, \'show\'])->name(\'books.show\');
+Route::get('/', [BookController::class, 'index'])->name('home');
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 
 // --- Authenticated routes (ログイン必須) ---
-Route::middleware(\'auth\')->group(function () {
+Route::middleware('auth')->group(function () {
     // 書籍登録
-    Route::get(\'/books/create\', [BookController::class, \'create\'])->name(\'books.create\');
-    Route::post(\'/books\', [BookController::class, \'store\'])->name(\'books.store\');
+    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
+    Route::post('/books', [BookController::class, 'store'])->name('books.store');
 
     // 書籍編集
-    Route::get(\'/books/{book}/edit\', [BookController::class, \'edit\'])->name(\'books.edit\');
-    Route::put(\'/books/{book}\', [BookController::class, \'update\'])->name(\'books.update\');
+    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
+    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
 
     // 書籍削除
-    Route::delete(\'/books/{book}\', [BookController::class, \'destroy\'])->name(\'books.destroy\');
+    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 });
 
 // 認証関連のルートを読み込む
-require __DIR__.\'/auth.php\';
+require __DIR__.'/auth.php';
 ```
 
 ---
 
 ## 5.6. コントローラーの実装 (`BookController.php`)
-
 いよいよ司令塔であるコントローラーを実装します。各メソッドが「要件」からどのように「実装」に落とし込まれるかを意識して読み進めてください。
 
 ```php
@@ -259,9 +223,9 @@ class BookController extends Controller
         // 2. `user_id`を自動で付与するため、`$request->user()->books()->create()`を使う。
         // 3. 多対多のリレーションを保存するため、`attach()`メソッドでジャンルIDを中間テーブルに保存する。
         $validated = $request->validated();
-        $bookData = collect($validated)->except(\'genres\')->toArray();
+        $bookData = collect($validated)->except('genres')->toArray();
         $book = $request->user()->books()->create($bookData);
-        $book->genres()->attach($validated[\'genres\']);
+        $book->genres()->attach($validated['genres']);
 
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
@@ -333,7 +297,6 @@ class BookController extends Controller
 ---
 
 ## 5.7. ビューの実装 (Blade)
-
 最後に、ユーザーが操作する画面を作成します。登録画面と編集画面はフォームの内容がほぼ同じなため、共通パーツとして切り出すのが定石です。
 
 ### 共通フォーム部品 (`resources/views/books/_form.blade.php`)
@@ -352,39 +315,23 @@ touch resources/views/books/edit.blade.php
 
 登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
 
-まず、必要なディレクトリと空のファイルを作成します。
-
-```bash
-# ディレクトリを作成
-mkdir -p resources/views/books
-
-# 空のファイルを作成
-touch resources/views/books/_form.blade.php
-touch resources/views/books/create.blade.php
-touch resources/views/books/edit.blade.php
-```
-
-登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
-
-登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
-
 ```html
 @csrf
 <!-- Title, Author, ISBN, etc. fields -->
 <div>
     <label for="title">タイトル</label>
-    <input type="text" name="title" id="title" value="{{ old(\'title\', $book->title ?? \'\') }}" required>
-    @error(\'title\')<p>{{ $message }}</p>@enderror
+    <input type="text" name="title" id="title" value="{{ old('title', $book->title ?? '') }}" required>
+    @error('title')<p>{{ $message }}</p>@enderror
 </div>
 <!-- ... other fields ... -->
 <div>
     <label>ジャンル</label>
     @foreach($genres as $genre)
         <input type="checkbox" name="genres[]" value="{{ $genre->id }}" 
-               @if(in_array($genre->id, old(\'genres\', $book->genres->pluck(\'id\')->toArray() ?? []))) checked @endif>
+               @if(in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
         <label>{{ $genre->name }}</label>
     @endforeach
-    @error(\'genres\')<p>{{ $message }}</p>@enderror
+    @error('genres')<p>{{ $message }}</p>@enderror
 </div>
 ```
 
@@ -393,8 +340,8 @@ touch resources/views/books/edit.blade.php
 ```html
 <x-app-layout>
     <x-slot name="header">書籍の登録</x-slot>
-    <form action="{{ route(\'books.store\') }}" method="POST">
-        @include(\'books._form\')
+    <form action="{{ route('books.store') }}" method="POST">
+        @include('books._form')
         <button type="submit">登録する</button>
     </form>
 </x-app-layout>
@@ -405,9 +352,9 @@ touch resources/views/books/edit.blade.php
 ```html
 <x-app-layout>
     <x-slot name="header">書籍の編集</x-slot>
-    <form action="{{ route(\'books.update\', $book) }}" method="POST">
-        @method(\'PUT\')
-        @include(\'books._form\')
+    <form action="{{ route('books.update', $book) }}" method="POST">
+        @method('PUT')
+        @include('books._form')
         <button type="submit">更新する</button>
     </form>
 </x-app-layout>

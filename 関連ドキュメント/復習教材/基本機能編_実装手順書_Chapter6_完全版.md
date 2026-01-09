@@ -1,4 +1,3 @@
-'''
 # Chapter 6: レビュー機能
 
 このChapterでは、書籍に対してレビュー（評価とコメント）を投稿・編集・削除できる機能を実装します。書籍という「親」のデータに紐付く「子」のデータ（レビュー）をどう扱うかがポイントです。
@@ -49,28 +48,6 @@ sail artisan make:request UpdateReviewRequest
 sail artisan make:policy ReviewPolicy --model=Review
 ```
 
-レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
-
-```bash
-# ReviewControllerには--resourceは不要。indexやshowは使わないため
-sail artisan make:controller ReviewController
-
-sail artisan make:request StoreReviewRequest
-sail artisan make:request UpdateReviewRequest
-sail artisan make:policy ReviewPolicy --model=Review
-```
-
-レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
-
-```bash
-# ReviewControllerには--resourceは不要。indexやshowは使わないため
-sail artisan make:controller ReviewController
-
-sail artisan make:request StoreReviewRequest
-sail artisan make:request UpdateReviewRequest
-sail artisan make:policy ReviewPolicy --model=Review
-```
-
 ---
 
 ## 6.3. 認可ルールの実装 (Policy)
@@ -104,7 +81,6 @@ sail artisan make:policy ReviewPolicy --model=Review
 ---
 
 ## 6.4. バリデーションルールの実装 (FormRequest)
-
 **要件**: 「評価は1〜5の整数で必須」「コメントは1000文字以内」
 
 ### `app/Http/Requests/StoreReviewRequest.php`
@@ -113,8 +89,8 @@ sail artisan make:policy ReviewPolicy --model=Review
 public function rules(): array
 {
     return [
-        \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
-        \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
+        'rating' => ['required', 'integer', 'min:1', 'max:5'],
+        'comment' => ['nullable', 'string', 'max:1000'],
     ];
 }
 ```
@@ -258,19 +234,7 @@ class ReviewController extends Controller
 ---
 
 ## 6.7. ビューの実装
-
 ### レビュー編集画面 (`resources/views/reviews/edit.blade.php`)
-
-まず、必要なディレクトリと空のファイルを作成します。
-
-```bash
-# ディレクトリを作成
-mkdir -p resources/views/reviews
-
-# 空のファイルを作成
-touch resources/views/reviews/edit.blade.php
-```
-
 
 まず、必要なディレクトリと空のファイルを作成します。
 
@@ -354,4 +318,3 @@ touch resources/views/reviews/edit.blade.php
 5.  削除ボタンを押し、レビューが一覧から消えることを確認します。
 
 これで、レビュー機能の実装が完了しました。
-'''

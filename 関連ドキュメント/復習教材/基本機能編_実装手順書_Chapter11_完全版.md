@@ -1,3 +1,9 @@
+# Chapter 11: ジャンル別一覧機能
+
+このChapterでは、特定のジャンルに属する書籍を一覧表示する機能を実装します。これは、多くのECサイトやブログで「カテゴリ別一覧」として実装されている、非常に一般的な機能です。Eloquentリレーションシップの強力さを改めて実感できる良い機会です。
+
+---
+
 ## 11-1. 先輩エンジニアの思考プロセス：リレーションを起点としたデータ取得
 
 ### Step 1: 要件とURL設計
@@ -18,7 +24,7 @@
 
 **実装方針:**
 1.  `GenreController`に`show(Genre $genre)`メソッドを作成する。
-2.  `$genre->books()->with(\'genres\')->paginate(10)`というコードで、対象ジャンルの書籍一覧を取得する。
+2.  `$genre->books()->with("genres")->paginate(10)`というコードで、対象ジャンルの書籍一覧を取得する。
 3.  取得したデータ（`$genre`と`$books`）を`genres.show`ビューに渡す。
 4.  `routes/web.php`に`/genres/{genre}`へのGETルートを追加する。
 
@@ -27,22 +33,6 @@
 ## 11.2. 部品の作成と実装
 
 ### 1. コントローラーの作成と`show`メソッドの実装
-
-`GenreController`はまだ作成していなかったので、`artisan`コマンドで作成します。
-
-```bash
-sail artisan make:controller GenreController
-```
-
-次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
-
-`GenreController`はまだ作成していなかったので、`artisan`コマンドで作成します。
-
-```bash
-sail artisan make:controller GenreController
-```
-
-次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
 
 `GenreController`はまだ作成していなかったので、`artisan`コマンドで作成します。
 
@@ -72,11 +62,11 @@ class GenreController extends Controller
         // 思考：
         // 1. ルートモデルバインディングで受け取った`$genre`モデルを起点にする。
         // 2. `books()`リレーションを呼び出して、紐づく書籍を取得する。
-        // 3. 書籍一覧表示なので、N+1問題対策の`with(\'genres\')`とページネーション`paginate(10)`は必須。
-        $books = $genre->books()->with(\'genres\')->latest()->paginate(10);
+        // 3. 書籍一覧表示なので、N+1問題対策の`with("genres")`とページネーション`paginate(10)`は必須。
+        $books = $genre->books()->with("genres")->latest()->paginate(10);
 
         // ジャンル名と、そのジャンルに属する書籍一覧をビューに渡す
-        return view(\'genres.show\', compact(\'genre\', \'books\'));
+        return view("genres.show", compact("genre", "books"));
     }
 
     // index, create, storeなどのメソッドは後のChapterで実装
@@ -88,8 +78,8 @@ class GenreController extends Controller
 誰でも閲覧できる公開ルートとして、ジャンル別一覧ページのルートを定義します。
 
 ```php
-// `routes/web.php` の `Route::middleware(\'auth\')` の外に記述
-Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
+// `routes/web.php` の `Route::middleware("auth")` の外に記述
+Route::get("/genres/{genre}", [GenreController::class, "show"])->name("genres.show");
 ```
 
 ### 3. ビューの実装 (`resources/views/genres/show.blade.php`)
@@ -106,20 +96,6 @@ touch resources/views/genres/show.blade.php
 
 コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
 
-まず、必要なディレクトリと空のファイルを作成します。
-
-```bash
-# ディレクトリを作成
-mkdir -p resources/views/genres
-
-# 空のファイルを作成
-touch resources/views/genres/show.blade.php
-```
-
-コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
-
-コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
-
 ```html
 <x-app-layout>
     <x-slot name="header">
@@ -132,7 +108,7 @@ touch resources/views/genres/show.blade.php
                 <!-- 書籍一覧の表示（books.indexとほぼ同じ） -->
                 @foreach ($books as $book)
                     <div>
-                        <a href="{{ route(\'books.show\', $book) }}">
+                        <a href="{{ route("books.show", $book) }}">
                             <h3>{{ $book->title }}</h3>
                             <p>著者: {{ $book->author }}</p>
                             <div>
