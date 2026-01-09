@@ -55,22 +55,6 @@ sail artisan make:request UpdateBookRequest
 sail artisan make:policy BookPolicy --model=Book
 ```
 
-まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
-
-```bash
-# CRUDの7メソッドを持つコントローラーを作成
-sail artisan make:controller BookController --resource
-
-# 書籍登録用のバリデーションルールを定義するクラスを作成
-sail artisan make:request StoreBookRequest
-
-# 書籍更新用のバリデーションルールを定義するクラスを作成
-sail artisan make:request UpdateBookRequest
-
-# 書籍の認可ロジックを定義するクラスを作成
-sail artisan make:policy BookPolicy --model=Book
-```
-
 ---
 
 ## 5.3. 認可ルールの実装 (Policy)
