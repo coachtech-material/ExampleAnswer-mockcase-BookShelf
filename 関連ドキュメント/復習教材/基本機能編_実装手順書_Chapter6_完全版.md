@@ -81,7 +81,6 @@ sail artisan make:policy ReviewPolicy --model=Review
 ---
 
 ## 6.4. バリデーションルールの実装 (FormRequest)
-
 **要件**: 「評価は1〜5の整数で必須」「コメントは1000文字以内」
 
 ### `app/Http/Requests/StoreReviewRequest.php`
@@ -163,74 +162,53 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use Illuminate\Support\Facades\Auth;
 
 class ReviewController extends Controller
 {
-    /**
-     * Create (Store): レビュー投稿処理
-     */
     public function store(StoreReviewRequest $request, Book $book)
     {
-        // 要件：書籍詳細ページからレビューを投稿できる。
-        // 思考：
-        // 1. 親である`$book`モデルのリレーション(`reviews()`)経由で`create()`を呼ぶ。
-        // 2. これにより、`book_id`が自動的に設定され、コードが簡潔になる。
-        // 3. `user_id`も`$request->user()->id()` (または`Auth::id()`)で設定する。
-        $review = new Review($request->validated());
-        $review->user_id = $request->user()->id;
-        $book->reviews()->save($review);
+        $book->reviews()->create([
+            'user_id' => Auth::id(),
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+        ]);
 
-  return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
-    }   /**
-     * Update (Form): レビュー編集フォーム表示
-     */
-    public function edit(Review $review)
-    {
-        // 要件：自分が投稿したレビューを編集できる。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェックを行う。
-        // 2. 許可されれば、編集対象の`$review`オブジェクトをビューに渡す。
-  $this->authorize(\'update\', $review);
-        return view(\'reviews.edit\', compact(\'review\'));
+        return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
 
-    /**
-     * Update (Store): レビュー更新処理
-     */
+    public function edit(Review $review)
+    {
+        $this->authorize('update', $review);
+        return view('reviews.edit', compact('review'));
+    }
+
     public function update(UpdateReviewRequest $request, Review $review)
     {
-        // 要件：レビュー情報を更新する。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェック。
-        // 2. `update()`メソッドで一括更新。
-        // 3. 更新後は、そのレビューが属していた書籍の詳細ページに戻る必要がある。
-        //    `$review->book`で親のBookモデルを取得できるのがリレーションの強み。
         $this->authorize('update', $review);
-        $review->update($request->validated());
+        $review->update([
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+        ]);
 
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
+    }
 
-    /**
-     * Delete: レビュー削除処理
-     */
     public function destroy(Review $review)
     {
-        // 要件：自分が投稿したレビューを削除できる。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェック。
-        // 2. 削除後リダイレクトするために、削除前に親のBookモデルを`$book`変数に保持しておく。
-        // 3. `delete()`メソッドで削除を実行。
-     $this->authorize(\'delete\', $review);
+        $this->authorize('delete', $review);
         $book = $review->book;
         $review->delete();
 
         return redirect()->route('books.show', $book)->with('success', 'レビューを削除しました。');
+    }
 }
 ```
 
 ---
 
 ## 6.7. ビューの実装
+
 
 ### レビュー編集画面 (`resources/views/reviews/edit.blade.php`)
 
@@ -307,4 +285,3 @@ touch resources/views/reviews/edit.blade.php
 5.  削除ボタンを押し、レビューが一覧から消えることを確認します。
 
 これで、レビュー機能の実装が完了しました。
-'''
