@@ -55,22 +55,6 @@ sail artisan make:request UpdateBookRequest
 sail artisan make:policy BookPolicy --model=Book
 ```
 
-まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
-
-```bash
-# CRUDの7メソッドを持つコントローラーを作成
-sail artisan make:controller BookController --resource
-
-# 書籍登録用のバリデーションルールを定義するクラスを作成
-sail artisan make:request StoreBookRequest
-
-# 書籍更新用のバリデーションルールを定義するクラスを作成
-sail artisan make:request UpdateBookRequest
-
-# 書籍の認可ロジックを定義するクラスを作成
-sail artisan make:policy BookPolicy --model=Book
-```
-
 ---
 
 ## 5.3. 認可ルールの実装 (Policy)
@@ -109,7 +93,6 @@ sail artisan make:policy BookPolicy --model=Book
 ---
 
 ## 5.4. バリデーションルールの実装 (FormRequest)
-
 **要件**: 「タイトルと著者は必須」「ISBNは13桁で、重複してはならない」など、要件定義書に定められた入力データに関するルールを実装します。
 
 ### `app/Http/Requests/StoreBookRequest.php` (登録用)
@@ -119,14 +102,14 @@ public function rules(): array
 {
     return [
         // ルールは要件定義書通りに記述
-        'title' => ['required', 'string', 'max:255'],
-        'author' => ['required', 'string', 'max:255'],
-        'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
-        'published_date' => ['required', 'date'],
-        'description' => ['nullable', 'string'],
-        'image_url' => ['nullable', 'url'],
-        'genres' => ['required', 'array'], // ジャンルは必須
-        'genres.*' => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
+        'title'           => ['required', 'string', 'max:255'],
+        'author'          => ['required', 'string', 'max:255'],
+        'isbn'            => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
+        'published_date'  => ['required', 'date'],
+        'description'     => ['nullable', 'string'],
+        'image_url'       => ['nullable', 'url'],
+        'genres'          => ['required', 'array'], // ジャンルは必須
+        'genres.*'        => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
     ];
 }
 ```
@@ -165,22 +148,22 @@ use App\Http\Controllers\BookController;
 use Illuminate\Support\Facades\Route;
 
 // --- Public routes (誰でもアクセス可能) ---
-Route::get('/', [BookController::class, \'index\'])->name(\'home\');
-Route::get('/books', [BookController::class, \'index\'])->name(\'books.index\');
-Route::get('/books/{book}', [BookController::class, \'show\'])->name(\'books.show\');
+Route::get('/', [BookController::class, 'index'])->name('home');
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 
 // --- Authenticated routes (ログイン必須) ---
 Route::middleware('auth')->group(function () {
     // 書籍登録
-    Route::get('/books/create', [BookController::class, \'create\'])->name(\'books.create\');
-    Route::post('/books', [BookController::class, \'store\'])->name(\'books.store\');
+    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
+    Route::post('/books', [BookController::class, 'store'])->name('books.store');
 
     // 書籍編集
-    Route::get('/books/{book}/edit', [BookController::class, \'edit\'])->name(\'books.edit\');
-    Route::put('/books/{book}', [BookController::class, \'update\'])->name(\'books.update\');
+    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
+    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
 
     // 書籍削除
-    Route::delete('/books/{book}', [BookController::class, \'destroy\'])->name(\'books.destroy\');
+    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 });
 
 // 認証関連のルートを読み込む
@@ -190,7 +173,6 @@ require __DIR__.'/auth.php';
 ---
 
 ## 5.6. コントローラーの実装 (`BookController.php`)
-
 いよいよ司令塔であるコントローラーを実装します。各メソッドが「要件」からどのように「実装」に落とし込まれるかを意識して読み進めてください。
 
 ```php
@@ -243,9 +225,9 @@ class BookController extends Controller
         // 2. `user_id`を自動で付与するため、`$request->user()->books()->create()`を使う。
         // 3. 多対多のリレーションを保存するため、`attach()`メソッドでジャンルIDを中間テーブルに保存する。
         $validated = $request->validated();
-        $bookData = collect($validated)->except(\'genres\')->toArray();
+        $bookData = collect($validated)->except('genres')->toArray();
         $book = $request->user()->books()->create($bookData);
-        $book->genres()->attach($validated[\'genres\']);
+        $book->genres()->attach($validated['genres']);
 
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
@@ -317,7 +299,6 @@ class BookController extends Controller
 ---
 
 ## 5.7. ビューの実装 (Blade)
-
 最後に、ユーザーが操作する画面を作成します。登録画面と編集画面はフォームの内容がほぼ同じなため、共通パーツとして切り出すのが定石です。
 
 ### 共通フォーム部品 (`resources/views/books/_form.blade.php`)
@@ -333,8 +314,6 @@ touch resources/views/books/_form.blade.php
 touch resources/views/books/create.blade.php
 touch resources/views/books/edit.blade.php
 ```
-
-登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
 
 登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
 
