@@ -1,3 +1,4 @@
+'''
 # Chapter 6: レビュー機能
 
 このChapterでは、書籍に対してレビュー（評価とコメント）を投稿・編集・削除できる機能を実装します。書籍という「親」のデータに紐付く「子」のデータ（レビュー）をどう扱うかがポイントです。
@@ -162,65 +163,41 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use Illuminate\Support\Facades\Auth;
 
 class ReviewController extends Controller
 {
-    /**
-     * Create (Store): レビュー投稿処理
-     */
     public function store(StoreReviewRequest $request, Book $book)
     {
-        // 要件：書籍詳細ページからレビューを投稿できる。
-        // 思考：
-        // 1. 親である`$book`モデルのリレーション(`reviews()`)経由で`create()`を呼ぶ。
-        // 2. これにより、`book_id`が自動的に設定され、コードが簡潔になる。
-        // 3. `user_id`も`$request->user()->id()` (または`Auth::id()`)で設定する。
-        $review = new Review($request->validated());
-        $review->user_id = $request->user()->id;
-        $book->reviews()->save($review);
+        $book->reviews()->create([
+            'user_id' => Auth::id(),
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+        ]);
 
-        return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
+        return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
-    /**
-     * Update (Form): レビュー編集フォーム表示
-     */
+
     public function edit(Review $review)
     {
-        // 要件：自分が投稿したレビューを編集できる。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェックを行う。
-        // 2. 許可されれば、編集対象の`$review`オブジェクトをビューに渡す。
-       $this->authorize(\'update\', $review);
-        return view(\'reviews.edit\', compact(\'review\'));
+        $this->authorize('update', $review);
+        return view('reviews.edit', compact('review'));
     }
-    /**
-     * Update (Store): レビュー更新処理
-     */
+
     public function update(UpdateReviewRequest $request, Review $review)
     {
-        // 要件：レビュー情報を更新する。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェック。
-        // 2. `update()`メソッドで一括更新。
-        // 3. 更新後は、そのレビューが属していた書籍の詳細ページに戻る必要がある。
-        //    `$review->book`で親のBookモデルを取得できるのがリレーションの強み。
         $this->authorize('update', $review);
-        $review->update($request->validated());
+        $review->update([
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+        ]);
 
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
     }
 
-    /**
-     * Delete: レビュー削除処理
-     */
     public function destroy(Review $review)
     {
-        // 要件：自分が投稿したレビューを削除できる。
-        // 思考：
-        // 1. まず`ReviewPolicy`で認可チェック。
-        // 2. 削除後リダイレクトするために、削除前に親のBookモデルを`$book`変数に保持しておく。
-        // 3. `delete()`メソッドで削除を実行。
-        $this->authorize(\'delete\', $review);
+        $this->authorize('delete', $review);
         $book = $review->book;
         $review->delete();
 
@@ -232,6 +209,8 @@ class ReviewController extends Controller
 ---
 
 ## 6.7. ビューの実装
+
+
 ### レビュー編集画面 (`resources/views/reviews/edit.blade.php`)
 
 まず、必要なディレクトリと空のファイルを作成します。
@@ -247,25 +226,21 @@ touch resources/views/reviews/edit.blade.php
 
 ```html
 <x-app-layout>
-    <x-slot name="header">レビューの編集</x-slot>
-    <form action="{{ route('reviews.update', $review) }}" method="POST">
-        @method('PUT')
-        @csrf
+    <x-slot name=\"header\">レビューの編集</x-slot>
+   <form action=\"{{ route('reviews.update', $review) }}\" method=\"POST\">       @method('PUT')        @csrf
         <div>
-            <label for="rating">評価</label>
-            <select name="rating" id="rating" required>
+            <label for=\"rating\">評価</label>
+            <select name=\"rating\" id=\"rating\" required>
                 @for ($i = 1; $i <= 5; $i++)
-                    <option value="{{ $i }}" {{ old('rating', $review->rating) == $i ? 'selected' : '' }}>
-                        {{ $i }}
+               <option value=\"{{ $i }}\" {{ old('rating', $review->rating) == $i ? 'selected' : '' }}>                        {{ $i }}
                     </option>
                 @endfor
             </select>
         </div>
         <div>
-            <label for="comment">コメント</label>
-            <textarea name="comment" id="comment">{{ old('comment', $review->comment) }}</textarea>
-        </div>
-        <button type="submit">更新する</button>
+            <label for=\"comment\">コメント</label>
+           <textarea name=\"comment\" id=\"comment\">{{ old('comment', $review->comment) }}</textarea>        </div>
+        <button type=\"submit\">更新する</button>
     </form>
 </x-app-layout>
 ```
@@ -276,11 +251,9 @@ touch resources/views/reviews/edit.blade.php
 
 ```html
 <!-- レビュー投稿フォーム -->
-@auth
-<form action="{{ route('reviews.store', $book) }}" method="POST">
-    @csrf
+@auth<form action=\"{{ route('reviews.store', $book) }}\" method=\"POST\">    @csrf
     <!-- 評価とコメントの入力欄 -->
-    <button type="submit">レビューを投稿</button>
+    <button type=\"submit\">レビューを投稿</button>
 </form>
 @endauth
 
@@ -290,20 +263,17 @@ touch resources/views/reviews/edit.blade.php
     <p>評価: {{ $review->rating }}</p>
     <p>{{ $review->comment }}</p>
     @can('update', $review)
-        <a href="{{ route('reviews.edit', $review) }}">編集</a>
+      <a href=\"{{ route('reviews.edit', $review) }}\">編集</a>
     @endcan
-    @can('delete', $review)
-        <form action="{{ route('reviews.destroy', $review) }}" method="POST">
-            @csrf
-            @method('DELETE')
-            <button type="submit">削除</button>
+   @can('delete', $review)        <form action=\"{{ route('reviews.destroy', $review) }}\" method=\"POST\">           @csrf
+            @method('DELETE')           <button type=\"submit\">削除</button>
         </form>
     @endcan
 @endforeach
 ```
 
 > **【学習のポイント】**
-> `@can('update', $review)`というBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
+> `@can('update', $review)いうBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
 
 ---
 
@@ -316,3 +286,4 @@ touch resources/views/reviews/edit.blade.php
 5.  削除ボタンを押し、レビューが一覧から消えることを確認します。
 
 これで、レビュー機能の実装が完了しました。
+'''
