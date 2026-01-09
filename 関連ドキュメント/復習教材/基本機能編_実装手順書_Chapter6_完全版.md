@@ -48,17 +48,6 @@ sail artisan make:request UpdateReviewRequest
 sail artisan make:policy ReviewPolicy --model=Review
 ```
 
-レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
-
-```bash
-# ReviewControllerには--resourceは不要。indexやshowは使わないため
-sail artisan make:controller ReviewController
-
-sail artisan make:request StoreReviewRequest
-sail artisan make:request UpdateReviewRequest
-sail artisan make:policy ReviewPolicy --model=Review
-```
-
 ---
 
 ## 6.3. 認可ルールの実装 (Policy)
