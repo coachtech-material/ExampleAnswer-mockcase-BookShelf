@@ -192,9 +192,8 @@ class ReviewController extends Controller
         $review->user_id = $request->user()->id;
         $book->reviews()->save($review);
 
-     return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');  }
-
-    /**
+  return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
+    }   /**
      * Update (Form): レビュー編集フォーム表示
      */
     public function edit(Review $review)
@@ -203,7 +202,9 @@ class ReviewController extends Controller
         // 思考：
         // 1. まず`ReviewPolicy`で認可チェックを行う。
         // 2. 許可されれば、編集対象の`$review`オブジェクトをビューに渡す。
-        $this->authorize('update', $review);      return view('reviews.edit', compact('review'));  }
+  $this->authorize(\'update\', $review);
+        return view(\'reviews.edit\', compact(\'review\'));
+    }
 
     /**
      * Update (Store): レビュー更新処理
@@ -231,7 +232,8 @@ class ReviewController extends Controller
         // 1. まず`ReviewPolicy`で認可チェック。
         // 2. 削除後リダイレクトするために、削除前に親のBookモデルを`$book`変数に保持しておく。
         // 3. `delete()`メソッドで削除を実行。
-       $this->authorize('delete', $review);        $book = $review->book;
+     $this->authorize(\'delete\', $review);
+        $book = $review->book;
         $review->delete();
 
         return redirect()->route('books.show', $book)->with('success', 'レビューを削除しました。');
