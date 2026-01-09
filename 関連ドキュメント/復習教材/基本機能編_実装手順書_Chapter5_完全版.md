@@ -100,19 +100,19 @@ sail artisan make:policy BookPolicy --model=Book
 
 ```php
 public function rules(): array
-{
-    return [
-        // ルールは要件定義書通りに記述
-        \_title\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_author\_ => [\_required\_, \_string\_, \_max:255\_],
-        \_isbn\_ => [\_required\_, \_string\_, \_size:13\_, \_unique:books,isbn\_], // booksテーブル内でユニーク
-        \_published_date\_ => [\_required\_, \_date\_],
-        \_description\_ => [\_nullable\_, \_string\_],
-        \_image_url\_ => [\_nullable\_, \_url\_],
-        \_genres\_ => [\_required\_, \_array\_], // ジャンルは必須
-        \_genres.*\_ => [\_exists:genres,id\_], // 配列内の各IDがgenresテーブルに存在するか
-    ];
-}
+    {
+        return [
+            // ルールは要件定義書通りに記述
+            'title'           => ['required', 'string', 'max:255'],
+            'author'          => ['required', 'string', 'max:255'],
+            'isbn'            => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
+            'published_date'  => ['required', 'date'],
+            'description'     => ['nullable', 'string'],
+            'image_url'       => ['nullable', 'url'],
+            'genres'          => ['required', 'array'], // ジャンルは必須
+            'genres.*'        => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
+        ];
+    }
 ```
 
 ### `app/Http/Requests/UpdateBookRequest.php` (更新用)
