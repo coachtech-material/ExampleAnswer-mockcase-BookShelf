@@ -1,4 +1,3 @@
-'''
 # Chapter 6: レビュー機能
 
 このChapterでは、書籍に対してレビュー（評価とコメント）を投稿・編集・削除できる機能を実装します。書籍という「親」のデータに紐付く「子」のデータ（レビュー）をどう扱うかがポイントです。
@@ -37,17 +36,6 @@
 ---
 
 ## 6.2. 部品の作成 (Artisanコマンド)
-
-レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
-
-```bash
-# ReviewControllerには--resourceは不要。indexやshowは使わないため
-sail artisan make:controller ReviewController
-
-sail artisan make:request StoreReviewRequest
-sail artisan make:request UpdateReviewRequest
-sail artisan make:policy ReviewPolicy --model=Review
-```
 
 レビュー機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を作成します。
 
