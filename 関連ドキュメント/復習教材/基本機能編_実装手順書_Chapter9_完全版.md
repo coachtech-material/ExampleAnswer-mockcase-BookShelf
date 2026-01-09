@@ -79,10 +79,6 @@ LIMIT 10; -- 上位10件に絞り込む
 sail artisan make:controller RankingController
 ```
 
-```bash
-sail artisan make:controller RankingController
-```
-
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 誰でも閲覧できる公開ルートとして、ランキングページのルートを定義します。
