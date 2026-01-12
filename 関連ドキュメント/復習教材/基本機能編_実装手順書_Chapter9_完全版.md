@@ -1,4 +1,3 @@
-
 # Chapter 9: ランキング機能（集計とSQL）
 
 このChapterでは、レビューの平均評価が高い書籍をランキング形式で表示する機能を実装します。ここでは、Eloquentリレーションシップだけでは効率的に処理できない「集計処理」を、クエリビルダとSQLを直接使って実装する方法を学びます。
@@ -79,10 +78,6 @@ LIMIT 10; -- 上位10件に絞り込む
 sail artisan make:controller RankingController
 ```
 
-```bash
-sail artisan make:controller RankingController
-```
-
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 誰でも閲覧できる公開ルートとして、ランキングページのルートを定義します。
@@ -151,8 +146,6 @@ mkdir -p resources/views/ranking
 # 空のファイルを作成
 touch resources/views/ranking/index.blade.php
 ```
-
-コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
 
 コントローラーから渡された`$rankedBooks`コレクションをループして、ランキングを表示します。
 

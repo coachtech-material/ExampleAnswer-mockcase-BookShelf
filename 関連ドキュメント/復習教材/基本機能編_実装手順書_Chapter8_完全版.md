@@ -32,10 +32,6 @@
 sail artisan make:controller ReviewLikeController
 ```
 
-```bash
-sail artisan make:controller ReviewLikeController
-```
-
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 `middleware('auth')`グループ内にルートを追加します。

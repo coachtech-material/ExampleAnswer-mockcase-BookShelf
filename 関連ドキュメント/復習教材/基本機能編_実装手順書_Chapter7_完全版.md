@@ -44,10 +44,6 @@
 sail artisan make:controller FavoriteController
 ```
 
-```bash
-sail artisan make:controller FavoriteController
-```
-
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 お気に入り操作のルートを`middleware('auth')`グループ内に追加します。
