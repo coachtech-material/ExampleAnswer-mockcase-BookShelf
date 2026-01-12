@@ -62,8 +62,8 @@ class GenreController extends Controller
         // 思考：
         // 1. ルートモデルバインディングで受け取った`$genre`モデルを起点にする。
         // 2. `books()`リレーションを呼び出して、紐づく書籍を取得する。
-        // 3. 書籍一覧表示なので、N+1問題対策の`with(\'genres\')`とページネーション`paginate(10)`は必須。
-        $books = $genre->books()->with(\'genres\')->latest()->paginate(10);
+        // 3. 書籍一覧表示なので、N+1問題対策の`with('genres')`とページネーション`paginate(10)`は必須。
+        $books = $genre->books()->with('genres')->latest()->paginate(10);
 
         // ジャンル名と、そのジャンルに属する書籍一覧をビューに渡す
         return view('genres.show', compact('genre', 'books'));
