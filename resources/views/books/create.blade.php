@@ -63,7 +63,7 @@
             this.textContent = '検索中...';
 
             try {
-                const response = await fetch(`/books/fetch?isbn=${isbn}`, {
+                const response = await fetch(`/books/isbn/${isbn}`, {
                     headers: {
                         'Accept': 'application/json',
                     },
