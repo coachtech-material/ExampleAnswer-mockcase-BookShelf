@@ -215,9 +215,6 @@ touch resources/views/genres/edit.blade.php
 - **`resources/views/genres/create.blade.php`**: 新規登録フォーム
 - **`resources/views/genres/edit.blade.php`**: 編集フォーム
 
-- **`resources/views/genres/index.blade.php`**: ジャンル一覧と関連書籍数を表示
-- **`resources/views/genres/create.blade.php`**: 新規登録フォーム
-- **`resources/views/genres/edit.blade.php`**: 編集フォーム
 
 各bladeファイルは「Preparedblade-mockcase-BookShelf」を参照してください。
 
