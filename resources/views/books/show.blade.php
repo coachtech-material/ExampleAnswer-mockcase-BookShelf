@@ -92,7 +92,7 @@
                                     @csrf
                                     <div class="mb-4">
                                         <label for="rating" class="block text-sm font-medium text-gray-700 mb-1">評価</label>
-                                        <select name="rating" id="rating" required class="border-gray-300 rounded-md shadow-sm">
+                                        <select name="rating" id="rating" class="border-gray-300 rounded-md shadow-sm">
                                             <option value="">選択してください</option>
                                             @for($i = 5; $i >= 1; $i--)
                                                 <option value="{{ $i }}" {{ old('rating') == $i ? 'selected' : '' }}>
