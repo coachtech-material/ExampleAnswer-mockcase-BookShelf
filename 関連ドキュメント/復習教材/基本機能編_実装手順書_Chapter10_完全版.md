@@ -42,14 +42,6 @@ sail artisan make:controller GenreController
 
 次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
 
-`GenreController`はまだ作成していなかったので、`artisan`コマンドで作成します。
-
-```bash
-sail artisan make:controller GenreController
-```
-
-次に、`app/Http/Controllers/GenreController.php`を開き、`show`メソッドを実装します。
-
 ```php
 <?php
 
