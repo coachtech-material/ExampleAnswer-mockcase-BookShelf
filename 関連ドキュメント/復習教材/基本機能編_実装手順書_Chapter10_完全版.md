@@ -96,8 +96,6 @@ touch resources/views/genres/show.blade.php
 
 コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
 
-コントローラーから渡された`$genre`と`$books`を使って、ジャンル別の書籍一覧ページを作成します。
-
 ```html
 <x-app-layout>
     <x-slot name="header">
