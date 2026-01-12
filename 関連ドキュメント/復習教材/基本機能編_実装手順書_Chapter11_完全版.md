@@ -51,13 +51,6 @@ sail artisan make:request StoreGenreRequest
 sail artisan make:request UpdateGenreRequest
 ```
 
-`GenreController`はChapter 10で作成済みなので、フォームリクエストのみ作成します。
-
-```bash
-sail artisan make:request StoreGenreRequest
-sail artisan make:request UpdateGenreRequest
-```
-
 ### 2. ルーティングの定義 (`routes/web.php`)
 
 `Route::resource`を使い、認証必須ルートグループ内にジャンル管理のルートを定義します。
