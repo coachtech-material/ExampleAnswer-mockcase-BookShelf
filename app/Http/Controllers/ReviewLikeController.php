@@ -7,28 +7,11 @@ use Illuminate\Support\Facades\Auth;
 
 class ReviewLikeController extends Controller
 {
+    // Bladeの要求に合わせて toggle メソッドに変更
     public function toggle(Review $review)
     {
-        $user = Auth::user();
-        
-        if ($user->likedReviews()->where('review_id', $review->id)->exists()) {
-            $user->likedReviews()->detach($review->id);
-        } else {
-            $user->likedReviews()->attach($review->id);
-        }
-        
-        return back();
-    }
-
-    public function store(Review $review)
-    {
-        Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
-        return back();
-    }
-
-    public function destroy(Review $review)
-    {
-        Auth::user()->likedReviews()->detach($review->id);
+        // ユーザーがすでにいいねしていれば解除、していなければ登録を自動で行う
+        Auth::user()->likedReviews()->toggle($review->id);
         return back();
     }
 }
