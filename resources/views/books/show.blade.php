@@ -7,6 +7,11 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            @if (session('success'))
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                    {{ session('success') }}
+                </div>
+            @endif
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <div class="flex flex-col md:flex-row gap-6">
@@ -92,7 +97,7 @@
                                     @csrf
                                     <div class="mb-4">
                                         <label for="rating" class="block text-sm font-medium text-gray-700 mb-1">評価</label>
-                                        <select name="rating" id="rating" required class="border-gray-300 rounded-md shadow-sm">
+                                        <select name="rating" id="rating" class="border-gray-300 rounded-md shadow-sm">
                                             <option value="">選択してください</option>
                                             @for($i = 5; $i >= 1; $i--)
                                                 <option value="{{ $i }}" {{ old('rating') == $i ? 'selected' : '' }}>

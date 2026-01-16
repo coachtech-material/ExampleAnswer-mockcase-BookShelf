@@ -4,7 +4,7 @@
         <label for="title" class="block text-sm font-medium text-gray-700">タイトル <span class="text-red-500">*</span></label>
         <input type="text" name="title" id="title" value="{{ old('title', $book->title ?? '') }}" 
                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-               placeholder="例: 吾輩は猫である" required>
+               placeholder="例: 吾輩は猫である">
         @error('title')
             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
         @enderror
@@ -14,7 +14,7 @@
         <label for="author" class="block text-sm font-medium text-gray-700">著者 <span class="text-red-500">*</span></label>
         <input type="text" name="author" id="author" value="{{ old('author', $book->author ?? '') }}" 
                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-               placeholder="例: 夏目漱石" required>
+               placeholder="例: 夏目漱石">
         @error('author')
             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
         @enderror
