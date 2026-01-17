@@ -58,9 +58,25 @@ sail artisan make:policy BookPolicy --model=Book
 ```php
 // app/Providers/AuthServiceProvider.php
 
-protected $policies = [
-    Book::class => BookPolicy::class,
-];
+<?php
+
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Policies\BookPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        $this->registerPolicies();
+    }
+}
 ```
 
 ### 5.2.2. ポリシーの実装
@@ -100,7 +116,6 @@ class BookPolicy
 ---
 
 ## 5.3. フォームリクエストの実装
-
 ### 5.3.1. StoreBookRequest（新規作成用）
 
 ```php
@@ -192,7 +207,6 @@ class UpdateBookRequest extends FormRequest
 ---
 
 ## 5.4. BookControllerの実装
-
 ```php
 // app/Http/Controllers/BookController.php
 
@@ -291,6 +305,10 @@ public function store(StoreBookRequest $request)
 
 ```php
 // routes/web.php
+
+use App\Http\Controllers\BookController;
+
+// ... (他のルート)
 
 // 認証が必要なルート
 Route::middleware('auth')->group(function () {

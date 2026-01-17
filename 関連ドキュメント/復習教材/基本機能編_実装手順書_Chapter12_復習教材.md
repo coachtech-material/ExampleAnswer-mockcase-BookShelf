@@ -42,60 +42,52 @@ class GenreController extends Controller
 {
     public function index()
     {
-        $genres = Genre::withCount('books')->paginate(10);
-        return view('genres.index', compact('genres'));
-    }
-
-    public function show(Genre $genre)
-    {
-        $books = $genre->books()->with('genres')->paginate(10);
-        return view('genres.show', compact('genre', 'books'));
+        $genres = Genre::all();
+        return view(\'genres.index\', compact(\'genres\'));
     }
 
     public function create()
     {
-        return view('genres.create');
+        return view(\'genres.create\');
     }
 
     public function store(StoreGenreRequest $request)
     {
         Genre::create($request->validated());
-        return redirect()->route('genres.index')->with('success', 'ジャンルを登録しました。');
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを登録しました。\');
     }
 
     public function edit(Genre $genre)
     {
-        return view('genres.edit', compact('genre'));
+        return view(\'genres.edit\', compact(\'genre\'));
     }
 
     public function update(UpdateGenreRequest $request, Genre $genre)
     {
         $genre->update($request->validated());
-        return redirect()->route('genres.index')->with('success', 'ジャンルを更新しました。');
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを更新しました。\');
     }
 
     public function destroy(Genre $genre)
     {
         $genre->delete();
-        return redirect()->route('genres.index')->with('success', 'ジャンルを削除しました。');
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを削除しました。\');
     }
 }
 ```
 
 ### 12.1.1. コードリーディング：`index`メソッド
-
 ```php
 public function index()
 {
-    $genres = Genre::withCount('books')->paginate(10);
-    return view('genres.index', compact('genres'));
+    $genres = Genre::all();
+    return view(\'genres.index\', compact(\'genres\'));
 }
 ```
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
-| `Genre::withCount('books')` | 各ジャンルに紐づく書籍数を`books_count`として取得します。 | `Builder` | 一覧画面で「このジャンルには〇冊の書籍があります」と表示できます。 |
-| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
+| `Genre::all()` | `genres`テーブルの全レコードを取得します。 | `Collection` | - |
 
 ---
 
@@ -127,7 +119,7 @@ class StoreGenreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'unique:genres'],
+            \'name\' => [\'required\', \'string\', \'max:255\', \'unique:genres\'],
         ];
     }
 }
@@ -155,11 +147,11 @@ class UpdateGenreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('genres')->ignore($this->genre),
+            \'name\' => [
+                \'required\',
+                \'string\',
+                \'max:255\',
+                Rule::unique(\'genres\')->ignore($this->genre),
             ],
         ];
     }
@@ -168,8 +160,8 @@ class UpdateGenreRequest extends FormRequest
 
 | ルール | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `'unique:genres'` | `genres`テーブルで一意である必要があります。 | 同じ名前のジャンルは登録できません。 |
-| `Rule::unique('genres')->ignore($this->genre)` | 更新時は、自分自身を除外してユニークチェックします。 | 名前を変更しない場合でも、バリデーションが通るようにします。 |
+| `\'unique:genres\'` | `genres`テーブルで一意である必要があります。 | 同じ名前のジャンルは登録できません。 |
+| `Rule::unique(\'genres\')->ignore($this->genre)` | 更新時は、自分自身を除外してユニークチェックします。 | 名前を変更しない場合でも、バリデーションが通るようにします。 |
 
 ---
 
@@ -178,21 +170,14 @@ class UpdateGenreRequest extends FormRequest
 ```php
 // routes/web.php
 
-Route::middleware('auth')->group(function () {
-    // ... 既存のルート
-
-    // Genre management (CRUD)
-    Route::resource('genres', GenreController::class)->except(['show']);
-});
-
-// 認証不要のルート
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+Route::resource(\'genres\', GenreController::class)->except([\'show\'])->middleware(\'auth\');
 ```
 
 | 設定 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `Route::resource('genres', GenreController::class)` | CRUDの7つのルートを一括で定義します。 | `index`, `create`, `store`, `show`, `edit`, `update`, `destroy` |
-| `->except(['show'])` | `show`ルートを除外します。 | `show`は認証不要のルートとして別途定義しているため。 |
+| `Route::resource(\'genres\', GenreController::class)` | CRUDの7つのルートを一括で定義します。 | `index`, `create`, `store`, `show`, `edit`, `update`, `destroy` |
+| `->except([\'show\'])` | `show`ルートを除外します。 | `show`は認証不要のルートとして別途定義しているため。 |
+| `->middleware(\'auth\')` | これらのルートに認証ミドルウェアを適用します。 | ログインしていないユーザーはアクセスできません。 |
 
 ---
 

@@ -38,75 +38,185 @@ sail artisan make:model Genre
 
 ---
 
-## 3.2. リレーションシップの定義
+## 3.2. リレーションシップとマスアサインメントの定義
 
-モデル間の関連性を定義していきます。これにより、例えば「あるユーザーが投稿したレビュー一覧」や「ある本に付けられたジャンル」などを簡単に取得できるようになります。
+モデル間の関連性を定義し、安全にデータを保存するための設定を行います。
 
-### 3.2.1. コードリーディング：`User`モデルのリレーション
+### 3.2.1. `User`モデル
 
-`app/Models/User.php`に、ユーザーに関連する他のモデルとの関係を定義します。
+`app/Models/User.php`を以下のように編集します。
 
 ```php
-// app/Models/User.php
+<?php
 
-// ... (クラス定義は省略)
+namespace App\Models;
 
-// 1対多：一人のユーザーはたくさんの書籍を登録できる
-public function books()
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
 {
-    return $this->hasMany(Book::class);
-}
+    use HasFactory, Notifiable;
 
-// 1対多：一人のユーザーはたくさんのレビューを投稿できる
-public function reviews()
-{
-    return $this->hasMany(Review::class);
-}
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
 
-// 多対多：一人のユーザーはたくさんの書籍をお気に入り登録できる
-public function favoriteBooks()
-{
-    return $this->belongsToMany(Book::class, \'favorites\');
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    public function books()
+    {
+        return $this->hasMany(Book::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function favoriteBooks()
+    {
+        return $this->belongsToMany(Book::class, 'favorites');
+    }
+
+    public function reviewLikes()
+    {
+        return $this->belongsToMany(Review::class, 'review_likes');
+    }
 }
 ```
 
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `$this->hasMany(...)` | 「1対多」のリレーションを定義します。 | `HasMany` | `User`モデルが「1」側、`Book`や`Review`モデルが「多」側です。 |
-| `$this->belongsToMany(...)` | 「多対多」のリレーションを定義します。 | `BelongsToMany` | `User`と`Book`の間に`favorites`という中間テーブルが存在する場合に使います。 |
-| `Book::class` | `Book`モデルの完全修飾クラス名を返します。 | `string` | `\\'App\\Models\\Book\\'`と同じです。`::class`を使うのがモダンな書き方です。 |
+### 3.2.2. `Book`モデル
 
-> **🧠 先輩エンジニアの思考プロセス**
-> `hasMany`と`belongsToMany`の使い分けは？
-> - **`hasMany` (1対多)**: 中間テーブルがない場合。`books`テーブルに`user_id`カラムがある、という関係。
-> - **`belongsToMany` (多対多)**: 中間テーブルがある場合。`users`テーブルと`books`テーブルの間に、`favorites`テーブルが存在する、という関係。
-
-### 3.2.2. マスアサインメントの設定：`$fillable`
-
-`app/Models/Book.php`に、`$fillable`プロパティを追加します。これは、`Book::create()`などで一括してデータを保存・更新する際に、どのカラムの変更を許可するかを指定する「ホワイトリスト」です。
+`app/Models/Book.php`を以下のように編集します。
 
 ```php
-// app/Models/Book.php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Book extends Model
 {
     use HasFactory;
 
-    // この配列に含まれるカラムのみ、一括代入が許可される
     protected $fillable = [
-        \'user_id\',
-        \'title\',
-        \'author\',
-        \'isbn\',
-        \'published_date\',
-        \'description\',
-        \'image_url\',
+        'user_id',
+        'title',
+        'author',
+        'isbn',
+        'description',
     ];
 
-    // ... (リレーション定義は後述)
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function genres()
+    {
+        return $this->belongsToMany(Genre::class, 'book_genre');
+    }
+
+    public function favoritedByUsers()
+    {
+        return $this->belongsToMany(User::class, 'favorites');
+    }
 }
 ```
 
-❌ **やってはいけない**: `$guarded = []` を安易に使うこと。これは全てのカラムのマスアサインメントを許可するため、脆弱性の原因になります。原則として`$fillable`を使い、許可するカラムを明示的に指定しましょう。
+### 3.2.3. `Review`モデル
 
-これで、モデルの基本的な設定は完了です。次のChapterでは、アプリケーションの「入り口」となる認証機能と、開発を効率化するための初期データ（マスタデータ）のシーディング）の準備を進めていきます。
+`app/Models/Review.php`を以下のように編集します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Review extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'book_id',
+        'rating',
+        'comment',
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function book()
+    {
+        return $this->belongsTo(Book::class);
+    }
+
+    public function likedByUsers()
+    {
+        return $this->belongsToMany(User::class, 'review_likes');
+    }
+}
+```
+
+### 3.2.4. `Genre`モデル
+
+`app/Models/Genre.php`を以下のように編集します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Genre extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+    ];
+
+    public function books()
+    {
+        return $this->belongsToMany(Book::class, 'book_genre');
+    }
+}
+```
+
+> **🧠 先輩エンジニアの思考プロセス**
+> `hasMany`と`belongsTo`は常にペアで使われます。
+> - `User`が`Book`をたくさん持つ (`hasMany`) → `Book`は`User`に属する (`belongsTo`)
+> - `Book`が`Review`をたくさん持つ (`hasMany`) → `Review`は`Book`に属する (`belongsTo`)
+> このペアを意識すると、リレーションの定義がスムーズになります。
+
+これで、モデルの基本的な設定は完了です。次のChapterでは、アプリケーションの「入り口」となる認証機能と、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。

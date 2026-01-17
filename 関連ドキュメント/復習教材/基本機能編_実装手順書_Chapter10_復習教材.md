@@ -29,37 +29,37 @@
 ```php
 // app/Http/Controllers/BookController.php
 
+// ... (既存のコード)
+
+use Illuminate\Http\Request;
+
+// ... (既存のコード)
+
 public function search(Request $request)
 {
-    $query = $request->input('query');
+    $query = $request->input(\'query\');
 
-    $books = Book::where('title', 'like', "%{$query}%")
-        ->orWhere('author', 'like', "%{$query}%")
-        ->with('genres')
-        ->latest()
+    $books = Book::where(\'title\', \'like\', "%{$query}%")
+        ->orWhere(\'author\', \'like\', "%{$query}%")
         ->paginate(10);
 
-    return view('books.index', compact('books', 'query'));
+    return view(\'books.index\', compact(\'books\', \'query\'));
 }
 ```
 
 ### 10.1.1. コードリーディング：メソッドチェーンの分解
 
 ```php
-$books = Book::where('title', 'like', "%{$query}%")
-    ->orWhere('author', 'like', "%{$query}%")
-    ->with('genres')
-    ->latest()
+$books = Book::where(\'title\', \'like\', "%{$query}%")
+    ->orWhere(\'author\', \'like\', "%{$query}%")
     ->paginate(10);
 ```
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
-| `$request->input('query')` | リクエストから`query`パラメータを取得します。 | `string\|null` | URLが`/books/search?query=Laravel`の場合、`'Laravel'`が取得されます。 |
-| `Book::where('title', 'like', "%{$query}%")` | `title`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `%`はワイルドカードで、任意の文字列にマッチします。 |
-| `->orWhere('author', 'like', "%{$query}%")` | または、`author`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `where`と`orWhere`はOR条件で結合されます。 |
-| `->with('genres')` | `genres`リレーションをEager Loadします。 | `Builder` | N+1問題を防ぎます。 |
-| `->latest()` | `created_at`の降順で並び替えます。 | `Builder` | 新しい書籍が先に表示されます。 |
+| `$request->input(\'query\')` | リクエストから`query`パラメータを取得します。 | `string\|null` | URLが`/books/search?query=Laravel`の場合、`\'Laravel\'`が取得されます。 |
+| `Book::where(\'title\', \'like\', "%{$query}%")` | `title`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `%`はワイルドカードで、任意の文字列にマッチします。 |
+| `->orWhere(\'author\', \'like\', "%{$query}%")` | または、`author`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `where`と`orWhere`はOR条件で結合されます。 |
 | `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
 
 > **💡 ポイント: LIKE検索のワイルドカード**
@@ -74,8 +74,9 @@ $books = Book::where('title', 'like', "%{$query}%")
 ```php
 // routes/web.php
 
-// 認証不要のルート
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
+// ... (他のルート)
+
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
 ```
 
 > **⚠️ 注意: ルートの順序**
@@ -83,12 +84,12 @@ Route::get('/books/search', [BookController::class, 'search'])->name('books.sear
 
 ```php
 // ✅ 正しい順序
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
+Route::resource(\'books\', BookController::class);
 
 // ❌ 間違った順序
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search'); // 到達しない
+Route::resource(\'books\', BookController::class);
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\'); // 到達しない
 ```
 
 ---
@@ -99,24 +100,16 @@ Route::get('/books/search', [BookController::class, 'search'])->name('books.sear
 
 ```blade
 {{-- 検索フォーム --}}
-<form action="{{ route('books.search') }}" method="GET" class="flex gap-2">
-    <input 
-        type="text" 
-        name="query" 
-        value="{{ $query ?? '' }}" 
-        placeholder="タイトルまたは著者名で検索"
-        class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-        検索
-    </button>
+<form action="{{ route(\'books.search\') }}" method="GET">
+    <input type="text" name="query" value="{{ $query ?? \'\' }}" placeholder="書籍を検索">
+    <button type="submit">検索</button>
 </form>
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
 | `method="GET"` | 検索はGETメソッドで行います。 | URLに検索キーワードが含まれるため、ブックマークや共有が可能になります。 |
-| `value="{{ $query ?? '' }}"` | 検索後も入力欄にキーワードを表示します。 | `??`はnull合体演算子で、`$query`がnullの場合は空文字を返します。 |
+| `value="{{ $query ?? \'\' }}"` | 検索後も入力欄にキーワードを表示します。 | `??`はnull合体演算子で、`$query`がnullの場合は空文字を返します。 |
 
 ---
 
@@ -127,9 +120,7 @@ Route::get('/books/search', [BookController::class, 'search'])->name('books.sear
 ```blade
 {{-- 検索結果のメッセージ --}}
 @if (isset($query) && $query)
-    <p class="mb-4 text-gray-600">
-        「{{ $query }}」の検索結果: {{ $books->total() }}件
-    </p>
+    <p>「{{ $query }}」の検索結果: {{ $books->total() }}件</p>
 @endif
 
 {{-- 書籍一覧（既存のコード） --}}

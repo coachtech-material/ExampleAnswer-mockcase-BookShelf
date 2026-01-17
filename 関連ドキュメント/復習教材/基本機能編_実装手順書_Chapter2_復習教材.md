@@ -25,56 +25,112 @@
 
 ---
 
-## 2.1. マイグレーションファイルの確認と理解
+## 2.1. マイグレーションファイルの作成
 
-本プロジェクトでは、既に必要なマイグレーションファイルが用意されています。まずはこれらの「設計図」を読み解くことから始めましょう。
+まずは、各テーブルの設計図となるマイグレーションファイルを作成します。
 
-### 2.1.1. ファイルの確認
+### 2.1.1. コマンドの実行
 
 ```bash
-# database/migrationsディレクトリの中身を確認
-sail ls database/migrations/
+# usersテーブルはLaravelデフォルトで存在
+sail artisan make:migration create_genres_table
+sleep 1
+sail artisan make:migration create_books_table
+sleep 1
+sail artisan make:migration create_reviews_table
+sleep 1
+sail artisan make:migration create_book_genre_table
+sleep 1
+sail artisan make:migration create_favorites_table
+sleep 1
+sail artisan make:migration create_review_likes_table
 ```
 
-`create_books_table.php`や`create_reviews_table.php`などのファイルが見つかります。ファイル名の先頭にあるタイムスタンプ（`YYYY_MM_DD_XXXXXX`）順に実行されるのがポイントです。
+> **🧠 先輩エンジニアの思考プロセス**
+> なぜ`sleep 1`を入れるのか？
+> マイグレーションファイルは、ファイル名の先頭にあるタイムスタンプ順に実行されます。しかし、コマンドを連続で実行すると、タイムスタンプが同じになり、実行順序が保証されなくなる可能性があります。`sleep 1`で1秒待つことで、タイムスタンプを確実にずらし、意図した順序でマイグレーションが実行されるようにしています。
 
-❌ **よくある間違い**: `sail artisan make:migration`を再度実行してしまうと、同じテーブルを作成しようとしてエラーになります。既存のファイルがある場合は、まずそれを活用しましょう。
+### 2.1.2. コードリーディング：`make:migration`コマンド
 
-### 2.1.2. コードリーディング：`create_books_table.php`
+| 部分 | 説明 | 戻り値 | 💡 ポイント |
+|:---|:---|:---|:---|
+| `sail artisan` | Sailコンテナ内でLaravelのArtisanコマンドを実行するためのコマンド | (コマンドの実行結果) | `sail`は`./vendor/bin/sail`のエイリアスです。 |
+| `make:migration` | 新しいマイグレーションファイルを作成するArtisanコマンド | (ファイルパス) | `database/migrations`ディレクトリにファイルが生成されます。 |
+| `create_genres_table` | 作成するマイグレーションファイルの名前 | なし | `create_..._table`という命名規則に従うと、Laravelがテーブル作成用の定型コードを自動で生成してくれます。 |
+
+---
+
+## 2.2. マイグレーションファイルへの記述
+
+作成された各マイグレーションファイルに、テーブルの構造を定義するコードを記述します。
+
+### 2.2.1. `create_genres_table`
+
+```php
+// database/migrations/YYYY_MM_DD_XXXXXX_create_genres_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'genres\', function (Blueprint $table) {
+            $table->id();
+            $table->string(\'name\', 50)->unique();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(\'genres\');
+    }
+};
+```
+
+### 2.2.2. `create_books_table`
 
 ```php
 // database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php
 
-Schema::create(\'books\', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-    $table->string(\'title\');
-    $table->string(\'author\');
-    $table->string(\'isbn\', 13)->unique();
-    $table->timestamps();
-});
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(\'books\', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
+            $table->string(\'title\');
+            $table->string(\'author\');
+            $table->string(\'isbn\', 13)->unique();
+            $table->text(\'description\')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(\'books\');
+    }
+};
 ```
 
-このコードは`books`テーブルの構造を定義しています。`Schema::create`静的メソッドの分解を見てみましょう。
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `Schema::create(...)` | 新しいテーブルを作成するためのメソッド | `void` | `Schema`ファサード（Laravelの便利な入り口）経由で呼び出します。`::`なので静的メソッドです。 |
-| `function (Blueprint $table)` | テーブルの構造を定義する無名関数（クロージャ） | `void` | 第2引数として渡され、`create`メソッドの内部で実行されます。`$table`が設計図の役割をします。 |
-| `$table->id()` | `id`という名前の主キー（`unsigned big integer`）カラムを作成 | `ColumnDefinition` | テーブルの各行を一意に識別するための番号です。 |
-| `$table->string(\'title\')` | `title`という名前の`VARCHAR`型カラムを作成 | `ColumnDefinition` | 書籍のタイトルを保存します。 |
-| `$table->foreignId(\'user_id\')` | `user_id`という名前の外部キーカラムを作成 | `ColumnDefinition` | `users`テーブルの`id`と関連付けられます。 |
-| `->constrained()` | 外部キー制約を追加するメソッド | `ColumnDefinition` | `users`テーブルに存在しない`user_id`は登録できなくなります。 |
-| `->onDelete(\'cascade\')` | 関連元のレコードが削除された時の動作を定義 | `ColumnDefinition` | ✅ ユーザーが退会したら、そのユーザーが登録した書籍も自動的に削除されます（カスケード削除）。 |
-| `$table->timestamps()` | `created_at`と`updated_at`カラムを自動的に作成 | `void` | レコードの作成日時と更新日時を記録します。Laravelではほぼ必須です。 |
+（以降、`reviews`, `book_genre`, `favorites`, `review_likes`テーブルのマイグレーションコードも同様に記載）
 
 ---
 
-## 2.2. マイグレーションの実行
+## 2.3. マイグレーションの実行
 
 定義された設計図を元に、データベースにテーブルを作成します。
 
-### 2.2.1. コマンドの実行
+### 2.3.1. コマンドの実行
 
 ```bash
 # Dockerコンテナをバックグラウンドで起動
@@ -87,7 +143,7 @@ sleep 30
 sail artisan migrate
 ```
 
-### 2.2.2. コードリーディング：`artisan migrate`コマンド
+### 2.3.2. コードリーディング：`artisan migrate`コマンド
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|

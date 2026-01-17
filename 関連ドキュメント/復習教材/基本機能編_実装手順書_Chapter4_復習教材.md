@@ -17,115 +17,31 @@
 | 課題 | 解決策 | なぜこのChapterでやるのか？ |
 |:---|:---|:---|
 | 誰が書籍を登録したか分からない | **認証機能**でログインユーザーを特定し、`user_id`を記録する | 書籍やレビューの「所有者」を明確にし、編集・削除の権限管理を可能にする。 |
-| 全ページでヘッダーやフッターを毎回書くのは非効率 | **レイアウト**と**コンポーネント**で共通部分を一元管理する | DRY原則（Don't Repeat Yourself）に従い、保守性を高める。 |
+| 全ページでヘッダーやフッターを毎回書くのは非効率 | **レイアウト**と**コンポーネント**で共通部分を一元管理する | DRY原則（Don\'t Repeat Yourself）に従い、保守性を高める。 |
 | 開発中にテストデータを手動で入力するのは面倒 | **Seeder**で初期データを自動投入する | `sail artisan migrate:fresh --seed`一発で、いつでもクリーンな状態から開発を再開できる。 |
 
 ---
 
-## 4.1. 認証コントローラーの作成
+## 4.1. Laravel Breezeのインストール
 
-Laravelには認証機能を簡単に実装するための仕組みが用意されています。まずは認証に必要なコントローラーを作成します。
+Laravel Breezeは、認証機能の雛形（ルート、コントローラー、ビュー）を自動で生成してくれる便利なパッケージです。
 
 ```bash
-# 認証関連のコントローラーを作成
-sail artisan make:controller Auth/RegisteredUserController
-sail artisan make:controller Auth/AuthenticatedSessionController
+# Laravel Breezeをインストール
+sail composer require laravel/breeze --dev
+
+# Breezeをインストール（Reactオプション付き）
+sail artisan breeze:install react
 ```
 
-### 4.1.1. コードリーディング：`RegisteredUserController`
-
-```php
-// app/Http/Controllers/Auth/RegisteredUserController.php
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-
-class RegisteredUserController extends Controller
-{
-    public function create()
-    {
-        return view('auth.register');
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        event(new Registered($user));
-
-        Auth::login($user);
-
-        return redirect('/');
-    }
-}
-```
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `$request->validate([...])` | リクエストデータのバリデーションを実行します。 | `array` | バリデーションに失敗すると、自動的に前のページにリダイレクトされ、エラーメッセージが表示されます。 |
-| `User::create([...])` | `User`モデルの新しいレコードをデータベースに作成します。 | `User` | `::create()`は静的メソッドで、`$fillable`に指定されたカラムのみが保存されます。 |
-| `Hash::make($request->password)` | パスワードを安全にハッシュ化します。 | `string` | 生のパスワードをデータベースに保存してはいけません。必ずハッシュ化します。 |
-| `Auth::login($user)` | 作成したユーザーでログイン状態にします。 | `void` | 登録後、自動的にログインさせることでユーザー体験を向上させます。 |
+> **💡 ポイント**
+> `breeze:install`を実行すると、`routes/auth.php`や認証関連のコントローラー、ビューが自動で作成されます。これにより、手動で作成する手間が大幅に省けます。
 
 ---
 
-## 4.2. 認証ルートの定義
+## 4.2. レイアウトとコンポーネントの作成
 
-認証に関するルートを`routes/auth.php`ファイルに定義します。
-
-```bash
-# ファイルを作成
-touch routes/auth.php
-```
-
-```php
-// routes/auth.php
-
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-use Illuminate\Support\Facades\Route;
-
-Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
-});
-
-Route::middleware('auth')->group(function () {
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-});
-```
-
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `Route::middleware('guest')` | 未ログインユーザーのみアクセス可能なルートをグループ化します。 | ログイン済みユーザーが登録ページにアクセスしようとすると、リダイレクトされます。 |
-| `Route::middleware('auth')` | ログイン済みユーザーのみアクセス可能なルートをグループ化します。 | ログアウトは、ログインしているユーザーだけが実行できます。 |
-| `->name('login')` | ルートに名前を付けます。 | `route('login')`でURLを生成できます。URLが変わっても、名前で参照していれば修正不要です。 |
-
----
-
-## 4.3. レイアウトとコンポーネントの作成
-
-全ページ共通のレイアウトと、再利用可能なUIコンポーネントを作成します。
+Breezeによって生成されたファイルに加えて、本アプリケーションで必要なレイアウトとコンポーネントを作成します。
 
 ```bash
 # ディレクトリとファイルを作成
@@ -143,7 +59,9 @@ touch app/View/Components/GuestLayout.php
 
 ---
 
-## 4.4. 認証ビューの作成
+## 4.3. 認証ビューの作成
+
+ログイン画面と会員登録画面のビューを作成します。
 
 ```bash
 # ディレクトリとファイルを作成
@@ -156,17 +74,17 @@ touch resources/views/auth/register.blade.php
 
 ---
 
-## 4.5. マスタデータの準備（ジャンルSeeder）
+## 4.4. マスタデータの準備（ジャンルSeeder）
 
 開発を効率化するために、ジャンルの初期データをデータベースに投入します。
 
-### 4.5.1. Seederファイルの作成
+### 4.4.1. Seederファイルの作成
 
 ```bash
 sail artisan make:seeder GenreSeeder
 ```
 
-### 4.5.2. Seederの実装
+### 4.4.2. Seederの実装
 
 ```php
 // database/seeders/GenreSeeder.php
@@ -184,20 +102,20 @@ class GenreSeeder extends Seeder
     public function run(): void
     {
         $genres = [
-            '小説',
-            'ビジネス',
-            '技術書',
-            '自己啓発',
-            'エッセイ',
-            '歴史',
-            '科学',
-            '芸術',
-            '料理',
-            '旅行',
+            \'小説\',
+            \'ビジネス\',
+            \'技術書\',
+            \'自己啓発\',
+            \'エッセイ\',
+            \'歴史\',
+            \'科学\',
+            \'芸術\',
+            \'料理\',
+            \'旅行\',
         ];
 
         foreach ($genres as $genre) {
-            Genre::firstOrCreate(['name' => $genre]);
+            Genre::firstOrCreate([\'name\' => $genre]);
         }
     }
 }
@@ -206,9 +124,8 @@ class GenreSeeder extends Seeder
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
 | `Genre::firstOrCreate([...])` | 指定した条件のレコードが存在すれば取得し、なければ作成します。 | `Genre` | Seederを複数回実行しても、重複データが作成されません。 |
-| `foreach ($genres as $genre)` | 配列をループして、各ジャンルを登録します。 | - | シンプルで分かりやすい実装です。 |
 
-### 4.5.3. DatabaseSeederへの登録
+### 4.4.3. DatabaseSeederへの登録
 
 ```php
 // database/seeders/DatabaseSeeder.php
@@ -230,7 +147,7 @@ class DatabaseSeeder extends Seeder
 }
 ```
 
-### 4.5.4. データベースへのデータ投入
+### 4.4.4. データベースへのデータ投入
 
 ```bash
 # テーブルを再作成し、Seederを実行
