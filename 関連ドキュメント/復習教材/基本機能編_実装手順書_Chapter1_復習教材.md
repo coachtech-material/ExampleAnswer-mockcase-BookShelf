@@ -36,7 +36,7 @@
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
-    -w /var/wsl/html \
+    -w /var/www/html \
     -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
     laravelsail/php82-composer:latest \
     composer create-project laravel/laravel:^10.0 book-review-app
@@ -52,7 +52,7 @@ docker run --rm \
 | `--rm` | コンテナ停止時に自動的にコンテナを削除する | なし | 一時的なコマンド実行に便利。不要なコンテナが残りません。 |
 | `-u "$(id -u):$(id -g)"` | 現在のユーザーのIDとグループIDでコンテナを実行する | なし | ✅ これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。 |
 | `-v "$(pwd):/var/www/html"` | 現在のディレクトリをコンテナの`/var/www/html`にマウントする | なし | ローカルのファイルをコンテナ内で直接編集できるようになります。 |
-| `-w /var/wsl/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
+| `-w /var/www/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
 | `laravelsail/php82-composer:latest` | 使用するDockerイメージを指定 | なし | PHP 8.2とComposerがプリインストールされたLaravel Sail公式イメージです。 |
 | `composer create-project ...` | Composerを使ってLaravelプロジェクトを作成するコマンド | (プロジェクトファイル) | `laravel/laravel:^10.0`でバージョン10を指定しています。 |
 
