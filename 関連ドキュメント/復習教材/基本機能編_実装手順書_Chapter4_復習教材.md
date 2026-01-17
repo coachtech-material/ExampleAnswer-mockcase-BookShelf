@@ -1,160 +1,178 @@
-# Chapter 4: 認証機能とマスタデータの準備
+# Chapter 4: 認証機能の実装
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、アプリケーションの「入り口」を整備します。具体的には以下の点を学びます。
+このセクションでは、アプリケーションの「入り口」となる認証機能を実装します。Laravelが提供する柔軟な認証バックエンド「Fortify」を利用して、ログイン・ログアウト・新規登録といった基本的な機能を構築します。
 
-- **認証機能の実装**: ユーザー登録（会員登録）とログイン機能を、Laravelの仕組みを活用して実装します。
-- **レイアウトとコンポーネント**: 全ページ共通のヘッダーやフッターを「レイアウト」として定義し、再利用可能な「コンポーネント」を作成します。
-- **マスタデータのシーディング**: 開発やテストを効率化するために、ジャンルなどの初期データをデータベースに投入する方法を学びます。
+- **Laravel Fortifyの役割**: なぜBreezeやJetstreamのようなUI付きのパッケージではなく、バックエンド処理に特化したFortifyを使うのかを理解します。
+- **認証ルートの構築**: ログイン画面や登録画面の表示、ログイン・ログアウト処理の実行に必要なルートを手動で設定します。
+- **Fortifyのカスタマイズ**: 設定ファイルやサービスプロバイダを調整し、自作のビューを使って認証機能を提供する方法を学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：なぜ認証を先に実装するのか？
+## 🧠 先輩エンジニアの思考プロセス：なぜUI付きパッケージを使わないのか？
 
-多くのWebアプリケーションでは、「誰がこの操作を行っているか」を特定することが重要です。書籍の登録やレビューの投稿は、ログインしているユーザーに紐づけて記録する必要があります。認証機能を先に整備しておくことで、後続の機能開発がスムーズに進みます。
+LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を一瞬で実装できる便利なパッケージがあります。しかし、実務では必ずしもそれらの提供するUIが要件に合うとは限りません。むしろ、デザイナーが作成した独自のUIに、Laravelの認証機能を「接続する」場面の方が圧倒的に多いのです。
 
 | 課題 | 解決策 | なぜこのChapterでやるのか？ |
 |:---|:---|:---|
-| 誰が書籍を登録したか分からない | **認証機能**でログインユーザーを特定し、`user_id`を記録する | 書籍やレビューの「所有者」を明確にし、編集・削除の権限管理を可能にする。 |
-| 全ページでヘッダーやフッターを毎回書くのは非効率 | **レイアウト**と**コンポーネント**で共通部分を一元管理する | DRY原則（Don\'t Repeat Yourself）に従い、保守性を高める。 |
-| 開発中にテストデータを手動で入力するのは面倒 | **Seeder**で初期データを自動投入する | `sail artisan migrate:fresh --seed`一発で、いつでもクリーンな状態から開発を再開できる。 |
+| Breeze等が提供するUIは、今回のデザインと異なる | **Laravel Fortify**を使い、認証のバックエンド処理のみを導入する | UI（Bladeファイル）は自前で用意したもの（`Preparedblade-mockcase-BookShelf`）を使い、機能だけをLaravelに任せることで、要件通りの画面と機能を両立できる。 |
+| 認証の仕組みがブラックボックス化しやすい | 認証ルートや設定を**手動で構築**する | ログイン画面がどう表示され、ログイン処理がどう実行されるのか、一連の流れをコードレベルで追うことで、認証の仕組みを深く理解できる。 |
+| ログイン後の遷移先などを柔軟に変更したい | **ServiceProvider**や設定ファイルをカスタマイズする | アプリケーションの仕様に合わせて、認証に関する様々な動作を自由に変更できるようになる。 |
+
+Fortifyは、認証機能の「エンジン」部分だけを提供してくれるパッケージです。車のボディ（UI）は自分たちで自由にデザインし、そこに強力なエンジン（Fortify）を搭載する、というイメージを持つと分かりやすいでしょう。
 
 ---
 
-## 4.1. Laravel Breezeのインストール
+## 4.1. Laravel Fortifyのインストール
 
-Laravel Breezeは、認証機能の雛形（ルート、コントローラー、ビュー）を自動で生成してくれる便利なパッケージです。
+まず、Composerを使ってLaravel Fortifyをプロジェクトにインストールします。その後、`vendor:publish`コマンドで設定ファイルをプロジェクト内にコピーします。
 
 ```bash
-# Laravel Breezeをインストール
-sail composer require laravel/breeze --dev
+# Laravel Fortifyをインストール
+sail composer require laravel/fortify
 
-# Breezeをインストール（Reactオプション付き）
-sail artisan breeze:install react
+# Fortifyのサービスプロバイダと設定ファイルを公開
+sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
+```
+
+このコマンドにより、`config/fortify.php`という設定ファイルと、`app/Providers/FortifyServiceProvider.php`が作成されます。
+
+---
+
+## 4.2. 認証ルートの作成
+
+次に、ログイン、新規登録、ログアウトなどの認証関連のルートを定義します。今回は`routes/web.php`が煩雑になるのを避けるため、`routes/auth.php`というファイルを新規に作成して、そこに認証ルートをまとめて記述します。
+
+**`routes/auth.php` を新規作成:**
+
+```php
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
+
+// 未ログインユーザー向けのルート
+Route::middleware("guest")->group(function () {
+    // ログイン画面表示
+    Route::get("/login", function () {
+        return view("auth.login");
+    })->name("login");
+
+    // 新規登録画面表示
+    Route::get("/register", function () {
+        return view("auth.register");
+    })->name("register");
+});
+
+// ログイン済みユーザー向けのルート
+Route::middleware("auth")->group(function () {
+    // ログアウト処理
+    Route::post("/logout", [AuthenticatedSessionController::class, "destroy"])
+        ->name("logout");
+});
 ```
 
 > **💡 ポイント**
-> `breeze:install`を実行すると、`routes/auth.php`や認証関連のコントローラー、ビューが自動で作成されます。これにより、手動で作成する手間が大幅に省けます。
+> この`auth.php`ファイルは、このままではアプリケーションに認識されません。後のステップで`routes/web.php`から読み込む設定を追加しますが、この時点ではファイルを作成するだけで問題ありません。
 
 ---
 
-## 4.2. レイアウトとコンポーネントの作成
+## 4.3. Fortifyの設定
 
-Breezeによって生成されたファイルに加えて、本アプリケーションで必要なレイアウトとコンポーネントを作成します。
+インストールしたFortifyが、私たちが用意したビューやルート定義を使うように設定を調整していきます。
 
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/layouts
-mkdir -p resources/views/components
-mkdir -p app/View/Components
+### 4.3.1. Fortifyのデフォルトビューを無効化
 
-touch resources/views/layouts/app.blade.php
-touch resources/views/layouts/guest.blade.php
-touch app/View/Components/AppLayout.php
-touch app/View/Components/GuestLayout.php
-```
+Fortifyはデフォルトで自身の持つビューを使おうとします。今回は自前のビューを使うため、この機能を無効化します。また、ログイン後のリダイレクト先をルートパス(`/`)に設定します。
 
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
-
----
-
-## 4.3. 認証ビューの作成
-
-ログイン画面と会員登録画面のビューを作成します。
-
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/auth
-touch resources/views/auth/login.blade.php
-touch resources/views/auth/register.blade.php
-```
-
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
-
----
-
-## 4.4. マスタデータの準備（ジャンルSeeder）
-
-開発を効率化するために、ジャンルの初期データをデータベースに投入します。
-
-### 4.4.1. Seederファイルの作成
-
-```bash
-sail artisan make:seeder GenreSeeder
-```
-
-### 4.4.2. Seederの実装
+`config/fortify.php` を開き、以下の2箇所を修正してください。
 
 ```php
-// database/seeders/GenreSeeder.php
+// config/fortify.php
 
-<?php
+// 変更前
+// 'views' => true,
+// 変更後
+'views' => false,
 
-namespace Database\Seeders;
+// ...
 
-use App\Models\Genre;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
+// 変更前
+// 'home' => '/home',
+// 変更後
+'home' => '/',
+```
 
-class GenreSeeder extends Seeder
+### 4.3.2. Fortifyのサービスプロバイダを登録
+
+Fortifyをアプリケーションに正式に登録するため、`config/app.php`の`providers`配列に`FortifyServiceProvider`を追加します。
+
+```php
+// config/app.php
+
+'providers' => ServiceProvider::defaultProviders()->merge([
+    /*
+     * Package Service Providers...
+     */
+
+    /*
+     * Application Service Providers...
+     */
+    App\Providers\AppServiceProvider::class,
+    App\Providers\AuthServiceProvider::class,
+    // App\Providers\BroadcastServiceProvider::class,
+    App\Providers\EventServiceProvider::class,
+    App\Providers\RouteServiceProvider::class,
+    App\Providers\FortifyServiceProvider::class, // ← これを追加
+])->toArray(),
+```
+
+### 4.3.3. Fortifyが使用するビューの指定
+
+`app/Providers/FortifyServiceProvider.php` を開き、`boot` メソッド内で、Fortifyがログイン画面や新規登録画面としてどのBladeファイルを呼び出すべきかを明示的に指定します。
+
+```php
+// app/Providers/FortifyServiceProvider.php
+
+use Laravel\Fortify\Fortify;
+
+// ...
+
+public function boot(): void
 {
-    public function run(): void
-    {
-        $genres = [
-            \'小説\',
-            \'ビジネス\',
-            \'技術書\',
-            \'自己啓発\',
-            \'エッセイ\',
-            \'歴史\',
-            \'科学\',
-            \'芸術\',
-            \'料理\',
-            \'旅行\',
-        ];
+    // Fortifyに、ログイン画面として `auth.login` ビューを使うよう指示
+    Fortify::loginView(fn () => view("auth.login"));
 
-        foreach ($genres as $genre) {
-            Genre::firstOrCreate([\'name\' => $genre]);
-        }
-    }
+    // Fortifyに、新規登録画面として `auth.register` ビューを使うよう指示
+    Fortify::registerView(fn () => view("auth.register"));
+
+    // ... (他のビュー設定は必要に応じて追加)
 }
 ```
 
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `Genre::firstOrCreate([...])` | 指定した条件のレコードが存在すれば取得し、なければ作成します。 | `Genre` | Seederを複数回実行しても、重複データが作成されません。 |
+---
 
-### 4.4.3. DatabaseSeederへの登録
+## 4.4. RouteServiceProviderの設定
+
+最後に、ユーザーがログインした後にどこへ遷移するかを設定します。`app/Providers/RouteServiceProvider.php`を開き、`HOME`定数の値を修正します。
 
 ```php
-// database/seeders/DatabaseSeeder.php
+// app/Providers/RouteServiceProvider.php
 
-<?php
-
-namespace Database\Seeders;
-
-use Illuminate\Database\Seeder;
-
-class DatabaseSeeder extends Seeder
+class RouteServiceProvider extends ServiceProvider
 {
-    public function run(): void
-    {
-        $this->call([
-            GenreSeeder::class,
-        ]);
-    }
+    /**
+     * The path to your application's "home" route.
+     *
+     * Typically, users are redirected here after authentication.
+     *
+     * @var string
+     */
+    public const HOME = '/'; // 変更
+
+    // ...
 }
 ```
 
-### 4.4.4. データベースへのデータ投入
-
-```bash
-# テーブルを再作成し、Seederを実行
-sail artisan migrate:fresh --seed
-```
-
-> **🧠 先輩エンジニアの思考プロセス**
-> `migrate:fresh --seed`は、開発中に「データベースをまっさらな状態に戻して、初期データを入れ直す」ときに非常に便利です。本番環境では絶対に実行しないでください（全データが消えます）。
-
-これで、認証機能と初期データの準備が整いました。次のChapterでは、いよいよ書籍管理機能（CRUD）を実装していきます。
+これで、認証機能のバックエンド側の設定は完了です。次のChapterでは、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。
