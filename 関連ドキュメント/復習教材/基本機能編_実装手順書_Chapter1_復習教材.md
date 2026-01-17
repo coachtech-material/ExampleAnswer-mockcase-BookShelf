@@ -194,7 +194,14 @@ sail npm run dev
 
 ### 1.4.3. Sailの起動とエイリアス設定
 
-- `./vendor/bin/sail up -d`: `compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
-- `alias sail=\'...\[ -f sail ] && bash sail || bash vendor/bin/sail\''`: 長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
+```bash
+./vendor/bin/sail up -d
+```
+`compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
+
+```bash
+alias sail=\'...\[ -f sail ] && bash sail || bash vendor/bin/sail\''
+```
+長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
 
 これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。
