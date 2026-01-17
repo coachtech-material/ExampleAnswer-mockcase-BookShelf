@@ -55,80 +55,71 @@
 erDiagram
     USERS {
         bigint id PK
-        string name "ユーザー名"
-        string email "メールアドレス"
-        timestamp email_verified_at "メール確認日時"
-        string password "パスワード"
-        string remember_token "ログイン保持"
+        string name
+        string email
+        timestamp email_verified_at
+        string password
+        string remember_token
         timestamp created_at
         timestamp updated_at
     }
 
     BOOKS {
         bigint id PK
-        bigint user_id FK "登録者"
-        string title "タイトル"
-        string author "著者"
-        string isbn "ISBN-13"
-        date published_date "出版日"
-        text description "概要"
-        string image_url "画像URL"
+        bigint user_id FK
+        string title
+        string author
+        string isbn
+        date published_date
+        text description
+        string image_url
         timestamp created_at
         timestamp updated_at
     }
 
     REVIEWS {
         bigint id PK
-        bigint user_id FK "投稿者"
-        bigint book_id FK "書籍"
-        tinyint rating "評価(1-5)"
-        text comment "コメント"
+        bigint user_id FK
+        bigint book_id FK
+        tinyint rating
+        text comment
         timestamp created_at
         timestamp updated_at
     }
 
     GENRES {
         bigint id PK
-        string name "ジャンル名"
+        string name
         timestamp created_at
         timestamp updated_at
     }
 
     FAVORITES {
-        bigint id PK
-        bigint user_id FK "ユーザー"
-        bigint book_id FK "書籍"
-        timestamp created_at
-        timestamp updated_at
+        bigint user_id PK, FK
+        bigint book_id PK, FK
     }
 
     REVIEW_LIKES {
-        bigint id PK
-        bigint user_id FK "ユーザー"
-        bigint review_id FK "レビュー"
-        timestamp created_at
-        timestamp updated_at
+        bigint user_id PK, FK
+        bigint review_id PK, FK
     }
 
     BOOK_GENRE {
-        bigint id PK
-        bigint book_id FK "書籍"
-        bigint genre_id FK "ジャンル"
-        timestamp created_at
-        timestamp updated_at
+        bigint book_id PK, FK
+        bigint genre_id PK, FK
     }
 
     USERS ||--o{ BOOKS : "registers"
     USERS ||--o{ REVIEWS : "writes"
     BOOKS ||--o{ REVIEWS : "has"
-    USERS ||--o{ FAVORITES : "favorites"
-    BOOKS ||--o{ FAVORITES : "is favorited by"
-    USERS ||--o{ REVIEW_LIKES : "likes"
-    REVIEWS ||--o{ REVIEW_LIKES : "is liked by"
-    BOOKS ||--|{ BOOK_GENRE : "belongs to"
-    GENRES ||--|{ BOOK_GENRE : "has"
-
+    USERS ||--|{ FAVORITES : "favorites"
+    BOOKS ||--|{ FAVORITES : "is favorited by"
+    USERS ||--|{ REVIEW_LIKES : "likes"
+    REVIEWS ||--|{ REVIEW_LIKES : "is liked by"
+    BOOKS }|--|{ BOOK_GENRE : "has"
+    GENRES }|--|{ BOOK_GENRE : "belongs to"
 ```
+
 
 ---
 
