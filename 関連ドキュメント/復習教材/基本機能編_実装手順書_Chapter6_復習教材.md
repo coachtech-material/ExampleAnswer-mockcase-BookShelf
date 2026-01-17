@@ -5,9 +5,9 @@
 このセクションでは、Webアプリケーション開発の心臓部とも言える**CRUD（Create, Read, Update, Delete）**操作を、書籍管理機能を通じて実装します。単に機能を実装するだけでなく、エラーを未然に防ぐための開発手順や、コードの責務を分離するための設計思想についても深く学んでいきます。
 
 - **トップダウンな開発アプローチ**: なぜ機能の詳細を実装する前に、まず全体の「骨格」となるルートとコントローラーを準備するのか、その重要性を理解します。
-- **リソースコントローラー**: Laravelの規約に沿った、RESTfulなコントローラーの作成方法を学びます。
 - **フォームリクエスト**: バリデーションロジックをコントローラーから分離し、再利用可能にする方法を学びます。
 - **ポリシー（認可）**: 「誰が」「何を」できるかを制御する認可の仕組みを学びます。
+- **段階的な実装**: まずは権限チェックなしで動作確認を行い、その後で権限チェックを追加するという、実践的な開発フローを体験します。
 
 ---
 
@@ -31,7 +31,7 @@
 
 ### 6.1.1. なぜ先にルートを定義するのか？
 
-今回使用する配布済みのBladeファイル（ビュー）には、ヘッダーやボタンなどに、`route('books.create')`のような形でリンク先のルート名が多数記述されています。もし、これらのルートが`routes/web.php`に定義されていない状態でページを表示しようとすると、Laravelは「`books.create`という名前のルートは見つかりません」という`RouteNotDefinedException`エラーを発生させます。
+今回使用する配布済みのBladeファイル（ビュー）には、ヘッダーやボタンなどに、`route(\'books.create\')`のような形でリンク先のルート名が多数記述されています。もし、これらのルートが`routes/web.php`に定義されていない状態でページを表示しようとすると、Laravelは「`books.create`という名前のルートは見つかりません」という`RouteNotDefinedException`エラーを発生させます。
 
 これを防ぐため、機能の中身が空であっても、先に**すべてのURL（ルート）と、その交通整理役であるコントローラーを定義**しておくのです。
 
@@ -51,9 +51,6 @@ sail artisan make:controller ReviewLikeController
 sail artisan make:controller RankingController
 ```
 
-> **💡 ポイント: `--resource` オプション**
-> `--resource`オプションを付けてコントローラーを作成すると、CRUD操作に対応する7つのメソッド（`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`）が自動的に生成されます。これにより、RESTfulな設計に沿ったコントローラーを効率的に作成できます。
-
 ### 6.1.3. ルート定義の作成 (`web.php`)
 
 次に、`routes/web.php`に、アプリケーションで必要となるすべてのルートを記述します。これにより、どのページにアクセスしても「Route not defined」エラーが出ない状態を作ります。
@@ -69,198 +66,271 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
+// ... (中略)
 
 // --- 1. 具体的な名前を持つ公開ルート (最優先) ---
-Route::get('/', [BookController::class, 'index'])->name('home');
-Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
-Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+Route::get(\'/\', [BookController::class, \'index\'])->name(\'home\');
+Route::get(\'/books\', [BookController::class, \'index\'])->name(\'books.index\');
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
+Route::get(\'/ranking\', [RankingController::class, \'index\'])->name(\'ranking.index\');
 
 // --- 2. 認証必須ルート ---
-Route::middleware('auth')->group(function () {
+Route::middleware(\'auth\')->group(function () {
     // 書籍管理 (Resource)
-    Route::resource('books', BookController::class)->except(['index', 'show']);
+    Route::resource(\'books\', BookController::class)->except([\'index\', \'show\']);
 
     // ジャンル管理
-    Route::resource('genres', GenreController::class)->except(['show']);
+    Route::resource(\'genres\', GenreController::class)->except([\'show\']);
 
     // レビュー管理
-    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
-    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
-    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
-    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::post(\'/books/{book}/reviews\', [ReviewController::class, \'store\'])->name(\'reviews.store\');
+    Route::get(\'/reviews/{review}/edit\', [ReviewController::class, \'edit\'])->name(\'reviews.edit\');
+    Route::put(\'/reviews/{review}\', [ReviewController::class, \'update\'])->name(\'reviews.update\');
+    Route::delete(\'/reviews/{review}\', [ReviewController::class, \'destroy\'])->name(\'reviews.destroy\');
 
     // お気に入り機能
-    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post(\'/books/{book}/favorites\', [FavoriteController::class, \'toggle\'])->name(\'favorites.toggle\');
+    Route::get(\'/favorites\', [FavoriteController::class, \'index\'])->name(\'favorites.index\');
 
     // レビューいいね機能
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
+    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'toggle\'])->name(\'reviews.like\');
 });
 
 // --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+Route::get(\'/books/{book}\', [BookController::class, \'show\'])->name(\'books.show\');
+Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
 
 // 認証機能用ルート
-require __DIR__.'/auth.php';
+require __DIR__.\'/auth.php\';
 ```
-
-これで、アプリケーションの「骨格」が完成しました。次から、この骨格に肉付けをしていく作業に入ります。
 
 ---
 
 ## 6.2. 書籍管理機能の実装 (CRUD)
 
-それでは、書籍管理機能の具体的な実装を進めていきましょう。
+ここからは、`BookController`に具体的な処理を実装していきます。完全手順書に従い、まずは**権限チェック（ポリシー）を実装せずに**一通りのCRUD機能が動作することを確認し、その後に権限チェックを追加するという、実践的な手順で進めます。
 
-### 6.2.1. フォームリクエストとポリシーの作成
+### 6.2.1. フォームリクエストの作成と実装
 
-書籍の登録・更新時のバリデーションルールを定義する「フォームリクエスト」と、操作の権限を管理する「ポリシー」を作成します。
+まずは、書籍の登録・更新時のバリデーションルールを定義する「フォームリクエスト」を作成します。
 
 ```bash
-# フォームリクエストを作成 (新規作成用と更新用)
 sail artisan make:request StoreBookRequest
 sail artisan make:request UpdateBookRequest
-
-# ポリシーを作成 (Bookモデルに関連付ける)
-sail artisan make:policy BookPolicy --model=Book
 ```
 
-### 6.2.2. ポリシーの登録と実装
-
-作成したポリシーを`AuthServiceProvider`に登録し、具体的な認可ルールを記述します。
-
-**ポリシーの登録 (`app/Providers/AuthServiceProvider.php`)**
-```php
-protected $policies = [
-    Book::class => BookPolicy::class,
-];
-```
-
-**ポリシーの実装 (`app/Policies/BookPolicy.php`)**
-```php
-public function update(User $user, Book $book): bool
-{
-    return $user->id === $book->user_id;
-}
-
-public function delete(User $user, Book $book): bool
-{
-    return $user->id === $book->user_id;
-}
-```
-
-### 6.2.3. フォームリクエストの実装
-
-`StoreBookRequest`と`UpdateBookRequest`に、それぞれバリデーションルールを記述します。
+次に、それぞれのファイルにバリデーションルールを記述します。
 
 **StoreBookRequest (`app/Http/Requests/StoreBookRequest.php`)**
 ```php
-public function rules(): array
+<?php
+namespace App\Http\Requests;
+use Illuminate\Foundation\Http\FormRequest;
+class StoreBookRequest extends FormRequest
 {
-    return [
-        'title' => ['required', 'string', 'max:255'],
-        'author' => ['required', 'string', 'max:255'],
-        'isbn' => ['required', 'string', 'size:13', 'unique:books'],
-        'published_date' => ['required', 'date'],
-        'description' => ['nullable', 'string'],
-        'image_url' => ['nullable', 'url'],
-        'genres' => ['required', 'array', 'min:1'],
-        'genres.*' => ['exists:genres,id'],
-    ];
+    public function authorize(): bool
+    {
+        return true;
+    }
+    public function rules(): array
+    {
+        return [
+            \'title\' => [\'required\', \'string\', \'max:255\'],
+            \'author\' => [\'required\', \'string\', \'max:255\'],
+            \'isbn\' => [\'required\', \'string\', \'size:13\', \'unique:books,isbn\'],
+            \'published_date\' => [\'required\', \'date\'],
+            \'description\' => [\'nullable\', \'string\'],
+            \'image_url\' => [\'nullable\', \'url\'],
+            \'genres\' => [\'required\', \'array\'],
+            \'genres.*\' => [\'exists:genres,id\'],
+        ];
+    }
 }
 ```
 
 **UpdateBookRequest (`app/Http/Requests/UpdateBookRequest.php`)**
 ```php
+<?php
+namespace App\Http\Requests;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-
-public function rules(): array
+class UpdateBookRequest extends FormRequest
 {
-    return [
-        // ... 他はStoreBookRequestと同じ
-        'isbn' => [
-            'required',
-            'string',
-            'size:13',
-            Rule::unique('books')->ignore($this->book),
-        ],
-        // ...
-    ];
+    public function authorize(): bool
+    {
+        return true;
+    }
+    public function rules(): array
+    {
+        return [
+            \'title\' => [\'required\', \'string\', \'max:255\'],
+            \'author\' => [\'required\', \'string\', \'max:255\'],
+            \'isbn\' => [\'required\', \'string\', \'size:13\', Rule::unique(\'books\')->ignore($this->book)],
+            \'published_date\' => [\'required\', \'date\'],
+            \'description\' => [\'nullable\', \'string\'],
+            \'image_url\' => [\'nullable\', \'url\'],
+            \'genres\' => [\'required\', \'array\'],
+            \'genres.*\' => [\'exists:genres,id\'],
+        ];
+    }
 }
 ```
 
-### 6.2.4. BookControllerの実装
+### 6.2.2. BookControllerの実装 (権限チェックなし)
 
-最後に、`BookController`にCRUDの各処理を実装します。
+次に、`BookController`に、権限チェックを**コメントアウトした状態**でCRUD処理を実装します。
 
 ```php
-// app/Http/Controllers/BookController.php
-
+<?php
+namespace App\Http\Controllers;
 use App\Models\Book;
-use App\Models\Genre;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
-use Illuminate\Support\Facades\Auth;
-
+use App\Models\Genre;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
+use Illuminate\Http\Request;
 class BookController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-        $books = Book::with('genres')->latest()->paginate(10);
-        return view('books.index', compact('books'));
+        $books = Book::with("genres")->latest()->paginate(10);
+        return view("books.index", compact("books"));
     }
-
-    public function create()
+    public function search(Request $request): View
+    {
+        $query = $request->input("query");
+        $books = Book::where("title", "like", "%{$query}%")
+            ->orWhere("author", "like", "%{$query}%")
+            ->with("genres")
+            ->latest()
+            ->paginate(10);
+        return view("books.index", compact("books", "query"));
+    }
+    public function create(): View
     {
         $genres = Genre::all();
-        return view('books.create', compact('genres'));
+        return view("books.create", compact("genres"));
     }
-
-    public function store(StoreBookRequest $request)
+    public function store(StoreBookRequest $request): RedirectResponse
     {
-        $book = Auth::user()->books()->create($request->validated());
-        $book->genres()->attach($request->genres);
-
-        return redirect()->route('books.show', $book)->with('success', '書籍を登録しました。');
+        $validated = $request->validated();
+        $bookData = collect($validated)->except(\'genres\')->toArray();
+        $book = $request->user()->books()->create($bookData);
+        $book->genres()->attach($validated[\'genres\']);
+        return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
-
-    public function show(Book $book)
+    public function show(Book $book): View
     {
-        $book->load(['genres', 'reviews.user']);
-        return view('books.show', compact('book'));
+        $book->load(["reviews.user", "genres"]);
+        return view("books.show", compact("book"));
     }
-
-    public function edit(Book $book)
+    public function edit(Book $book): View
     {
-        $this->authorize('update', $book);
+        // $this->authorize("update", $book);
         $genres = Genre::all();
-        return view('books.edit', compact('book', 'genres'));
+        return view("books.edit", compact("book", "genres"));
     }
-
-    public function update(UpdateBookRequest $request, Book $book)
+    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
-        $this->authorize('update', $book);
+        // $this->authorize("update", $book);
         $book->update($request->validated());
         $book->genres()->sync($request->genres);
-
-        return redirect()->route('books.show', $book)->with('success', '書籍を更新しました。');
+        return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
-
-    public function destroy(Book $book)
+    public function destroy(Book $book): RedirectResponse
     {
-        $this->authorize('delete', $book);
+        // $this->authorize("delete", $book);
         $book->delete();
-
-        return redirect()->route('books.index')->with('success', '書籍を削除しました。');
+        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
     }
 }
 ```
+
+> **✅ 動作確認**
+> この時点で、書籍の登録、表示、編集、削除が一通り動作することを確認しましょう。ただし、まだ権限チェックがないため、**他のユーザーが登録した書籍も編集・削除できてしまう**状態です。
+
+### 6.2.3. ポリシーの作成と実装
+
+CRUDの基本的な動作が確認できたら、次に「認可」、つまり権限管理の仕組みを導入します。
+
+```bash
+sail artisan make:policy BookPolicy --model=Book
+```
+
+作成された`app/Policies/BookPolicy.php`に、更新（`update`）と削除（`delete`）の権限ルールを記述します。
+
+```php
+<?php
+namespace App\Policies;
+use App\Models\Book;
+use App\Models\User;
+class BookPolicy
+{
+    public function update(User $user, Book $book): bool
+    {
+        return $user->id === $book->user_id;
+    }
+    public function delete(User $user, Book $book): bool
+    {
+        return $user->id === $book->user_id;
+    }
+}
+```
+
+### 6.2.4. ポリシーの登録
+
+作成したポリシーを`AuthServiceProvider`に登録して、Laravelに認識させます。
+
+`app/Providers/AuthServiceProvider.php`の`$policies`配列に`BookPolicy`を追加します。
+
+```php
+use App\Models\Book;
+use App\Policies\BookPolicy;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+    ];
+    // ...
+}
+```
+
+### 6.2.5. コントローラーへの権限チェック追加
+
+最後に、`BookController`の`edit`, `update`, `destroy`メソッドのコメントアウトを解除し、権限チェックを有効にします。
+
+```php
+// app/Http/Controllers/BookController.php (修正箇所のみ)
+
+public function edit(Book $book): View
+{
+    // 権限チェックを追加
+    $this->authorize("update", $book);
+    $genres = Genre::all();
+    return view("books.edit", compact("book", "genres"));
+}
+
+public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+{
+    // 権限チェックを追加
+    $this->authorize("update", $book);
+    $book->update($request->validated());
+    $book->genres()->sync($request->genres);
+    return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
+}
+
+public function destroy(Book $book): RedirectResponse
+{
+    // 権限チェックを追加
+    $this->authorize("delete", $book);
+    $book->delete();
+    return redirect()->route("books.index")->with("success", "書籍を削除しました。");
+}
+```
+
+> **✅ 動作確認**
+> 再度、動作確認を行いましょう。今度は、自分が登録した書籍は編集・削除できますが、他のユーザーが登録した書籍の編集・削除ページにアクセスしようとすると「403 This action is unauthorized.」エラーが表示されるはずです。
 
 これで、書籍管理機能（CRUD）の実装が完了しました。次のChapterでは、レビュー機能を実装していきます。
