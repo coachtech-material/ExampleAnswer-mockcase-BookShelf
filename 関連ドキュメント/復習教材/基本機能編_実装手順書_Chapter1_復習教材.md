@@ -201,7 +201,13 @@ sail npm run dev
 
 以下のコマンドで、長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
 ```bash
-alias sail=\'...\[ -f sail ] && bash sail || bash vendor/bin/sail\''
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
 ```
 
 これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。
+
+### 1.4.4. アプリケーションキーの生成
+以下のコマンドで、Laravel がアプリを安全に動かすために必要な「暗号化の元になる秘密鍵（APP_KEY）」 を .env に入れておきます。
+```php
+sail artisan key:generate
+```
