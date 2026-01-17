@@ -18,7 +18,7 @@
 |:---|:---|:---|
 | レビューは書籍に紐づく | URLを`/books/{book}/reviews`のようにネストする | 「どの書籍に対するレビューか」が明確になる。 |
 | レビューは投稿者のみ編集・削除可能 | `ReviewPolicy`で認可を制御する | 他人のレビューを勝手に編集・削除されないようにする。 |
-| レビュー投稿後は書籍詳細ページに戻る | `redirect()->route('books.show', $book)` | ユーザーが自分の投稿を確認しやすい。 |
+| レビュー投稿後は書籍詳細ページに戻る | `redirect()->route(\'books.show\', $book)` | ユーザーが自分の投稿を確認しやすい。 |
 
 ---
 
@@ -40,13 +40,28 @@ sail artisan make:policy ReviewPolicy --model=Review
 ```php
 // app/Providers/AuthServiceProvider.php
 
-use App\Models\Review;
-use App\Policies\ReviewPolicy;
+<?php
 
-protected $policies = [
-    Book::class => BookPolicy::class,
-    Review::class => ReviewPolicy::class,
-];
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Policies\BookPolicy;
+use App\Policies\ReviewPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+        Review::class => ReviewPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        $this->registerPolicies();
+    }
+}
 ```
 
 ---
@@ -80,7 +95,6 @@ class ReviewPolicy
 ---
 
 ## 6.4. ReviewControllerの実装
-
 ```php
 // app/Http/Controllers/ReviewController.php
 
@@ -99,38 +113,38 @@ class ReviewController extends Controller
     public function store(StoreReviewRequest $request, Book $book)
     {
         $book->reviews()->create([
-            'user_id' => Auth::id(),
-            'rating' => $request->rating,
-            'comment' => $request->comment,
+            \'user_id\' => Auth::id(),
+            \'rating\' => $request->rating,
+            \'comment\' => $request->comment,
         ]);
 
-        return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
+        return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
     }
 
     public function edit(Review $review)
     {
-        $this->authorize('update', $review);
-        return view('reviews.edit', compact('review'));
+        $this->authorize(\'update\', $review);
+        return view(\'reviews.edit\', compact(\'review\'));
     }
 
     public function update(UpdateReviewRequest $request, Review $review)
     {
-        $this->authorize('update', $review);
+        $this->authorize(\'update\', $review);
         $review->update([
-            'rating' => $request->rating,
-            'comment' => $request->comment,
+            \'rating\' => $request->rating,
+            \'comment\' => $request->comment,
         ]);
 
-        return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
+        return redirect()->route(\'books.show\', $review->book)->with(\'success\', \'レビューを更新しました。\');
     }
 
     public function destroy(Review $review)
     {
-        $this->authorize('delete', $review);
+        $this->authorize(\'delete\', $review);
         $book = $review->book;
         $review->delete();
 
-        return redirect()->route('books.show', $book)->with('success', 'レビューを削除しました。');
+        return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを削除しました。\');
     }
 }
 ```
@@ -141,12 +155,12 @@ class ReviewController extends Controller
 public function store(StoreReviewRequest $request, Book $book)
 {
     $book->reviews()->create([
-        'user_id' => Auth::id(),
-        'rating' => $request->rating,
-        'comment' => $request->comment,
+        \'user_id\' => Auth::id(),
+        \'rating\' => $request->rating,
+        \'comment\' => $request->comment,
     ]);
 
-    return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
+    return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
 }
 ```
 
@@ -155,42 +169,41 @@ public function store(StoreReviewRequest $request, Book $book)
 | `$book->reviews()` | `Book`モデルの`reviews`リレーションを取得します。 | `HasMany` |
 | `->create([...])` | リレーションを通じて新しい`Review`を作成します。 | `Review` |
 | `Auth::id()` | 現在ログインしているユーザーのIDを取得します。 | `int` |
-| `redirect()->route('books.show', $book)` | 書籍詳細ページにリダイレクトします。 | `RedirectResponse` |
-| `->with('success', '...')` | セッションにフラッシュメッセージを保存します。 | `RedirectResponse` |
+| `redirect()->route(\'books.show\', $book)` | 書籍詳細ページにリダイレクトします。 | `RedirectResponse` |
+| `->with(\'success\', \'...\')` | セッションにフラッシュメッセージを保存します。 | `RedirectResponse` |
 
 > **💡 ポイント: リレーションを通じた`create`**
-> `$book->reviews()->create([...])`を使うと、`book_id`が自動的に設定されます。手動で`'book_id' => $book->id`を指定する必要はありません。
+> `$book->reviews()->create([...])`を使うと、`book_id`が自動的に設定されます。手動で`\'book_id\' => $book->id`を指定する必要はありません。
 
 ### 6.4.2. コードリーディング：`destroy`メソッド
-
 ```php
 public function destroy(Review $review)
 {
-    $this->authorize('delete', $review);
+    $this->authorize(\'delete\', $review);
     $book = $review->book;
     $review->delete();
 
-    return redirect()->route('books.show', $book)->with('success', 'レビューを削除しました。');
+    return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを削除しました。\');
 }
 ```
 
 | 部分 | 説明 | 戻り値 |
 |:---|:---|:---|
-| `$this->authorize('delete', $review)` | `ReviewPolicy`の`delete`メソッドで認可を確認します。 | `void`（認可されない場合は例外がスローされます） |
+| `$this->authorize(\'delete\', $review)` | `ReviewPolicy`の`delete`メソッドで認可を確認します。 | `void`（認可されない場合は例外がスローされます） |
 | `$book = $review->book` | 削除前に、リダイレクト先の書籍を取得しておきます。 | `Book` |
 | `$review->delete()` | レビューを削除します。 | `bool` |
 
 > **❌ よくある間違い**
 > ```php
 > $review->delete();
-> return redirect()->route('books.show', $review->book); // ❌ 削除後は$review->bookにアクセスできない
+> return redirect()->route(\'books.show\', $review->book); // ❌ 削除後は$review->bookにアクセスできない
 > ```
 > 
 > **✅ 正解**
 > ```php
 > $book = $review->book; // 削除前に取得
 > $review->delete();
-> return redirect()->route('books.show', $book); // ✅ 事前に取得した$bookを使用
+> return redirect()->route(\'books.show\', $book); // ✅ 事前に取得した$bookを使用
 > ```
 
 ---
@@ -218,8 +231,8 @@ class StoreReviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
+            \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
+            \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
         ];
     }
 }
@@ -246,8 +259,8 @@ class UpdateReviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
+            \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
+            \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
         ];
     }
 }
@@ -255,9 +268,9 @@ class UpdateReviewRequest extends FormRequest
 
 | ルール | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `'integer'` | 整数である必要があります。 | - |
-| `'min:1', 'max:5'` | 1〜5の範囲内である必要があります。 | 5段階評価を想定しています。 |
-| `'nullable'` | 空の値を許可します。 | コメントは任意入力です。 |
+| `\'integer\'` | 整数である必要があります。 | - |
+| `\'min:1\', \'max:5\'` | 1〜5の範囲内である必要があります。 | 5段階評価を想定しています。 |
+| `\'nullable\'` | 空の値を許可します。 | コメントは任意入力です。 |
 
 ---
 
@@ -266,14 +279,18 @@ class UpdateReviewRequest extends FormRequest
 ```php
 // routes/web.php
 
-Route::middleware('auth')->group(function () {
+use App\Http\Controllers\ReviewController;
+
+// ... (他のルート)
+
+Route::middleware(\'auth\')->group(function () {
     // ... 既存のルート
 
     // Review management
-    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
-    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
-    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
-    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::post(\'/books/{book}/reviews\', [ReviewController::class, \'store\'])->name(\'reviews.store\');
+    Route::get(\'/reviews/{review}/edit\', [ReviewController::class, \'edit\'])->name(\'reviews.edit\');
+    Route::put(\'/reviews/{review}\', [ReviewController::class, \'update\'])->name(\'reviews.update\');
+    Route::delete(\'/reviews/{review}\', [ReviewController::class, \'destroy\'])->name(\'reviews.destroy\');
 });
 ```
 

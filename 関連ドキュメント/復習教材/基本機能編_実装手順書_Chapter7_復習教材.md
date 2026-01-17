@@ -40,6 +40,7 @@ sail artisan make:controller FavoriteController
 namespace App\Http\Controllers;
 
 use App\Models\Book;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class FavoriteController extends Controller
@@ -47,19 +48,22 @@ class FavoriteController extends Controller
     public function store(Book $book)
     {
         Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
+
         return back();
     }
 
     public function destroy(Book $book)
     {
         Auth::user()->favoriteBooks()->detach($book->id);
+
         return back();
     }
 
     public function index()
     {
         $books = Auth::user()->favoriteBooks()->paginate(10);
-        return view('favorites.index', compact('books'));
+
+        return view(\'favorites.index\', compact(\'books\'));
     }
 }
 ```
@@ -92,7 +96,6 @@ public function store(Book $book)
 > お気に入り登録には`syncWithoutDetaching`が最適です。
 
 ### 7.2.2. コードリーディング：`destroy`メソッド
-
 ```php
 public function destroy(Book $book)
 {
@@ -111,7 +114,7 @@ public function destroy(Book $book)
 public function index()
 {
     $books = Auth::user()->favoriteBooks()->paginate(10);
-    return view('favorites.index', compact('books'));
+    return view(\'favorites.index\', compact(\'books\'));
 }
 ```
 
@@ -127,13 +130,17 @@ public function index()
 ```php
 // routes/web.php
 
-Route::middleware('auth')->group(function () {
+use App\Http\Controllers\FavoriteController;
+
+// ... (他のルート)
+
+Route::middleware(\'auth\')->group(function () {
     // ... 既存のルート
 
     // Favorite management
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
-    Route::delete('/books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post(\'/books/{book}/favorite\', [FavoriteController::class, \'store\'])->name(\'favorites.store\');
+    Route::delete(\'/books/{book}/unfavorite\', [FavoriteController::class, \'destroy\'])->name(\'favorites.destroy\');
+    Route::get(\'/favorites\', [FavoriteController::class, \'index\'])->name(\'favorites.index\');
 });
 ```
 
@@ -164,22 +171,16 @@ touch resources/views/favorites/index.blade.php
 ```blade
 {{-- お気に入りボタン --}}
 @auth
-    @if (auth()->user()->favoriteBooks->contains($book->id))
-        {{-- お気に入り済み：解除ボタンを表示 --}}
-        <form action="{{ route('favorites.destroy', $book) }}" method="POST">
+    @if (Auth::user()->isFavoriting($book))
+        <form action="{{ route(\'favorites.destroy\', $book) }}" method="POST">
             @csrf
-            @method('DELETE')
-            <button type="submit" class="text-red-500">
-                ★ お気に入り解除
-            </button>
+            @method(\'DELETE\')
+            <button type="submit">お気に入り解除</button>
         </form>
     @else
-        {{-- 未登録：登録ボタンを表示 --}}
-        <form action="{{ route('favorites.store', $book) }}" method="POST">
+        <form action="{{ route(\'favorites.store\', $book) }}" method="POST">
             @csrf
-            <button type="submit" class="text-gray-500">
-                ☆ お気に入り登録
-            </button>
+            <button type="submit">お気に入り登録</button>
         </form>
     @endif
 @endauth
@@ -188,7 +189,7 @@ touch resources/views/favorites/index.blade.php
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
 | `@auth` | ログインしている場合のみ表示します。 | 未ログインユーザーにはボタンを表示しません。 |
-| `auth()->user()->favoriteBooks->contains($book->id)` | ログインユーザーのお気に入りに、この書籍が含まれているか確認します。 | `contains`メソッドはコレクションのメソッドです。 |
-| `@method('DELETE')` | HTMLフォームでDELETEメソッドを擬似的に送信します。 | HTMLフォームはGETとPOSTしかサポートしないため、Laravelの仕組みで対応します。 |
+| `Auth::user()->isFavoriting($book)` | ログインユーザーがお気に入りに登録済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
+| `@method(\'DELETE\')` | HTMLフォームでDELETEメソッドを擬似的に送信します。 | HTMLフォームはGETとPOSTしかサポートしないため、Laravelの仕組みで対応します。 |
 
 これで、お気に入り機能の実装が完了しました。次のChapterでは、レビューいいね機能を実装していきます。

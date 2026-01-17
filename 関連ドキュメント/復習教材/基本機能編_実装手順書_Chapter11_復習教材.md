@@ -28,24 +28,29 @@
 ```php
 // app/Http/Controllers/GenreController.php
 
+// ... (既存のコード)
+
+use App\Models\Genre;
+
+// ... (既存のコード)
+
 public function show(Genre $genre)
 {
-    $books = $genre->books()->with('genres')->paginate(10);
-    return view('genres.show', compact('genre', 'books'));
+    $books = $genre->books()->paginate(10);
+    return view(\'genres.show\', compact(\'genre\', \'books\'));
 }
 ```
 
 ### 11.1.1. コードリーディング：メソッドチェーンの分解
 
 ```php
-$books = $genre->books()->with('genres')->paginate(10);
+$books = $genre->books()->paginate(10);
 ```
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
 | `$genre` | ルートモデルバインディングにより、URLの`{genre}`から自動的に取得された`Genre`モデルのインスタンスです。 | `Genre` | URLが`/genres/1`の場合、ID=1のジャンルが自動的に取得されます。 |
 | `->books()` | `Genre`モデルの`books`リレーション（`belongsToMany`）を取得します。 | `BelongsToMany` | Chapter 3で定義したリレーションを活用します。 |
-| `->with('genres')` | 各書籍の`genres`リレーションをEager Loadします。 | `Builder` | 書籍カードにジャンルタグを表示する場合に必要です。 |
 | `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
 
 > **💡 ポイント: ルートモデルバインディング**
@@ -53,7 +58,7 @@ $books = $genre->books()->with('genres')->paginate(10);
 > 
 > ```php
 > // ルート定義
-> Route::get('/genres/{genre}', [GenreController::class, 'show']);
+> Route::get(\'/genres/{genre}\', [GenreController::class, \'show\']);
 > 
 > // コントローラー
 > public function show(Genre $genre) // 自動的にGenre::findOrFail($id)が実行される
@@ -66,8 +71,9 @@ $books = $genre->books()->with('genres')->paginate(10);
 ```php
 // routes/web.php
 
-// 認証不要のルート
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+// ... (他のルート)
+
+Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
 ```
 
 ---
@@ -88,53 +94,22 @@ touch resources/views/genres/show.blade.php
 
 ```blade
 {{-- ジャンル別一覧 --}}
-<x-app-layout>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {{-- ジャンル名 --}}
-            <h1 class="text-2xl font-bold mb-6">
-                ジャンル: {{ $genre->name }}
-            </h1>
+<h1>ジャンル: {{ $genre->name }}</h1>
 
-            {{-- 書籍一覧 --}}
-            @if ($books->count() > 0)
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    @foreach ($books as $book)
-                        {{-- 書籍カード --}}
-                        <div class="bg-white rounded-lg shadow p-4">
-                            <a href="{{ route('books.show', $book) }}" class="font-semibold hover:underline">
-                                {{ $book->title }}
-                            </a>
-                            <p class="text-sm text-gray-600">{{ $book->author }}</p>
-                            {{-- ジャンルタグ --}}
-                            <div class="mt-2 flex flex-wrap gap-1">
-                                @foreach ($book->genres as $g)
-                                    <a href="{{ route('genres.show', $g) }}" 
-                                       class="text-xs px-2 py-1 bg-gray-100 rounded {{ $g->id === $genre->id ? 'bg-blue-100 text-blue-800' : '' }}">
-                                        {{ $g->name }}
-                                    </a>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
+<ul>
+    @foreach ($books as $book)
+        <li>
+            <a href="{{ route(\'books.show\', $book) }}">{{ $book->title }}</a>
+        </li>
+    @endforeach
+</ul>
 
-                {{-- ページネーション --}}
-                <div class="mt-6">
-                    {{ $books->links() }}
-                </div>
-            @else
-                <p class="text-gray-500">このジャンルには書籍がありません。</p>
-            @endif
-        </div>
-    </div>
-</x-app-layout>
+{{ $books->links() }}
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
 | `$genre->name` | 現在表示しているジャンルの名前です。 | - |
-| `$g->id === $genre->id` | 現在のジャンルと一致するタグをハイライトします。 | 複数ジャンルに属する書籍で、どのジャンルから来たか分かりやすくなります。 |
 | `$books->links()` | ページネーションリンクを表示します。 | Tailwind CSSに対応したスタイルが自動的に適用されます。 |
 
 ---
@@ -145,14 +120,13 @@ touch resources/views/genres/show.blade.php
 
 ```blade
 {{-- ジャンル一覧 --}}
-<nav class="space-y-1">
+<ul>
     @foreach (\App\Models\Genre::all() as $genre)
-        <a href="{{ route('genres.show', $genre) }}" 
-           class="block px-3 py-2 rounded hover:bg-gray-100">
-            {{ $genre->name }}
-        </a>
+        <li>
+            <a href="{{ route(\'genres.show\', $genre) }}">{{ $genre->name }}</a>
+        </li>
     @endforeach
-</nav>
+</ul>
 ```
 
 > **⚠️ 注意: N+1問題**

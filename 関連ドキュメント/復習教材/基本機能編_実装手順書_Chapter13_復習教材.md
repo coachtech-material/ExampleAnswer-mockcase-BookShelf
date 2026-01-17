@@ -17,7 +17,7 @@
 | 原則 | 説明 | 例 |
 |:---|:---|:---|
 | **RESTful** | リソース（名詞）に対する操作（動詞）をHTTPメソッドで表現 | `GET /books`（一覧）, `POST /books`（作成） |
-| **認証の分離** | 認証が必要なルートと不要なルートを明確に分離 | `Route::middleware('auth')->group(...)` |
+| **認証の分離** | 認証が必要なルートと不要なルートを明確に分離 | `Route::middleware(\'auth\')->group(...)` |
 | **ネストの適切な深さ** | 親子関係があるリソースは1階層までネスト | `/books/{book}/reviews`（OK）, `/users/{user}/books/{book}/reviews`（深すぎ） |
 
 ---
@@ -43,70 +43,59 @@ use Illuminate\Support\Facades\Route;
 // ========================================
 
 // トップページ
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get(\'/\', [BookController::class, \'index\'])->name(\'root\');
 
 // 書籍関連（閲覧のみ）
-Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get(\'/books/search\', [BookController::class, \'search\\])->name(\'books.search\');
+Route::resource(\'books\', BookController::class)->only([\'index\', \'show\']);
 
 // ジャンル関連（閲覧のみ）
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+Route::resource(\'genres\', GenreController::class)->only([\'show\']);
 
 // ランキング
-Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+Route::get(\'/ranking\', [RankingController::class, \'index\\])->name(\'ranking.index\');
 
 // ========================================
 // 認証が必要なルート
 // ========================================
 
-Route::middleware('auth')->group(function () {
+Route::middleware(\'auth\')->group(function () {
     // プロフィール管理
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get(\'/profile\', [ProfileController::class, \'edit\\])->name(\'profile.edit\');
+    Route::patch(\'/profile\', [ProfileController::class, \'update\\])->name(\'profile.update\');
+    Route::delete(\'/profile\', [ProfileController::class, \'destroy\\])->name(\'profile.destroy\');
 
     // 書籍管理（CRUD）
-    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
-    Route::post('/books', [BookController::class, 'store'])->name('books.store');
-    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
-    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
-    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
+    Route::resource(\'books\', BookController::class)->except([\'index\', \'show\']);
 
     // レビュー管理
-    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
-    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
-    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
-    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::resource(\'reviews\', ReviewController::class)->except([\'index\', \'show\']);
 
     // お気に入り管理
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
-    Route::delete('/books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post(\'/books/{book}/favorite\', [FavoriteController::class, \'store\\])->name(\'favorites.store\');
+    Route::delete(\'/books/{book}/unfavorite\', [FavoriteController::class, \'destroy\\])->name(\'favorites.destroy\');
+    Route::get(\'/favorites\', [FavoriteController::class, \'index\\])->name(\'favorites.index\');
 
     // レビューいいね管理
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'store'])->name('likes.store');
-    Route::delete('/reviews/{review}/unlike', [ReviewLikeController::class, 'destroy'])->name('likes.destroy');
+    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'store\\])->name(\'likes.store\');
+    Route::delete(\'/reviews/{review}/unlike\', [ReviewLikeController::class, \'destroy\\])->name(\'likes.destroy\');
 
     // ジャンル管理（CRUD）
-    Route::resource('genres', GenreController::class)->except(['show']);
+    Route::resource(\'genres\', GenreController::class)->except([\'show\']);
 });
 
 // 認証ルート（Breezeが生成）
-require __DIR__.'/auth.php';
+require __DIR__.\'/auth.php\';
 ```
 
 ---
 
 ## 13.2. ルート一覧表
-
 ### 認証不要のルート
 
 | HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
 |:---|:---|:---|:---|:---|
-| GET | `/` | (Closure) | - | トップページ |
+| GET | `/` | `BookController@index` | `root` | トップページ |
 | GET | `/books` | `BookController@index` | `books.index` | 書籍一覧 |
 | GET | `/books/search` | `BookController@search` | `books.search` | 書籍検索 |
 | GET | `/books/{book}` | `BookController@show` | `books.show` | 書籍詳細 |
@@ -120,16 +109,17 @@ require __DIR__.'/auth.php';
 | GET | `/books/create` | `BookController@create` | `books.create` | 書籍登録フォーム |
 | POST | `/books` | `BookController@store` | `books.store` | 書籍登録処理 |
 | GET | `/books/{book}/edit` | `BookController@edit` | `books.edit` | 書籍編集フォーム |
-| PUT | `/books/{book}` | `BookController@update` | `books.update` | 書籍更新処理 |
+| PUT/PATCH | `/books/{book}` | `BookController@update` | `books.update` | 書籍更新処理 |
 | DELETE | `/books/{book}` | `BookController@destroy` | `books.destroy` | 書籍削除処理 |
 
 ### 認証が必要なルート（レビュー管理）
 
 | HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
 |:---|:---|:---|:---|:---|
-| POST | `/books/{book}/reviews` | `ReviewController@store` | `reviews.store` | レビュー投稿 |
+| GET | `/reviews/create` | `ReviewController@create` | `reviews.create` | レビュー投稿フォーム |
+| POST | `/reviews` | `ReviewController@store` | `reviews.store` | レビュー投稿処理 |
 | GET | `/reviews/{review}/edit` | `ReviewController@edit` | `reviews.edit` | レビュー編集フォーム |
-| PUT | `/reviews/{review}` | `ReviewController@update` | `reviews.update` | レビュー更新処理 |
+| PUT/PATCH | `/reviews/{review}` | `ReviewController@update` | `reviews.update` | レビュー更新処理 |
 | DELETE | `/reviews/{review}` | `ReviewController@destroy` | `reviews.destroy` | レビュー削除処理 |
 
 ### 認証が必要なルート（お気に入り・いいね）
@@ -150,7 +140,7 @@ require __DIR__.'/auth.php';
 | GET | `/genres/create` | `GenreController@create` | `genres.create` | ジャンル登録フォーム |
 | POST | `/genres` | `GenreController@store` | `genres.store` | ジャンル登録処理 |
 | GET | `/genres/{genre}/edit` | `GenreController@edit` | `genres.edit` | ジャンル編集フォーム |
-| PUT | `/genres/{genre}` | `GenreController@update` | `genres.update` | ジャンル更新処理 |
+| PUT/PATCH | `/genres/{genre}` | `GenreController@update` | `genres.update` | ジャンル更新処理 |
 | DELETE | `/genres/{genre}` | `GenreController@destroy` | `genres.destroy` | ジャンル削除処理 |
 
 ---

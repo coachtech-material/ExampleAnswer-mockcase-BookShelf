@@ -36,7 +36,7 @@
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
-    -w /var/www/html \
+    -w /var/wsl/html \
     -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
     laravelsail/php82-composer:latest \
     composer create-project laravel/laravel:^10.0 book-review-app
@@ -52,7 +52,7 @@ docker run --rm \
 | `--rm` | コンテナ停止時に自動的にコンテナを削除する | なし | 一時的なコマンド実行に便利。不要なコンテナが残りません。 |
 | `-u "$(id -u):$(id -g)"` | 現在のユーザーのIDとグループIDでコンテナを実行する | なし | ✅ これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。 |
 | `-v "$(pwd):/var/www/html"` | 現在のディレクトリをコンテナの`/var/www/html`にマウントする | なし | ローカルのファイルをコンテナ内で直接編集できるようになります。 |
-| `-w /var/www/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
+| `-w /var/wsl/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
 | `laravelsail/php82-composer:latest` | 使用するDockerイメージを指定 | なし | PHP 8.2とComposerがプリインストールされたLaravel Sail公式イメージです。 |
 | `composer create-project ...` | Composerを使ってLaravelプロジェクトを作成するコマンド | (プロジェクトファイル) | `laravel/laravel:^10.0`でバージョン10を指定しています。 |
 
@@ -71,10 +71,22 @@ docker run --rm \
 cd book-review-app
 
 # Laravel Sailをインストール
-docker run --rm ... composer require laravel/sail --dev
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
+    laravelsail/php82-composer:latest \
+    composer require laravel/sail --dev
 
 # Sailの設定ファイルをパブリッシュ（MySQLを選択）
-docker run --rm ... php artisan sail:install --with=mysql
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
+    laravelsail/php82-composer:latest \
+    php artisan sail:install --with=mysql
 ```
 
 ### 1.2.2. コードリーディング：`sail:install`コマンド
@@ -88,26 +100,101 @@ docker run --rm ... php artisan sail:install --with=mysql
 
 ---
 
-## 1.3. フロントエンドとツールのセットアップ
+## 1.3. .env ファイルの設定
+
+`.env` ファイルを開き、データベース接続情報が以下と一致していることを確認します。
+
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=laravel
+DB_USERNAME=sail
+DB_PASSWORD=password
+```
+
+**重要:** `DB_HOST` は `localhost` や `127.0.0.1` ではなく、Dockerコンテナ名である `mysql` を指定します。
+
+---
+
+## 1.4. フロントエンドとツールのセットアップ
 
 最後に、開発を効率化するための周辺ツールを導入します。
 
-### 1.3.1. フロントエンドのセットアップ (Vite & Tailwind CSS)
+### 1.4.1. フロントエンドのセットアップ (Vite & Tailwind CSS)
 
-手順は「完全手順書」の通りですが、各コマンドの意味を理解しましょう。
+**1. NPM依存パッケージのインストール**
 
-- `sail npm install`: `package.json`に定義されたNode.jsのライブラリをインストールします。
-- `sail npm install -D tailwindcss ...`: Tailwind CSSとその関連ライブラリを「開発時依存」としてインストールします。
-- `sail npx tailwindcss init -p`: Tailwind CSSの設定ファイル（`tailwind.config.js`と`postcss.config.js`）を生成します。
-- `sail npm run dev`: Vite開発サーバーを起動し、ファイルの変更を監視して自動的にブラウザに反映させます。
+> **重要:** `sail npm install` を実行する前に、必ずSailコンテナが起動していることを確認してください。
+> コンテナが起動していない場合は、先に `./vendor/bin/sail up -d` を実行してください。
 
-### 1.3.2. phpMyAdminの追加
+```bash
+sail npm install
+```
 
-`compose.yaml`に`phpmyadmin`サービスを追記することで、Sailの起動時にphpMyAdminコンテナも一緒に起動するようになります。
+**2. Tailwind CSSのインストール**
 
-### 1.3.3. Sailの起動とエイリアス設定
+```bash
+sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer
+```
+
+**3. 設定ファイルの生成**
+
+```bash
+sail npx tailwindcss init -p
+```
+
+**4. Tailwind CSSのテンプレートパス設定**
+
+`tailwind.config.js` を開き、TailwindがCSSを適用するテンプレートファイル（Bladeファイルなど）のパスを指定します。
+
+**`tailwind.config.js`**
+```javascript
+/** @type {import(\'tailwindcss\').Config} */
+export default {
+  content: [
+    "./resources/**/*.blade.php",
+    "./resources/**/*.js",
+    "./resources/**/*.vue",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+**5. Vite開発サーバーの起動**
+
+```bash
+# 新しいターミナルを開いて実行
+sail npm run dev
+```
+
+### 1.4.2. phpMyAdminの追加
+
+`compose.yaml` を開き、`mysql` サービスの後に以下の設定を追加してください。
+
+**`compose.yaml` に追加する内容:**
+
+```yaml
+    phpmyadmin:
+        image: \'phpmyadmin:latest\'
+        ports:
+            - \'${FORWARD_PHPMYADMIN_PORT:-8080}:80\'
+        environment:
+            PMA_HOST: mysql
+            PMA_USER: \'${DB_USERNAME}\'
+            PMA_PASSWORD: \'${DB_PASSWORD}\'
+        networks:
+            - sail
+        depends_on:
+            - mysql
+```
+
+### 1.4.3. Sailの起動とエイリアス設定
 
 - `./vendor/bin/sail up -d`: `compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
-- `alias sail='...'`: 長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
+- `alias sail=\'...\[ -f sail ] && bash sail || bash vendor/bin/sail\''`: 長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
 
 これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。

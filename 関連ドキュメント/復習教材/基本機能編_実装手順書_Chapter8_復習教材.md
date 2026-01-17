@@ -40,6 +40,7 @@ sail artisan make:controller ReviewLikeController
 namespace App\Http\Controllers;
 
 use App\Models\Review;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReviewLikeController extends Controller
@@ -47,12 +48,14 @@ class ReviewLikeController extends Controller
     public function store(Review $review)
     {
         Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
+
         return back();
     }
 
     public function destroy(Review $review)
     {
         Auth::user()->likedReviews()->detach($review->id);
+
         return back();
     }
 }
@@ -76,12 +79,16 @@ class ReviewLikeController extends Controller
 ```php
 // routes/web.php
 
-Route::middleware('auth')->group(function () {
+use App\Http\Controllers\ReviewLikeController;
+
+// ... (他のルート)
+
+Route::middleware(\'auth\')->group(function () {
     // ... 既存のルート
 
     // Review Like management
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'store'])->name('likes.store');
-    Route::delete('/reviews/{review}/unlike', [ReviewLikeController::class, 'destroy'])->name('likes.destroy');
+    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'store\'])->name(\'likes.store\');
+    Route::delete(\'/reviews/{review}/unlike\', [ReviewLikeController::class, \'destroy\'])->name(\'likes.destroy\');
 });
 ```
 
@@ -99,35 +106,24 @@ Route::middleware('auth')->group(function () {
 ```blade
 {{-- いいねボタン --}}
 @auth
-    @if (auth()->user()->likedReviews->contains($review->id))
-        {{-- いいね済み：解除ボタンを表示 --}}
-        <form action="{{ route('likes.destroy', $review) }}" method="POST" class="inline">
+    @if (Auth::user()->isLiking($review))
+        <form action="{{ route(\'likes.destroy\', $review) }}" method="POST">
             @csrf
-            @method('DELETE')
-            <button type="submit" class="text-red-500">
-                ♥ {{ $review->likedByUsers->count() }}
-            </button>
+            @method(\'DELETE\')
+            <button type="submit">いいね解除</button>
         </form>
     @else
-        {{-- 未いいね：いいねボタンを表示 --}}
-        <form action="{{ route('likes.store', $review) }}" method="POST" class="inline">
+        <form action="{{ route(\'likes.store\', $review) }}" method="POST">
             @csrf
-            <button type="submit" class="text-gray-500">
-                ♡ {{ $review->likedByUsers->count() }}
-            </button>
+            <button type="submit">いいね</button>
         </form>
     @endif
-@else
-    {{-- 未ログイン：いいね数のみ表示 --}}
-    <span class="text-gray-500">♡ {{ $review->likedByUsers->count() }}</span>
 @endauth
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `auth()->user()->likedReviews->contains($review->id)` | ログインユーザーがこのレビューにいいねしているか確認します。 | - |
-| `$review->likedByUsers->count()` | このレビューにいいねしているユーザー数を取得します。 | `Review`モデルに`likedByUsers`リレーションを定義しておく必要があります。 |
-| `@else` | 未ログインユーザー向けの表示です。 | いいねボタンは表示せず、いいね数のみ表示します。 |
+| `Auth::user()->isLiking($review)` | ログインユーザーがいいね済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
 
 ---
 
@@ -138,15 +134,17 @@ Route::middleware('auth')->group(function () {
 ```php
 // app/Models/Review.php
 
+// ... (既存のコード)
+
 public function likedByUsers()
 {
-    return $this->belongsToMany(User::class, 'review_likes');
+    return $this->belongsToMany(User::class, \'review_likes\');
 }
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `belongsToMany(User::class, 'review_likes')` | `review_likes`中間テーブルを通じて、このレビューにいいねしたユーザーを取得します。 | `User`モデルの`likedReviews`リレーションの「逆方向」です。 |
+| `belongsToMany(User::class, \'review_likes\')` | `review_likes`中間テーブルを通じて、このレビューにいいねしたユーザーを取得します。 | `User`モデルの`likedReviews`リレーションの「逆方向」です。 |
 
 > **🧠 先輩エンジニアの思考プロセス**
 > 多対多リレーションは、両方向から定義することで、どちらのモデルからでも関連データにアクセスできるようになります。
