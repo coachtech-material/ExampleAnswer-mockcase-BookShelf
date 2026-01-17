@@ -51,6 +51,14 @@ sail artisan make:seeder ReviewLikeSeeder
 `database/seeders/UserSeeder.php`を開き、5人のダミーユーザーを作成する処理を記述します。
 
 ```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\User;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+
 class UserSeeder extends Seeder
 {
     public function run(): void
