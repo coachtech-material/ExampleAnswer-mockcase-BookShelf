@@ -1,137 +1,146 @@
-# Chapter 10: 検索機能
+# Chapter 10: ランキング機能（集計とSQL）
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、書籍のタイトルや著者名で検索する機能を実装します。
+このセクションでは、レビューの平均評価に基づいて書籍をランキング表示する機能を実装します。
 
-- **クエリパラメータの取得**: URLの`?query=xxx`からキーワードを取得する方法を学びます。
-- **LIKE検索**: 部分一致検索をEloquentで実装する方法を学びます。
-- **`orWhere`**: 複数条件のOR検索を実装する方法を学びます。
+- **集計クエリ**: `withAvg`や`withCount`を使って、リレーション先のデータを集計する方法を学びます。
+- **並び替え**: 集計結果に基づいてデータを並び替える方法を学びます。
+- **Eloquentの強力な機能**: 複雑なSQLを書かずに、Eloquentのメソッドチェーンで集計・並び替えを実現します。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：検索機能の設計
+## 🧠 先輩エンジニアの思考プロセス：ランキング機能の設計
 
-検索機能を実装する際、以下の点を考慮します。
+ランキング機能を実装する際、以下の点を考慮します。
 
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
-| 何を検索対象にするか | タイトルと著者名 | ユーザーが最もよく検索する項目。 |
-| 完全一致か部分一致か | 部分一致（LIKE検索） | ユーザーが正確なタイトルを覚えていなくても検索できる。 |
-| 検索結果の表示方法 | 既存の一覧ページを再利用 | 新しいビューを作る必要がなく、UIの一貫性も保てる。 |
+| 何を基準にランキングするか | レビューの平均評価 | ユーザーにとって最も参考になる指標。 |
+| レビューがない書籍はどうするか | ランキングから除外 | 評価がない書籍を上位に表示しても意味がない。 |
+| 同点の場合はどうするか | レビュー数が多い方を上位に | より多くの評価を受けている方が信頼性が高い。 |
 
 ---
 
-## 10.1. BookControllerにsearchメソッドを追加
+## 9.1. コントローラーの作成
 
-既存の`BookController`に検索メソッドを追加します。
+```bash
+sail artisan make:controller RankingController
+```
+
+---
+
+## 9.2. RankingControllerの実装
 
 ```php
-// app/Http/Controllers/BookController.php
+// app/Http/Controllers/RankingController.php
 
-// ... (既存のコード)
+<?php
 
+namespace App\Http\Controllers;
+
+use App\Models\Book;
 use Illuminate\Http\Request;
 
-// ... (既存のコード)
-
-public function search(Request $request)
+class RankingController extends Controller
 {
-    $query = $request->input(\'query\');
+    public function index()
+    {
+        $books = Book::withAvg(\'reviews\
+', \'rating\')
+            ->orderByDesc(\'reviews_avg_rating\')
+            ->take(10)
+            ->get();
 
-    $books = Book::where(\'title\', \'like\', "%{$query}%")
-        ->orWhere(\'author\', \'like\', "%{$query}%")
-        ->paginate(10);
-
-    return view(\'books.index\', compact(\'books\', \'query\'));
+        return view(\'ranking.index\
+', compact(\'books\'));
+    }
 }
 ```
 
-### 10.1.1. コードリーディング：メソッドチェーンの分解
+### 9.2.1. コードリーディング：メソッドチェーンの分解
 
 ```php
-$books = Book::where(\'title\', \'like\', "%{$query}%")
-    ->orWhere(\'author\', \'like\', "%{$query}%")
-    ->paginate(10);
+$books = Book::withAvg(\'reviews\
+', \'rating\')
+    ->orderByDesc(\'reviews_avg_rating\')
+    ->take(10)
+    ->get();
 ```
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
-| `$request->input(\'query\')` | リクエストから`query`パラメータを取得します。 | `string\|null` | URLが`/books/search?query=Laravel`の場合、`\'Laravel\'`が取得されます。 |
-| `Book::where(\'title\', \'like\', "%{$query}%")` | `title`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `%`はワイルドカードで、任意の文字列にマッチします。 |
-| `->orWhere(\'author\', \'like\', "%{$query}%")` | または、`author`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `where`と`orWhere`はOR条件で結合されます。 |
-| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
-
-> **💡 ポイント: LIKE検索のワイルドカード**
-> - `%Laravel%`: 「Laravel」を含む文字列にマッチ（例: 「入門Laravel」「Laravel実践」）
-> - `Laravel%`: 「Laravel」で始まる文字列にマッチ（例: 「Laravel入門」）
-> - `%Laravel`: 「Laravel」で終わる文字列にマッチ（例: 「入門Laravel」）
+| `Book::withAvg(\'reviews\
+', \'rating\')` | `reviews`リレーションの`rating`カラムの平均値を計算し、`reviews_avg_rating`という仮想カラムとして追加します。 | `Builder` | 生成されるSQL: `SELECT *, (SELECT AVG(rating) FROM reviews WHERE books.id = reviews.book_id) AS reviews_avg_rating` |
+| `->orderByDesc(\'reviews_avg_rating\')` | `reviews_avg_rating`の降順（高い順）で並び替えます。 | `Builder` | 平均評価が高い書籍が上位に来ます。 |
+| `->take(10)` | 上位10件のみ取得します。 | `Builder` | ランキングなので、全件取得する必要はありません。 |
+| `->get()` | クエリを実行し、結果をコレクションとして取得します。 | `Collection` | - |
 
 ---
 
-## 10.2. ルートの追加
-
+## 9.3. ルートの追加
 ```php
 // routes/web.php
 
+use App\Http\Controllers\RankingController;
+
 // ... (他のルート)
 
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
-```
-
-> **⚠️ 注意: ルートの順序**
-> `/books/search`は`/books/{book}`よりも**先に**定義する必要があります。そうしないと、`search`が書籍IDとして解釈されてしまいます。
-
-```php
-// ✅ 正しい順序
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
-Route::resource(\'books\', BookController::class);
-
-// ❌ 間違った順序
-Route::resource(\'books\', BookController::class);
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\'); // 到達しない
+Route::get(\'/ranking\', [RankingController::class, \'index\'])->name(\'ranking.index\');
 ```
 
 ---
 
-## 10.3. 検索フォームの実装例
+## 9.4. ビューの作成
 
-ヘッダーやサイドバーに検索フォームを設置する例です。
-
-```blade
-{{-- 検索フォーム --}}
-<form action="{{ route(\'books.search\') }}" method="GET">
-    <input type="text" name="query" value="{{ $query ?? \'\' }}" placeholder="書籍を検索">
-    <button type="submit">検索</button>
-</form>
+```bash
+# ディレクトリとファイルを作成
+mkdir -p resources/views/ranking
+touch resources/views/ranking/index.blade.php
 ```
 
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `method="GET"` | 検索はGETメソッドで行います。 | URLに検索キーワードが含まれるため、ブックマークや共有が可能になります。 |
-| `value="{{ $query ?? \'\' }}"` | 検索後も入力欄にキーワードを表示します。 | `??`はnull合体演算子で、`$query`がnullの場合は空文字を返します。 |
+各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
 
 ---
 
-## 10.4. 検索結果の表示
-
-`books.index`ビューを再利用し、検索結果を表示します。検索キーワードがある場合は、検索結果であることを示すメッセージを表示します。
+## 9.5. Bladeテンプレートでのランキング表示例
 
 ```blade
-{{-- 検索結果のメッセージ --}}
-@if (isset($query) && $query)
-    <p>「{{ $query }}」の検索結果: {{ $books->total() }}件</p>
-@endif
-
-{{-- 書籍一覧（既存のコード） --}}
-@foreach ($books as $book)
-    {{-- ... --}}
-@endforeach
+{{-- ランキング一覧 --}}
+<ol>
+    @foreach ($books as $book)
+        <li>
+            <a href="{{ route(\'books.show\
+', $book) }}">
+                {{ $book->title }}
+            </a>
+            <span>★{{ number_format($book->reviews_avg_rating, 1) }}</span>
+        </li>
+    @endforeach
+</ol>
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `isset($query) && $query` | `$query`が存在し、かつ空でない場合に表示します。 | 通常の一覧表示時には表示しません。 |
-| `$books->total()` | ページネーション全体の件数を取得します。 | 現在のページの件数ではなく、検索結果全体の件数です。 |
+| `$book->reviews_avg_rating` | `withAvg`で追加された仮想カラムにアクセスします。 | 通常のプロパティと同じようにアクセスできます。 |
+| `number_format($book->reviews_avg_rating, 1)` | 小数点以下1桁で表示します。 | 例: `4.5` |
 
-これで、検索機能の実装が完了しました。次のChapterでは、ジャンル別一覧機能を実装していきます。
+---
+
+## 9.6. 発展：生SQLとの比較
+
+Eloquentのメソッドチェーンは、内部的に以下のようなSQLを生成しています。
+
+```sql
+SELECT 
+    books.*,
+    (SELECT AVG(rating) FROM reviews WHERE books.id = reviews.book_id) AS reviews_avg_rating
+FROM books
+ORDER BY reviews_avg_rating DESC
+LIMIT 10
+```
+
+> **🧠 先輩エンジニアの思考プロセス**
+> Eloquentを使うことで、複雑なSQLを書かずに同じ結果を得られます。ただし、パフォーマンスが重要な場面では、生SQLや`DB::raw()`を使うことも検討します。
+
+これで、ランキング機能の実装が完了しました。次のChapterでは、検索機能を実装していきます。

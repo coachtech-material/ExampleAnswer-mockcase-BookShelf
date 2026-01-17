@@ -1,121 +1,186 @@
-# Chapter 8: レビューいいね機能
+# Chapter 8: お気に入り機能
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、レビューに対する「いいね」機能を実装します。Chapter 7で学んだお気に入り機能と同様の「多対多リレーション」のパターンを、別のコンテキストで再度実践します。
+このセクションでは、ユーザーが書籍を「お気に入り」に登録・解除する機能を実装します。
 
-- **パターンの再利用**: お気に入り機能と同じ設計パターンを、レビューいいね機能に適用します。
-- **学習の定着**: 同じパターンを繰り返し実装することで、理解を深めます。
-
----
-
-## 🧠 先輩エンジニアの思考プロセス：パターンの認識
-
-お気に入り機能とレビューいいね機能は、技術的には全く同じパターンです。
-
-| 機能 | 主体 | 対象 | 中間テーブル | リレーション名 |
-|:---|:---|:---|:---|:---|
-| お気に入り | User | Book | favorites | favoriteBooks |
-| いいね | User | Review | review_likes | likedReviews |
-
-このように、**「ユーザーが何かをお気に入り/いいねする」**というパターンは、多くのWebアプリケーションで共通して使われます。一度理解すれば、様々な場面で応用できます。
+- **多対多リレーションの操作**: `belongsToMany`リレーションで定義した中間テーブル（`favorites`）を操作する方法を学びます。
+- **`syncWithoutDetaching`と`detach`**: 多対多リレーションでのデータ追加・削除の方法を学びます。
+- **トグル操作**: 同じボタンで「お気に入り登録」と「お気に入り解除」を切り替えるUIパターンを学びます。
 
 ---
 
-## 8.1. コントローラーの作成
+## 🧠 先輩エンジニアの思考プロセス：お気に入り機能の設計
+
+お気に入り機能は、ユーザーと書籍の「多対多」の関係を表現します。
+
+| 考慮点 | 設計判断 | 理由 |
+|:---|:---|:---|
+| 1人のユーザーは複数の書籍をお気に入りにできる | `belongsToMany`リレーションを使用 | 中間テーブル（`favorites`）で関係を管理する。 |
+| 1つの書籍は複数のユーザーにお気に入りされる | 同上 | 同上 |
+| 同じ書籍を2回お気に入りに登録できない | `syncWithoutDetaching`を使用 | 重複登録を防ぎつつ、既存のお気に入りを保持する。 |
+
+---
+
+## 7.1. コントローラーの作成
 
 ```bash
-sail artisan make:controller ReviewLikeController
+sail artisan make:controller FavoriteController
 ```
 
 ---
 
-## 8.2. ReviewLikeControllerの実装
+## 7.2. FavoriteControllerの実装
 
 ```php
-// app/Http/Controllers/ReviewLikeController.php
+// app/Http/Controllers/FavoriteController.php
 
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Review;
+use App\Models\Book;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class ReviewLikeController extends Controller
+class FavoriteController extends Controller
 {
-    public function store(Review $review)
+    public function store(Book $book)
     {
-        Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
+        Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
 
         return back();
     }
 
-    public function destroy(Review $review)
+    public function destroy(Book $book)
     {
-        Auth::user()->likedReviews()->detach($review->id);
+        Auth::user()->favoriteBooks()->detach($book->id);
 
         return back();
+    }
+
+    public function index()
+    {
+        $books = Auth::user()->favoriteBooks()->paginate(10);
+
+        return view(\'favorites.index\', compact(\'books\'));
     }
 }
 ```
 
-### 8.2.1. コードリーディング：お気に入り機能との比較
+### 7.2.1. コードリーディング：`store`メソッド
 
-| お気に入り機能 | レビューいいね機能 | 説明 |
+```php
+public function store(Book $book)
+{
+    Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
+    return back();
+}
+```
+
+| 部分 | 説明 | 戻り値 |
 |:---|:---|:---|
-| `Auth::user()->favoriteBooks()` | `Auth::user()->likedReviews()` | リレーション名が異なるだけ |
-| `->syncWithoutDetaching($book->id)` | `->syncWithoutDetaching($review->id)` | 対象のIDが異なるだけ |
-| `->detach($book->id)` | `->detach($review->id)` | 対象のIDが異なるだけ |
+| `Auth::user()` | 現在ログインしているユーザーを取得します。 | `User` |
+| `->favoriteBooks()` | `User`モデルの`favoriteBooks`リレーション（`belongsToMany`）を取得します。 | `BelongsToMany` |
+| `->syncWithoutDetaching($book->id)` | 指定したIDを中間テーブルに追加します。既存のレコードは削除しません。 | `array` |
+| `return back()` | 直前のページにリダイレクトします。 | `RedirectResponse` |
 
-> **💡 ポイント: DRY原則とパターン認識**
-> 同じパターンを認識できるようになると、新しい機能を実装する際に「これは〇〇と同じパターンだ」と気づけるようになります。これにより、実装スピードが上がり、バグも減ります。
+> **💡 ポイント: `syncWithoutDetaching` vs `attach` vs `sync`**
+> 
+> | メソッド | 動作 | 重複時の挙動 |
+> |:---|:---|:---|
+> | `attach($id)` | 中間テーブルにレコードを追加 | エラー（重複キー違反） |
+> | `syncWithoutDetaching($id)` | 中間テーブルにレコードを追加 | 何もしない（安全） |
+> | `sync([$id])` | 中間テーブルを指定したIDのみに置き換え | 他のレコードが削除される |
+> 
+> お気に入り登録には`syncWithoutDetaching`が最適です。
+
+### 7.2.2. コードリーディング：`destroy`メソッド
+```php
+public function destroy(Book $book)
+{
+    Auth::user()->favoriteBooks()->detach($book->id);
+    return back();
+}
+```
+
+| 部分 | 説明 | 戻り値 |
+|:---|:---|:---|
+| `->detach($book->id)` | 中間テーブルから指定したIDのレコードを削除します。 | `int`（削除されたレコード数） |
+
+### 7.2.3. コードリーディング：`index`メソッド
+
+```php
+public function index()
+{
+    $books = Auth::user()->favoriteBooks()->paginate(10);
+    return view(\'favorites.index\', compact(\'books\'));
+}
+```
+
+| 部分 | 説明 | 戻り値 |
+|:---|:---|:---|
+| `Auth::user()->favoriteBooks()` | ログインユーザーのお気に入り書籍を取得するクエリビルダーを返します。 | `BelongsToMany` |
+| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` |
 
 ---
 
-## 8.3. ルートの追加
+## 7.3. ルートの追加
 
 ```php
 // routes/web.php
 
-use App\Http\Controllers\ReviewLikeController;
+use App\Http\Controllers\FavoriteController;
 
 // ... (他のルート)
 
 Route::middleware(\'auth\')->group(function () {
     // ... 既存のルート
 
-    // Review Like management
-    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'store\'])->name(\'likes.store\');
-    Route::delete(\'/reviews/{review}/unlike\', [ReviewLikeController::class, \'destroy\'])->name(\'likes.destroy\');
+    // Favorite management
+    Route::post(\'/books/{book}/favorite\', [FavoriteController::class, \'store\'])->name(\'favorites.store\');
+    Route::delete(\'/books/{book}/unfavorite\', [FavoriteController::class, \'destroy\'])->name(\'favorites.destroy\');
+    Route::get(\'/favorites\', [FavoriteController::class, \'index\'])->name(\'favorites.index\');
 });
 ```
 
 | ルート | HTTPメソッド | 説明 |
 |:---|:---|:---|
-| `/reviews/{review}/like` | POST | レビューにいいねを追加 |
-| `/reviews/{review}/unlike` | DELETE | レビューのいいねを解除 |
+| `/books/{book}/favorite` | POST | 書籍をお気に入りに登録 |
+| `/books/{book}/unfavorite` | DELETE | 書籍をお気に入りから解除 |
+| `/favorites` | GET | お気に入り一覧を表示 |
 
 ---
 
-## 8.4. Bladeテンプレートでのいいねボタン実装例
+## 7.4. ビューの作成
 
-レビュー表示部分で、いいねボタンを表示する際の実装例です。
+```bash
+# ディレクトリとファイルを作成
+mkdir -p resources/views/favorites
+touch resources/views/favorites/index.blade.php
+```
+
+各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
+
+---
+
+## 7.5. Bladeテンプレートでのお気に入りボタン実装例
+
+書籍詳細ページや一覧ページで、お気に入りボタンを表示する際の実装例です。
 
 ```blade
-{{-- いいねボタン --}}
+{{-- お気に入りボタン --}}
 @auth
-    @if (Auth::user()->isLiking($review))
-        <form action="{{ route(\'likes.destroy\', $review) }}" method="POST">
+    @if (Auth::user()->isFavoriting($book))
+        <form action="{{ route(\'favorites.destroy\', $book) }}" method="POST">
             @csrf
             @method(\'DELETE\')
-            <button type="submit">いいね解除</button>
+            <button type="submit">お気に入り解除</button>
         </form>
     @else
-        <form action="{{ route(\'likes.store\', $review) }}" method="POST">
+        <form action="{{ route(\'favorites.store\', $book) }}" method="POST">
             @csrf
-            <button type="submit">いいね</button>
+            <button type="submit">お気に入り登録</button>
         </form>
     @endif
 @endauth
@@ -123,32 +188,8 @@ Route::middleware(\'auth\')->group(function () {
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `Auth::user()->isLiking($review)` | ログインユーザーがいいね済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
+| `@auth` | ログインしている場合のみ表示します。 | 未ログインユーザーにはボタンを表示しません。 |
+| `Auth::user()->isFavoriting($book)` | ログインユーザーがお気に入りに登録済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
+| `@method(\'DELETE\')` | HTMLフォームでDELETEメソッドを擬似的に送信します。 | HTMLフォームはGETとPOSTしかサポートしないため、Laravelの仕組みで対応します。 |
 
----
-
-## 8.5. Reviewモデルへのリレーション追加
-
-いいね数を表示するために、`Review`モデルに`likedByUsers`リレーションを追加します。
-
-```php
-// app/Models/Review.php
-
-// ... (既存のコード)
-
-public function likedByUsers()
-{
-    return $this->belongsToMany(User::class, \'review_likes\');
-}
-```
-
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `belongsToMany(User::class, \'review_likes\')` | `review_likes`中間テーブルを通じて、このレビューにいいねしたユーザーを取得します。 | `User`モデルの`likedReviews`リレーションの「逆方向」です。 |
-
-> **🧠 先輩エンジニアの思考プロセス**
-> 多対多リレーションは、両方向から定義することで、どちらのモデルからでも関連データにアクセスできるようになります。
-> - `$user->likedReviews`: ユーザーがいいねしたレビュー一覧
-> - `$review->likedByUsers`: レビューにいいねしたユーザー一覧
-
-これで、レビューいいね機能の実装が完了しました。次のChapterでは、ランキング機能を実装していきます。
+これで、お気に入り機能の実装が完了しました。次のChapterでは、レビューいいね機能を実装していきます。

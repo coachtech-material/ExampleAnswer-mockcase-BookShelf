@@ -1,135 +1,137 @@
-# Chapter 11: ジャンル別一覧機能
+# Chapter 11: 検索機能
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、特定のジャンルに属する書籍の一覧を表示する機能を実装します。
+このセクションでは、書籍のタイトルや著者名で検索する機能を実装します。
 
-- **リレーションを活用した絞り込み**: `belongsToMany`リレーションを使って、特定のジャンルに紐づく書籍を取得する方法を学びます。
-- **ルートモデルバインディング**: URLパラメータから自動的にモデルインスタンスを取得する仕組みを学びます。
+- **クエリパラメータの取得**: URLの`?query=xxx`からキーワードを取得する方法を学びます。
+- **LIKE検索**: 部分一致検索をEloquentで実装する方法を学びます。
+- **`orWhere`**: 複数条件のOR検索を実装する方法を学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：ジャンル別一覧の設計
+## 🧠 先輩エンジニアの思考プロセス：検索機能の設計
 
-ジャンル別一覧機能を実装する際、以下の点を考慮します。
+検索機能を実装する際、以下の点を考慮します。
 
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
-| URLの設計 | `/genres/{genre}` | RESTfulな設計で、「ジャンルの詳細」を表示するイメージ。 |
-| データの取得方法 | `$genre->books()` | `Genre`モデルに定義した`books`リレーションを活用する。 |
-| 既存のビューを再利用するか | 専用のビューを作成 | ジャンル名を表示するなど、ジャンル固有の情報を含めたい。 |
+| 何を検索対象にするか | タイトルと著者名 | ユーザーが最もよく検索する項目。 |
+| 完全一致か部分一致か | 部分一致（LIKE検索） | ユーザーが正確なタイトルを覚えていなくても検索できる。 |
+| 検索結果の表示方法 | 既存の一覧ページを再利用 | 新しいビューを作る必要がなく、UIの一貫性も保てる。 |
 
 ---
 
-## 11.1. GenreControllerにshowメソッドを追加
+## 10.1. BookControllerにsearchメソッドを追加
 
-ジャンル管理用の`GenreController`に、ジャンル別一覧を表示する`show`メソッドを追加します。
+既存の`BookController`に検索メソッドを追加します。
 
 ```php
-// app/Http/Controllers/GenreController.php
+// app/Http/Controllers/BookController.php
 
 // ... (既存のコード)
 
-use App\Models\Genre;
+use Illuminate\Http\Request;
 
 // ... (既存のコード)
 
-public function show(Genre $genre)
+public function search(Request $request)
 {
-    $books = $genre->books()->paginate(10);
-    return view(\'genres.show\', compact(\'genre\', \'books\'));
+    $query = $request->input(\'query\');
+
+    $books = Book::where(\'title\', \'like\', "%{$query}%")
+        ->orWhere(\'author\', \'like\', "%{$query}%")
+        ->paginate(10);
+
+    return view(\'books.index\', compact(\'books\', \'query\'));
 }
 ```
 
-### 11.1.1. コードリーディング：メソッドチェーンの分解
+### 10.1.1. コードリーディング：メソッドチェーンの分解
 
 ```php
-$books = $genre->books()->paginate(10);
+$books = Book::where(\'title\', \'like\', "%{$query}%")
+    ->orWhere(\'author\', \'like\', "%{$query}%")
+    ->paginate(10);
 ```
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
 |:---|:---|:---|:---|
-| `$genre` | ルートモデルバインディングにより、URLの`{genre}`から自動的に取得された`Genre`モデルのインスタンスです。 | `Genre` | URLが`/genres/1`の場合、ID=1のジャンルが自動的に取得されます。 |
-| `->books()` | `Genre`モデルの`books`リレーション（`belongsToMany`）を取得します。 | `BelongsToMany` | Chapter 3で定義したリレーションを活用します。 |
+| `$request->input(\'query\')` | リクエストから`query`パラメータを取得します。 | `string\|null` | URLが`/books/search?query=Laravel`の場合、`\'Laravel\'`が取得されます。 |
+| `Book::where(\'title\', \'like\', "%{$query}%")` | `title`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `%`はワイルドカードで、任意の文字列にマッチします。 |
+| `->orWhere(\'author\', \'like\', "%{$query}%")` | または、`author`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `where`と`orWhere`はOR条件で結合されます。 |
 | `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
 
-> **💡 ポイント: ルートモデルバインディング**
-> Laravelは、ルートパラメータ名（`{genre}`）とメソッド引数の型ヒント（`Genre $genre`）を照合し、自動的にデータベースからモデルを取得します。
-> 
-> ```php
-> // ルート定義
-> Route::get(\'/genres/{genre}\', [GenreController::class, \'show\']);
-> 
-> // コントローラー
-> public function show(Genre $genre) // 自動的にGenre::findOrFail($id)が実行される
-> ```
+> **💡 ポイント: LIKE検索のワイルドカード**
+> - `%Laravel%`: 「Laravel」を含む文字列にマッチ（例: 「入門Laravel」「Laravel実践」）
+> - `Laravel%`: 「Laravel」で始まる文字列にマッチ（例: 「Laravel入門」）
+> - `%Laravel`: 「Laravel」で終わる文字列にマッチ（例: 「入門Laravel」）
 
 ---
 
-## 11.2. ルートの追加
+## 10.2. ルートの追加
 
 ```php
 // routes/web.php
 
 // ... (他のルート)
 
-Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
+```
+
+> **⚠️ 注意: ルートの順序**
+> `/books/search`は`/books/{book}`よりも**先に**定義する必要があります。そうしないと、`search`が書籍IDとして解釈されてしまいます。
+
+```php
+// ✅ 正しい順序
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
+Route::resource(\'books\', BookController::class);
+
+// ❌ 間違った順序
+Route::resource(\'books\', BookController::class);
+Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\'); // 到達しない
 ```
 
 ---
 
-## 11.3. ビューの作成
+## 10.3. 検索フォームの実装例
 
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/genres
-touch resources/views/genres/show.blade.php
-```
-
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
-
----
-
-## 11.4. Bladeテンプレートでのジャンル別一覧表示例
+ヘッダーやサイドバーに検索フォームを設置する例です。
 
 ```blade
-{{-- ジャンル別一覧 --}}
-<h1>ジャンル: {{ $genre->name }}</h1>
-
-<ul>
-    @foreach ($books as $book)
-        <li>
-            <a href="{{ route(\'books.show\', $book) }}">{{ $book->title }}</a>
-        </li>
-    @endforeach
-</ul>
-
-{{ $books->links() }}
+{{-- 検索フォーム --}}
+<form action="{{ route(\'books.search\') }}" method="GET">
+    <input type="text" name="query" value="{{ $query ?? \'\' }}" placeholder="書籍を検索">
+    <button type="submit">検索</button>
+</form>
 ```
 
 | 部分 | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `$genre->name` | 現在表示しているジャンルの名前です。 | - |
-| `$books->links()` | ページネーションリンクを表示します。 | Tailwind CSSに対応したスタイルが自動的に適用されます。 |
+| `method="GET"` | 検索はGETメソッドで行います。 | URLに検索キーワードが含まれるため、ブックマークや共有が可能になります。 |
+| `value="{{ $query ?? \'\' }}"` | 検索後も入力欄にキーワードを表示します。 | `??`はnull合体演算子で、`$query`がnullの場合は空文字を返します。 |
 
 ---
 
-## 11.5. ジャンル一覧からのリンク
+## 10.4. 検索結果の表示
 
-ヘッダーやサイドバーにジャンル一覧を表示し、各ジャンルへのリンクを設置する例です。
+`books.index`ビューを再利用し、検索結果を表示します。検索キーワードがある場合は、検索結果であることを示すメッセージを表示します。
 
 ```blade
-{{-- ジャンル一覧 --}}
-<ul>
-    @foreach (\App\Models\Genre::all() as $genre)
-        <li>
-            <a href="{{ route(\'genres.show\', $genre) }}">{{ $genre->name }}</a>
-        </li>
-    @endforeach
-</ul>
+{{-- 検索結果のメッセージ --}}
+@if (isset($query) && $query)
+    <p>「{{ $query }}」の検索結果: {{ $books->total() }}件</p>
+@endif
+
+{{-- 書籍一覧（既存のコード） --}}
+@foreach ($books as $book)
+    {{-- ... --}}
+@endforeach
 ```
 
-> **⚠️ 注意: N+1問題**
-> 上記のコードは、ビューで直接`Genre::all()`を呼び出しています。これは簡易的な実装ですが、パフォーマンスを考慮する場合は、コントローラーでジャンル一覧を取得し、ビューに渡す方が良いでしょう。
+| 部分 | 説明 | 💡 ポイント |
+|:---|:---|:---|
+| `isset($query) && $query` | `$query`が存在し、かつ空でない場合に表示します。 | 通常の一覧表示時には表示しません。 |
+| `$books->total()` | ページネーション全体の件数を取得します。 | 現在のページの件数ではなく、検索結果全体の件数です。 |
 
-これで、ジャンル別一覧機能の実装が完了しました。次のChapterでは、ジャンル管理機能（CRUD）を実装していきます。
+これで、検索機能の実装が完了しました。次のChapterでは、ジャンル別一覧機能を実装していきます。

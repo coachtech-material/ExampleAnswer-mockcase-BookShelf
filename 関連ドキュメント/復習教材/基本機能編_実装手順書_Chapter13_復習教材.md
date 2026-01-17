@@ -1,214 +1,210 @@
-# Chapter 13: ルート定義の完全版（設計思想のまとめ）
+# Chapter 13: ジャンル管理機能 (CRUD)
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、これまでに実装してきた全機能のルート定義を確認し、全体の設計思想を振り返ります。
+このセクションでは、ジャンルの登録・編集・削除機能を実装します。Chapter 6で学んだ書籍管理機能（CRUD）と同様のパターンを、別のリソースで再度実践します。
 
-- **ルート設計の全体像**: 認証の有無、HTTPメソッド、URLパターンの設計思想を理解します。
-- **RESTful設計**: リソース指向のURL設計について理解を深めます。
-- **ルートグループ**: ミドルウェアによるルートのグループ化を理解します。
+- **CRUDパターンの再実践**: 書籍管理で学んだパターンを、ジャンル管理に適用します。
+- **学習の定着**: 同じパターンを繰り返し実装することで、理解を深めます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：ルート設計の原則
+## 🧠 先輩エンジニアの思考プロセス：パターンの認識
 
-ルートを設計する際、以下の原則に従います。
+書籍管理とジャンル管理は、技術的にはほぼ同じパターンです。
 
-| 原則 | 説明 | 例 |
+| 機能 | 書籍管理 | ジャンル管理 |
 |:---|:---|:---|
-| **RESTful** | リソース（名詞）に対する操作（動詞）をHTTPメソッドで表現 | `GET /books`（一覧）, `POST /books`（作成） |
-| **認証の分離** | 認証が必要なルートと不要なルートを明確に分離 | `Route::middleware(\'auth\')->group(...)` |
-| **ネストの適切な深さ** | 親子関係があるリソースは1階層までネスト | `/books/{book}/reviews`（OK）, `/users/{user}/books/{book}/reviews`（深すぎ） |
+| 一覧表示 | `BookController@index` | `GenreController@index` |
+| 詳細表示 | `BookController@show` | `GenreController@show` |
+| 新規作成 | `BookController@create/store` | `GenreController@create/store` |
+| 編集 | `BookController@edit/update` | `GenreController@edit/update` |
+| 削除 | `BookController@destroy` | `GenreController@destroy` |
 
 ---
 
-## 13.1. ルート定義の完全版
+## 12.1. GenreControllerの実装
+
+Chapter 12で`show`メソッドを追加した`GenreController`に、CRUD機能を追加します。
+
+```php
+// app/Http/Controllers/GenreController.php
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Genre;
+use App\Http\Requests\StoreGenreRequest;
+use App\Http\Requests\UpdateGenreRequest;
+
+class GenreController extends Controller
+{
+    public function index()
+    {
+        $genres = Genre::all();
+        return view(\'genres.index\', compact(\'genres\'));
+    }
+
+    public function create()
+    {
+        return view(\'genres.create\');
+    }
+
+    public function store(StoreGenreRequest $request)
+    {
+        Genre::create($request->validated());
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを登録しました。\');
+    }
+
+    public function edit(Genre $genre)
+    {
+        return view(\'genres.edit\', compact(\'genre\'));
+    }
+
+    public function update(UpdateGenreRequest $request, Genre $genre)
+    {
+        $genre->update($request->validated());
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを更新しました。\');
+    }
+
+    public function destroy(Genre $genre)
+    {
+        $genre->delete();
+        return redirect()->route(\'genres.index\')->with(\'success\', \'ジャンルを削除しました。\');
+    }
+}
+```
+
+### 12.1.1. コードリーディング：`index`メソッド
+```php
+public function index()
+{
+    $genres = Genre::all();
+    return view(\'genres.index\', compact(\'genres\'));
+}
+```
+
+| 部分 | 説明 | 戻り値 | 💡 ポイント |
+|:---|:---|:---|:---|
+| `Genre::all()` | `genres`テーブルの全レコードを取得します。 | `Collection` | - |
+
+---
+
+## 12.2. フォームリクエストの作成
+
+```bash
+sail artisan make:request StoreGenreRequest
+sail artisan make:request UpdateGenreRequest
+```
+
+### 12.2.1. StoreGenreRequest
+
+```php
+// app/Http/Requests/StoreGenreRequest.php
+
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreGenreRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            \'name\' => [\'required\', \'string\', \'max:255\', \'unique:genres\'],
+        ];
+    }
+}
+```
+
+### 12.2.2. UpdateGenreRequest
+
+```php
+// app/Http/Requests/UpdateGenreRequest.php
+
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateGenreRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            \'name\' => [
+                \'required\',
+                \'string\',
+                \'max:255\',
+                Rule::unique(\'genres\')->ignore($this->genre),
+            ],
+        ];
+    }
+}
+```
+
+| ルール | 説明 | 💡 ポイント |
+|:---|:---|:---|
+| `\'unique:genres\'` | `genres`テーブルで一意である必要があります。 | 同じ名前のジャンルは登録できません。 |
+| `Rule::unique(\'genres\')->ignore($this->genre)` | 更新時は、自分自身を除外してユニークチェックします。 | 名前を変更しない場合でも、バリデーションが通るようにします。 |
+
+---
+
+## 12.3. ルートの追加
 
 ```php
 // routes/web.php
 
-<?php
-
-use App\Http\Controllers\BookController;
-use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\GenreController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\RankingController;
-use App\Http\Controllers\ReviewController;
-use App\Http\Controllers\ReviewLikeController;
-use Illuminate\Support\Facades\Route;
-
-// ========================================
-// 認証不要のルート
-// ========================================
-
-// トップページ
-Route::get(\'/\', [BookController::class, \'index\'])->name(\'root\');
-
-// 書籍関連（閲覧のみ）
-Route::get(\'/books/search\', [BookController::class, \'search\\])->name(\'books.search\');
-Route::resource(\'books\', BookController::class)->only([\'index\', \'show\']);
-
-// ジャンル関連（閲覧のみ）
-Route::resource(\'genres\', GenreController::class)->only([\'show\']);
-
-// ランキング
-Route::get(\'/ranking\', [RankingController::class, \'index\\])->name(\'ranking.index\');
-
-// ========================================
-// 認証が必要なルート
-// ========================================
-
-Route::middleware(\'auth\')->group(function () {
-    // プロフィール管理
-    Route::get(\'/profile\', [ProfileController::class, \'edit\\])->name(\'profile.edit\');
-    Route::patch(\'/profile\', [ProfileController::class, \'update\\])->name(\'profile.update\');
-    Route::delete(\'/profile\', [ProfileController::class, \'destroy\\])->name(\'profile.destroy\');
-
-    // 書籍管理（CRUD）
-    Route::resource(\'books\', BookController::class)->except([\'index\', \'show\']);
-
-    // レビュー管理
-    Route::resource(\'reviews\', ReviewController::class)->except([\'index\', \'show\']);
-
-    // お気に入り管理
-    Route::post(\'/books/{book}/favorite\', [FavoriteController::class, \'store\\])->name(\'favorites.store\');
-    Route::delete(\'/books/{book}/unfavorite\', [FavoriteController::class, \'destroy\\])->name(\'favorites.destroy\');
-    Route::get(\'/favorites\', [FavoriteController::class, \'index\\])->name(\'favorites.index\');
-
-    // レビューいいね管理
-    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'store\\])->name(\'likes.store\');
-    Route::delete(\'/reviews/{review}/unlike\', [ReviewLikeController::class, \'destroy\\])->name(\'likes.destroy\');
-
-    // ジャンル管理（CRUD）
-    Route::resource(\'genres\', GenreController::class)->except([\'show\']);
-});
-
-// 認証ルート（Breezeが生成）
-require __DIR__.\'/auth.php\';
+Route::resource(\'genres\', GenreController::class)->except([\'show\'])->middleware(\'auth\');
 ```
+
+| 設定 | 説明 | 💡 ポイント |
+|:---|:---|:---|
+| `Route::resource(\'genres\', GenreController::class)` | CRUDの7つのルートを一括で定義します。 | `index`, `create`, `store`, `show`, `edit`, `update`, `destroy` |
+| `->except([\'show\'])` | `show`ルートを除外します。 | `show`は認証不要のルートとして別途定義しているため。 |
+| `->middleware(\'auth\')` | これらのルートに認証ミドルウェアを適用します。 | ログインしていないユーザーはアクセスできません。 |
 
 ---
 
-## 13.2. ルート一覧表
-### 認証不要のルート
+## 12.4. ビューの作成
 
-| HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
-|:---|:---|:---|:---|:---|
-| GET | `/` | `BookController@index` | `root` | トップページ |
-| GET | `/books` | `BookController@index` | `books.index` | 書籍一覧 |
-| GET | `/books/search` | `BookController@search` | `books.search` | 書籍検索 |
-| GET | `/books/{book}` | `BookController@show` | `books.show` | 書籍詳細 |
-| GET | `/genres/{genre}` | `GenreController@show` | `genres.show` | ジャンル別一覧 |
-| GET | `/ranking` | `RankingController@index` | `ranking.index` | ランキング |
+```bash
+# ファイルを作成
+touch resources/views/genres/index.blade.php
+touch resources/views/genres/create.blade.php
+touch resources/views/genres/edit.blade.php
+```
 
-### 認証が必要なルート（書籍管理）
-
-| HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
-|:---|:---|:---|:---|:---|
-| GET | `/books/create` | `BookController@create` | `books.create` | 書籍登録フォーム |
-| POST | `/books` | `BookController@store` | `books.store` | 書籍登録処理 |
-| GET | `/books/{book}/edit` | `BookController@edit` | `books.edit` | 書籍編集フォーム |
-| PUT/PATCH | `/books/{book}` | `BookController@update` | `books.update` | 書籍更新処理 |
-| DELETE | `/books/{book}` | `BookController@destroy` | `books.destroy` | 書籍削除処理 |
-
-### 認証が必要なルート（レビュー管理）
-
-| HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
-|:---|:---|:---|:---|:---|
-| GET | `/reviews/create` | `ReviewController@create` | `reviews.create` | レビュー投稿フォーム |
-| POST | `/reviews` | `ReviewController@store` | `reviews.store` | レビュー投稿処理 |
-| GET | `/reviews/{review}/edit` | `ReviewController@edit` | `reviews.edit` | レビュー編集フォーム |
-| PUT/PATCH | `/reviews/{review}` | `ReviewController@update` | `reviews.update` | レビュー更新処理 |
-| DELETE | `/reviews/{review}` | `ReviewController@destroy` | `reviews.destroy` | レビュー削除処理 |
-
-### 認証が必要なルート（お気に入り・いいね）
-
-| HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
-|:---|:---|:---|:---|:---|
-| POST | `/books/{book}/favorite` | `FavoriteController@store` | `favorites.store` | お気に入り登録 |
-| DELETE | `/books/{book}/unfavorite` | `FavoriteController@destroy` | `favorites.destroy` | お気に入り解除 |
-| GET | `/favorites` | `FavoriteController@index` | `favorites.index` | お気に入り一覧 |
-| POST | `/reviews/{review}/like` | `ReviewLikeController@store` | `likes.store` | いいね登録 |
-| DELETE | `/reviews/{review}/unlike` | `ReviewLikeController@destroy` | `likes.destroy` | いいね解除 |
-
-### 認証が必要なルート（ジャンル管理）
-
-| HTTPメソッド | URL | コントローラー@メソッド | ルート名 | 説明 |
-|:---|:---|:---|:---|:---|
-| GET | `/genres` | `GenreController@index` | `genres.index` | ジャンル一覧 |
-| GET | `/genres/create` | `GenreController@create` | `genres.create` | ジャンル登録フォーム |
-| POST | `/genres` | `GenreController@store` | `genres.store` | ジャンル登録処理 |
-| GET | `/genres/{genre}/edit` | `GenreController@edit` | `genres.edit` | ジャンル編集フォーム |
-| PUT/PATCH | `/genres/{genre}` | `GenreController@update` | `genres.update` | ジャンル更新処理 |
-| DELETE | `/genres/{genre}` | `GenreController@destroy` | `genres.destroy` | ジャンル削除処理 |
+各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
 
 ---
 
-## 13.3. 設計のポイント
+## 12.5. 書籍管理との比較
 
-### 13.3.1. 認証の有無による分類
-
-```
-認証不要（誰でもアクセス可能）
-├── 書籍一覧・詳細・検索
-├── ジャンル別一覧
-└── ランキング
-
-認証必要（ログインユーザーのみ）
-├── 書籍の登録・編集・削除
-├── レビューの投稿・編集・削除
-├── お気に入りの登録・解除
-├── いいねの登録・解除
-└── ジャンルの管理
-```
-
-> **💡 ポイント**
-> 「閲覧」は誰でも可能、「変更」はログインユーザーのみ、という原則に従っています。
-
-### 13.3.2. RESTfulなURL設計
-
-| 操作 | HTTPメソッド | URL | 説明 |
-|:---|:---|:---|:---|
-| 一覧表示 | GET | `/resources` | リソースの一覧を取得 |
-| 詳細表示 | GET | `/resources/{id}` | 特定のリソースを取得 |
-| 作成フォーム | GET | `/resources/create` | 作成フォームを表示 |
-| 作成処理 | POST | `/resources` | 新しいリソースを作成 |
-| 編集フォーム | GET | `/resources/{id}/edit` | 編集フォームを表示 |
-| 更新処理 | PUT/PATCH | `/resources/{id}` | リソースを更新 |
-| 削除処理 | DELETE | `/resources/{id}` | リソースを削除 |
-
-### 13.3.3. ネストしたリソース
-
-```
-/books/{book}/reviews  → 書籍に紐づくレビュー
-/books/{book}/favorite → 書籍に対するお気に入り
-/reviews/{review}/like → レビューに対するいいね
-```
+| 項目 | 書籍管理 | ジャンル管理 |
+|:---|:---|:---|
+| モデル | `Book` | `Genre` |
+| コントローラー | `BookController` | `GenreController` |
+| フォームリクエスト | `StoreBookRequest`, `UpdateBookRequest` | `StoreGenreRequest`, `UpdateGenreRequest` |
+| ビュー | `resources/views/books/*` | `resources/views/genres/*` |
+| バリデーション | `title`, `author`, `isbn`, `description`, `genres` | `name` |
 
 > **🧠 先輩エンジニアの思考プロセス**
-> ネストは1階層までに抑えます。深くネストすると、URLが長くなり、コントローラーの責務も複雑になります。
+> CRUDは多くのWebアプリケーションで共通するパターンです。一度理解すれば、新しいリソース（例: カテゴリ、タグ、ユーザー）を追加する際にも、同じパターンを適用できます。
 
----
-
-## 13.4. まとめ
-
-このチュートリアルでは、以下の機能を実装しました。
-
-| Chapter | 機能 | 学んだこと |
-|:---|:---|:---|
-| 1 | 環境構築 | Laravel Sail, Docker |
-| 2 | データベース設計 | マイグレーション, 外部キー |
-| 3 | モデル | Eloquent, リレーションシップ |
-| 4 | 認証 | Breeze, ミドルウェア |
-| 5 | 書籍管理 | CRUD, FormRequest, Policy |
-| 6 | レビュー機能 | ネストしたリソース, 認可 |
-| 7 | お気に入り | 多対多リレーション |
-| 8 | いいね | パターンの再利用 |
-| 9 | ランキング | 集計クエリ |
-| 10 | 検索 | LIKE検索, クエリパラメータ |
-| 11 | ジャンル別一覧 | リレーションを活用した絞り込み |
-| 12 | ジャンル管理 | CRUDパターンの再実践 |
-| 13 | ルート設計 | RESTful, ルートグループ |
-
-これで、基本機能編の実装が完了しました。お疲れ様でした！
+これで、ジャンル管理機能（CRUD）の実装が完了しました。次のChapterでは、ルート定義の完全版を確認し、全体の設計を振り返ります。

@@ -1,195 +1,314 @@
-# Chapter 7: お気に入り機能
+# Chapter 7: レビュー機能
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、ユーザーが書籍を「お気に入り」に登録・解除する機能を実装します。
+このセクションでは、書籍に対するレビュー（評価とコメント）を投稿・編集・削除する機能を実装します。
 
-- **多対多リレーションの操作**: `belongsToMany`リレーションで定義した中間テーブル（`favorites`）を操作する方法を学びます。
-- **`syncWithoutDetaching`と`detach`**: 多対多リレーションでのデータ追加・削除の方法を学びます。
-- **トグル操作**: 同じボタンで「お気に入り登録」と「お気に入り解除」を切り替えるUIパターンを学びます。
+- **ネストしたリソース**: 書籍（`Book`）に紐づくレビュー（`Review`）という、親子関係のあるリソースの扱い方を学びます。
+- **リレーションを活用したデータ作成**: `$book->reviews()->create([...])`のように、リレーションを通じてデータを作成する方法を学びます。
+- **ポリシーによる認可**: 自分が投稿したレビューのみ編集・削除できるように制御します。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：お気に入り機能の設計
+## 🧠 先輩エンジニアの思考プロセス：レビュー機能の設計
 
-お気に入り機能は、ユーザーと書籍の「多対多」の関係を表現します。
+レビュー機能を設計する際、以下の点を考慮します。
 
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
-| 1人のユーザーは複数の書籍をお気に入りにできる | `belongsToMany`リレーションを使用 | 中間テーブル（`favorites`）で関係を管理する。 |
-| 1つの書籍は複数のユーザーにお気に入りされる | 同上 | 同上 |
-| 同じ書籍を2回お気に入りに登録できない | `syncWithoutDetaching`を使用 | 重複登録を防ぎつつ、既存のお気に入りを保持する。 |
+| レビューは書籍に紐づく | URLを`/books/{book}/reviews`のようにネストする | 「どの書籍に対するレビューか」が明確になる。 |
+| レビューは投稿者のみ編集・削除可能 | `ReviewPolicy`で認可を制御する | 他人のレビューを勝手に編集・削除されないようにする。 |
+| レビュー投稿後は書籍詳細ページに戻る | `redirect()->route(\'books.show\', $book)` | ユーザーが自分の投稿を確認しやすい。 |
 
 ---
 
-## 7.1. コントローラーの作成
+## 6.1. コントローラーとリクエストの作成
 
 ```bash
-sail artisan make:controller FavoriteController
+sail artisan make:controller ReviewController
+sail artisan make:request StoreReviewRequest
+sail artisan make:request UpdateReviewRequest
+sail artisan make:policy ReviewPolicy --model=Review
 ```
 
 ---
 
-## 7.2. FavoriteControllerの実装
+## 6.2. ポリシーの登録
+
+`app/Providers/AuthServiceProvider.php`に`ReviewPolicy`を追加します。
 
 ```php
-// app/Http/Controllers/FavoriteController.php
+// app/Providers/AuthServiceProvider.php
+
+<?php
+
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Policies\BookPolicy;
+use App\Policies\ReviewPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+        Review::class => ReviewPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        $this->registerPolicies();
+    }
+}
+```
+
+---
+
+## 6.3. ReviewPolicyの実装
+
+```php
+// app/Policies/ReviewPolicy.php
+
+<?php
+
+namespace App\Policies;
+
+use App\Models\Review;
+use App\Models\User;
+
+class ReviewPolicy
+{
+    public function update(User $user, Review $review): bool
+    {
+        return $user->id === $review->user_id;
+    }
+
+    public function delete(User $user, Review $review): bool
+    {
+        return $user->id === $review->user_id;
+    }
+}
+```
+
+---
+
+## 6.4. ReviewControllerの実装
+```php
+// app/Http/Controllers/ReviewController.php
 
 <?php
 
 namespace App\Http\Controllers;
 
 use App\Models\Book;
-use Illuminate\Http\Request;
+use App\Models\Review;
+use App\Http\Requests\StoreReviewRequest;
+use App\Http\Requests\UpdateReviewRequest;
 use Illuminate\Support\Facades\Auth;
 
-class FavoriteController extends Controller
+class ReviewController extends Controller
 {
-    public function store(Book $book)
+    public function store(StoreReviewRequest $request, Book $book)
     {
-        Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
+        $book->reviews()->create([
+            \'user_id\' => Auth::id(),
+            \'rating\' => $request->rating,
+            \'comment\' => $request->comment,
+        ]);
 
-        return back();
+        return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
     }
 
-    public function destroy(Book $book)
+    public function edit(Review $review)
     {
-        Auth::user()->favoriteBooks()->detach($book->id);
-
-        return back();
+        $this->authorize(\'update\', $review);
+        return view(\'reviews.edit\', compact(\'review\'));
     }
 
-    public function index()
+    public function update(UpdateReviewRequest $request, Review $review)
     {
-        $books = Auth::user()->favoriteBooks()->paginate(10);
+        $this->authorize(\'update\', $review);
+        $review->update([
+            \'rating\' => $request->rating,
+            \'comment\' => $request->comment,
+        ]);
 
-        return view(\'favorites.index\', compact(\'books\'));
+        return redirect()->route(\'books.show\', $review->book)->with(\'success\', \'レビューを更新しました。\');
+    }
+
+    public function destroy(Review $review)
+    {
+        $this->authorize(\'delete\', $review);
+        $book = $review->book;
+        $review->delete();
+
+        return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを削除しました。\');
     }
 }
 ```
 
-### 7.2.1. コードリーディング：`store`メソッド
+### 6.4.1. コードリーディング：`store`メソッド
 
 ```php
-public function store(Book $book)
+public function store(StoreReviewRequest $request, Book $book)
 {
-    Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
-    return back();
+    $book->reviews()->create([
+        \'user_id\' => Auth::id(),
+        \'rating\' => $request->rating,
+        \'comment\' => $request->comment,
+    ]);
+
+    return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを投稿しました。\');
 }
 ```
 
 | 部分 | 説明 | 戻り値 |
 |:---|:---|:---|
-| `Auth::user()` | 現在ログインしているユーザーを取得します。 | `User` |
-| `->favoriteBooks()` | `User`モデルの`favoriteBooks`リレーション（`belongsToMany`）を取得します。 | `BelongsToMany` |
-| `->syncWithoutDetaching($book->id)` | 指定したIDを中間テーブルに追加します。既存のレコードは削除しません。 | `array` |
-| `return back()` | 直前のページにリダイレクトします。 | `RedirectResponse` |
+| `$book->reviews()` | `Book`モデルの`reviews`リレーションを取得します。 | `HasMany` |
+| `->create([...])` | リレーションを通じて新しい`Review`を作成します。 | `Review` |
+| `Auth::id()` | 現在ログインしているユーザーのIDを取得します。 | `int` |
+| `redirect()->route(\'books.show\', $book)` | 書籍詳細ページにリダイレクトします。 | `RedirectResponse` |
+| `->with(\'success\', \'...\')` | セッションにフラッシュメッセージを保存します。 | `RedirectResponse` |
 
-> **💡 ポイント: `syncWithoutDetaching` vs `attach` vs `sync`**
+> **💡 ポイント: リレーションを通じた`create`**
+> `$book->reviews()->create([...])`を使うと、`book_id`が自動的に設定されます。手動で`\'book_id\' => $book->id`を指定する必要はありません。
+
+### 6.4.2. コードリーディング：`destroy`メソッド
+```php
+public function destroy(Review $review)
+{
+    $this->authorize(\'delete\', $review);
+    $book = $review->book;
+    $review->delete();
+
+    return redirect()->route(\'books.show\', $book)->with(\'success\', \'レビューを削除しました。\');
+}
+```
+
+| 部分 | 説明 | 戻り値 |
+|:---|:---|:---|
+| `$this->authorize(\'delete\', $review)` | `ReviewPolicy`の`delete`メソッドで認可を確認します。 | `void`（認可されない場合は例外がスローされます） |
+| `$book = $review->book` | 削除前に、リダイレクト先の書籍を取得しておきます。 | `Book` |
+| `$review->delete()` | レビューを削除します。 | `bool` |
+
+> **❌ よくある間違い**
+> ```php
+> $review->delete();
+> return redirect()->route(\'books.show\', $review->book); // ❌ 削除後は$review->bookにアクセスできない
+> ```
 > 
-> | メソッド | 動作 | 重複時の挙動 |
-> |:---|:---|:---|
-> | `attach($id)` | 中間テーブルにレコードを追加 | エラー（重複キー違反） |
-> | `syncWithoutDetaching($id)` | 中間テーブルにレコードを追加 | 何もしない（安全） |
-> | `sync([$id])` | 中間テーブルを指定したIDのみに置き換え | 他のレコードが削除される |
-> 
-> お気に入り登録には`syncWithoutDetaching`が最適です。
-
-### 7.2.2. コードリーディング：`destroy`メソッド
-```php
-public function destroy(Book $book)
-{
-    Auth::user()->favoriteBooks()->detach($book->id);
-    return back();
-}
-```
-
-| 部分 | 説明 | 戻り値 |
-|:---|:---|:---|
-| `->detach($book->id)` | 中間テーブルから指定したIDのレコードを削除します。 | `int`（削除されたレコード数） |
-
-### 7.2.3. コードリーディング：`index`メソッド
-
-```php
-public function index()
-{
-    $books = Auth::user()->favoriteBooks()->paginate(10);
-    return view(\'favorites.index\', compact(\'books\'));
-}
-```
-
-| 部分 | 説明 | 戻り値 |
-|:---|:---|:---|
-| `Auth::user()->favoriteBooks()` | ログインユーザーのお気に入り書籍を取得するクエリビルダーを返します。 | `BelongsToMany` |
-| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` |
+> **✅ 正解**
+> ```php
+> $book = $review->book; // 削除前に取得
+> $review->delete();
+> return redirect()->route(\'books.show\', $book); // ✅ 事前に取得した$bookを使用
+> ```
 
 ---
 
-## 7.3. ルートの追加
+## 6.5. フォームリクエストの実装
+
+### 6.5.1. StoreReviewRequest
+
+```php
+// app/Http/Requests/StoreReviewRequest.php
+
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreReviewRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
+            \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
+        ];
+    }
+}
+```
+
+### 6.5.2. UpdateReviewRequest
+
+```php
+// app/Http/Requests/UpdateReviewRequest.php
+
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateReviewRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            \'rating\' => [\'required\', \'integer\', \'min:1\', \'max:5\'],
+            \'comment\' => [\'nullable\', \'string\', \'max:1000\'],
+        ];
+    }
+}
+```
+
+| ルール | 説明 | 💡 ポイント |
+|:---|:---|:---|
+| `\'integer\'` | 整数である必要があります。 | - |
+| `\'min:1\', \'max:5\'` | 1〜5の範囲内である必要があります。 | 5段階評価を想定しています。 |
+| `\'nullable\'` | 空の値を許可します。 | コメントは任意入力です。 |
+
+---
+
+## 6.6. ルートの追加
 
 ```php
 // routes/web.php
 
-use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\ReviewController;
 
 // ... (他のルート)
 
 Route::middleware(\'auth\')->group(function () {
     // ... 既存のルート
 
-    // Favorite management
-    Route::post(\'/books/{book}/favorite\', [FavoriteController::class, \'store\'])->name(\'favorites.store\');
-    Route::delete(\'/books/{book}/unfavorite\', [FavoriteController::class, \'destroy\'])->name(\'favorites.destroy\');
-    Route::get(\'/favorites\', [FavoriteController::class, \'index\'])->name(\'favorites.index\');
+    // Review management
+    Route::post(\'/books/{book}/reviews\', [ReviewController::class, \'store\'])->name(\'reviews.store\');
+    Route::get(\'/reviews/{review}/edit\', [ReviewController::class, \'edit\'])->name(\'reviews.edit\');
+    Route::put(\'/reviews/{review}\', [ReviewController::class, \'update\'])->name(\'reviews.update\');
+    Route::delete(\'/reviews/{review}\', [ReviewController::class, \'destroy\'])->name(\'reviews.destroy\');
 });
 ```
 
-| ルート | HTTPメソッド | 説明 |
+| ルート | 説明 | 💡 ポイント |
 |:---|:---|:---|
-| `/books/{book}/favorite` | POST | 書籍をお気に入りに登録 |
-| `/books/{book}/unfavorite` | DELETE | 書籍をお気に入りから解除 |
-| `/favorites` | GET | お気に入り一覧を表示 |
+| `POST /books/{book}/reviews` | 特定の書籍にレビューを投稿します。 | URLに書籍IDが含まれるため、どの書籍へのレビューか明確です。 |
+| `GET /reviews/{review}/edit` | レビューの編集画面を表示します。 | 編集・更新・削除はレビューIDのみで操作します。 |
 
 ---
 
-## 7.4. ビューの作成
+## 6.7. ビューの作成
 
 ```bash
 # ディレクトリとファイルを作成
-mkdir -p resources/views/favorites
-touch resources/views/favorites/index.blade.php
+mkdir -p resources/views/reviews
+touch resources/views/reviews/edit.blade.php
 ```
 
 各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
 
----
-
-## 7.5. Bladeテンプレートでのお気に入りボタン実装例
-
-書籍詳細ページや一覧ページで、お気に入りボタンを表示する際の実装例です。
-
-```blade
-{{-- お気に入りボタン --}}
-@auth
-    @if (Auth::user()->isFavoriting($book))
-        <form action="{{ route(\'favorites.destroy\', $book) }}" method="POST">
-            @csrf
-            @method(\'DELETE\')
-            <button type="submit">お気に入り解除</button>
-        </form>
-    @else
-        <form action="{{ route(\'favorites.store\', $book) }}" method="POST">
-            @csrf
-            <button type="submit">お気に入り登録</button>
-        </form>
-    @endif
-@endauth
-```
-
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `@auth` | ログインしている場合のみ表示します。 | 未ログインユーザーにはボタンを表示しません。 |
-| `Auth::user()->isFavoriting($book)` | ログインユーザーがお気に入りに登録済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
-| `@method(\'DELETE\')` | HTMLフォームでDELETEメソッドを擬似的に送信します。 | HTMLフォームはGETとPOSTしかサポートしないため、Laravelの仕組みで対応します。 |
-
-これで、お気に入り機能の実装が完了しました。次のChapterでは、レビューいいね機能を実装していきます。
+これで、レビュー機能の実装が完了しました。次のChapterでは、お気に入り機能を実装していきます。
