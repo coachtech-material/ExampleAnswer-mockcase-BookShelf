@@ -49,5 +49,5 @@ Route::middleware('auth')->group(function () {
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
-// 認証機能用ルート
-require __DIR__.'/auth.php';
+// 認証機能用ルート、RouteServiceProvider.phpでミドルウェアを設定している場合は必要ない
+// require __DIR__.'/auth.php';
