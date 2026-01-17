@@ -1,218 +1,207 @@
-# Chapter 6: 書籍管理機能 (CRUD)
+# Chapter 6: 書籍管理機能 (CRUD) の実装
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、Webアプリケーションの基本である**CRUD（Create, Read, Update, Delete）**操作を、書籍管理機能を通じて実装します。
+このセクションでは、Webアプリケーション開発の心臓部とも言える**CRUD（Create, Read, Update, Delete）**操作を、書籍管理機能を通じて実装します。単に機能を実装するだけでなく、エラーを未然に防ぐための開発手順や、コードの責務を分離するための設計思想についても深く学んでいきます。
 
+- **トップダウンな開発アプローチ**: なぜ機能の詳細を実装する前に、まず全体の「骨格」となるルートとコントローラーを準備するのか、その重要性を理解します。
 - **リソースコントローラー**: Laravelの規約に沿った、RESTfulなコントローラーの作成方法を学びます。
 - **フォームリクエスト**: バリデーションロジックをコントローラーから分離し、再利用可能にする方法を学びます。
 - **ポリシー（認可）**: 「誰が」「何を」できるかを制御する認可の仕組みを学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：CRUD実装の順序
+## 🧠 先輩エンジニアの思考プロセス：なぜ最初に「骨格」を作るのか？
 
-CRUD機能を実装する際、経験豊富なエンジニアは以下の順序で考えます。
+多くの初学者は、一つの機能（例えば「書籍の登録」）を完成させてから次の機能に取り掛かろうとします。しかし、経験豊富なエンジニアは、まずアプリケーション全体の「骨格」となる部分から組み立て始めます。これは、家を建てる際に、内装工事の前にまず土台と柱を組み上げるのと同じです。
 
-| 順序 | 作業 | 理由 |
+| 課題 | 解決策 | なぜこのChapterでやるのか？ |
 |:---|:---|:---|
-| 1 | コントローラー作成 | アプリケーションの「司令塔」となるクラスを用意する。 |
-| 2 | フォームリクエスト作成 | バリデーションルールを定義し、不正なデータの侵入を防ぐ。 |
-| 3 | ポリシー作成 | 認可ルールを定義し、「自分の投稿だけ編集・削除できる」などの制御を行う。 |
-| 4 | ルート定義 | URLとコントローラーのメソッドを紐づける。 |
-| 5 | ビュー作成 | ユーザーが実際に操作する画面を作成する。 |
+| 配布されたビューには`route()`ヘルパーが多数あり、ルートが未定義だとエラーになる | **最初にすべてのルートとコントローラーを準備**する | どのページにアクセスしても`RouteNotDefined`エラーが発生しない状態を先に作ることで、ビューの表示確認をしながらスムーズに開発を進められる。 |
+| 機能ごとに行き当たりばったりで実装すると、全体像が見えなくなる | **トップダウン**で実装を進める | まず全体のURL設計（ルート）と司令塔（コントローラー）を決め、その後に各機能の詳細（ロジック）を肉付けしていくことで、一貫性のある設計を維持できる。 |
+| どこに何を書くべきか迷う | **責務の分離**を意識する | 「URLの交通整理はルート」「リクエストの検証はフォームリクエスト」「権限の確認はポリシー」「具体的な処理はコントローラー」というように、役割分担を明確にすることで、見通しが良くメンテナンスしやすいコードになる。 |
 
-この順序で実装することで、**「データの流れ」**を意識しながら開発を進められます。
+このChapterでは、まずアプリケーション全体の「骨格」を固め、その上で書籍管理機能という「最初の部屋」の内装を仕上げていく、という流れで開発を進めます。
 
 ---
 
-## 5.1. コントローラーとリクエスト、ポリシーの作成
+## 6.1. ルート定義とコントローラーの準備
+
+機能ごとの詳細な実装に入る前に、まずアプリケーション全体の「骨格」となるルートとコントローラーを準備します。これにより、開発中の`RouteNotDefined`エラーを防ぎ、スムーズに開発を進めることができます。
+
+### 6.1.1. なぜ先にルートを定義するのか？
+
+今回使用する配布済みのBladeファイル（ビュー）には、ヘッダーやボタンなどに、`route('books.create')`のような形でリンク先のルート名が多数記述されています。もし、これらのルートが`routes/web.php`に定義されていない状態でページを表示しようとすると、Laravelは「`books.create`という名前のルートは見つかりません」という`RouteNotDefinedException`エラーを発生させます。
+
+これを防ぐため、機能の中身が空であっても、先に**すべてのURL（ルート）と、その交通整理役であるコントローラーを定義**しておくのです。
+
+### 6.1.2. 全コントローラーの作成
+
+まずは、このアプリケーションで必要となるすべてのコントローラーを`artisan`コマンドで一括作成します。この時点では、コントローラーの中身は空のままで問題ありません。
 
 ```bash
-# リソースコントローラーを作成（--resourceオプションでCRUDメソッドが自動生成される）
+# 書籍・ジャンル管理用のリソースコントローラーを作成
 sail artisan make:controller BookController --resource
+sail artisan make:controller GenreController --resource
 
-# フォームリクエストを作成
+# その他の機能用のコントローラーを作成
+sail artisan make:controller ReviewController
+sail artisan make:controller FavoriteController
+sail artisan make:controller ReviewLikeController
+sail artisan make:controller RankingController
+```
+
+> **💡 ポイント: `--resource` オプション**
+> `--resource`オプションを付けてコントローラーを作成すると、CRUD操作に対応する7つのメソッド（`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`）が自動的に生成されます。これにより、RESTfulな設計に沿ったコントローラーを効率的に作成できます。
+
+### 6.1.3. ルート定義の作成 (`web.php`)
+
+次に、`routes/web.php`に、アプリケーションで必要となるすべてのルートを記述します。これにより、どのページにアクセスしても「Route not defined」エラーが出ない状態を作ります。
+
+```php
+<?php
+
+use App\Http\Controllers\BookController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\ReviewLikeController;
+use App\Http\Controllers\GenreController;
+use App\Http\Controllers\RankingController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// --- 1. 具体的な名前を持つ公開ルート (最優先) ---
+Route::get('/', [BookController::class, 'index'])->name('home');
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
+Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+
+// --- 2. 認証必須ルート ---
+Route::middleware('auth')->group(function () {
+    // 書籍管理 (Resource)
+    Route::resource('books', BookController::class)->except(['index', 'show']);
+
+    // ジャンル管理
+    Route::resource('genres', GenreController::class)->except(['show']);
+
+    // レビュー管理
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    // お気に入り機能
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+
+    // レビューいいね機能
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
+});
+
+// --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+
+// 認証機能用ルート
+require __DIR__.'/auth.php';
+```
+
+これで、アプリケーションの「骨格」が完成しました。次から、この骨格に肉付けをしていく作業に入ります。
+
+---
+
+## 6.2. 書籍管理機能の実装 (CRUD)
+
+それでは、書籍管理機能の具体的な実装を進めていきましょう。
+
+### 6.2.1. フォームリクエストとポリシーの作成
+
+書籍の登録・更新時のバリデーションルールを定義する「フォームリクエスト」と、操作の権限を管理する「ポリシー」を作成します。
+
+```bash
+# フォームリクエストを作成 (新規作成用と更新用)
 sail artisan make:request StoreBookRequest
 sail artisan make:request UpdateBookRequest
 
-# ポリシーを作成
+# ポリシーを作成 (Bookモデルに関連付ける)
 sail artisan make:policy BookPolicy --model=Book
 ```
 
-| コマンド | 生成されるファイル | 💡 ポイント |
-|:---|:---|:---|
-| `make:controller BookController --resource` | `app/Http/Controllers/BookController.php` | `index`, `create`, `store`, `show`, `edit`, `update`, `destroy`の7メソッドが自動生成されます。 |
-| `make:request StoreBookRequest` | `app/Http/Requests/StoreBookRequest.php` | 新規作成時のバリデーションルールを定義します。 |
-| `make:request UpdateBookRequest` | `app/Http/Requests/UpdateBookRequest.php` | 更新時のバリデーションルールを定義します。 |
-| `make:policy BookPolicy --model=Book` | `app/Policies/BookPolicy.php` | `Book`モデルに対する認可ルールを定義します。 |
+### 6.2.2. ポリシーの登録と実装
 
----
+作成したポリシーを`AuthServiceProvider`に登録し、具体的な認可ルールを記述します。
 
-## 5.2. ポリシーの登録と実装
-
-### 5.2.1. ポリシーの登録
-
-`app/Providers/AuthServiceProvider.php`にポリシーを登録します。
-
+**ポリシーの登録 (`app/Providers/AuthServiceProvider.php`)**
 ```php
-// app/Providers/AuthServiceProvider.php
+protected $policies = [
+    Book::class => BookPolicy::class,
+];
+```
 
-<?php
-
-namespace App\Providers;
-
-use App\Models\Book;
-use App\Policies\BookPolicy;
-use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
-
-class AuthServiceProvider extends ServiceProvider
+**ポリシーの実装 (`app/Policies/BookPolicy.php`)**
+```php
+public function update(User $user, Book $book): bool
 {
-    protected $policies = [
-        Book::class => BookPolicy::class,
+    return $user->id === $book->user_id;
+}
+
+public function delete(User $user, Book $book): bool
+{
+    return $user->id === $book->user_id;
+}
+```
+
+### 6.2.3. フォームリクエストの実装
+
+`StoreBookRequest`と`UpdateBookRequest`に、それぞれバリデーションルールを記述します。
+
+**StoreBookRequest (`app/Http/Requests/StoreBookRequest.php`)**
+```php
+public function rules(): array
+{
+    return [
+        'title' => ['required', 'string', 'max:255'],
+        'author' => ['required', 'string', 'max:255'],
+        'isbn' => ['required', 'string', 'size:13', 'unique:books'],
+        'published_date' => ['required', 'date'],
+        'description' => ['nullable', 'string'],
+        'image_url' => ['nullable', 'url'],
+        'genres' => ['required', 'array', 'min:1'],
+        'genres.*' => ['exists:genres,id'],
     ];
-
-    public function boot(): void
-    {
-        $this->registerPolicies();
-    }
 }
 ```
 
-### 5.2.2. ポリシーの実装
-
+**UpdateBookRequest (`app/Http/Requests/UpdateBookRequest.php`)**
 ```php
-// app/Policies/BookPolicy.php
-
-<?php
-
-namespace App\Policies;
-
-use App\Models\Book;
-use App\Models\User;
-
-class BookPolicy
-{
-    public function update(User $user, Book $book): bool
-    {
-        return $user->id === $book->user_id;
-    }
-
-    public function delete(User $user, Book $book): bool
-    {
-        return $user->id === $book->user_id;
-    }
-}
-```
-
-| メソッド | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `update(User $user, Book $book)` | 書籍を更新できるかどうかを判定します。 | 書籍を登録したユーザー（`$book->user_id`）と、現在ログインしているユーザー（`$user->id`）が一致する場合のみ`true`を返します。 |
-| `delete(User $user, Book $book)` | 書籍を削除できるかどうかを判定します。 | 同上。 |
-
-> **🧠 先輩エンジニアの思考プロセス**
-> ポリシーは「認可（Authorization）」を担当します。認証（Authentication）が「あなたは誰？」を確認するのに対し、認可は「あなたはこれをする権限がある？」を確認します。
-
----
-
-## 5.3. フォームリクエストの実装
-### 5.3.1. StoreBookRequest（新規作成用）
-
-```php
-// app/Http/Requests/StoreBookRequest.php
-
-<?php
-
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class StoreBookRequest extends FormRequest
-{
-    public function authorize(): bool
-    {
-        return true; // 認証済みユーザーなら誰でも書籍を登録できる
-    }
-
-    public function rules(): array
-    {
-        return [
-            'title' => ['required', 'string', 'max:255'],
-            'author' => ['required', 'string', 'max:255'],
-            'isbn' => ['required', 'string', 'size:13', 'unique:books'],
-            'published_date' => ['required', 'date'],
-            'description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url'],
-            'genres' => ['required', 'array', 'min:1'],
-            'genres.*' => ['exists:genres,id'],
-        ];
-    }
-}
-```
-
-| ルール | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `'required'` | 必須項目です。 | 空の値は許可されません。 |
-| `'string'` | 文字列である必要があります。 | - |
-| `'max:255'` | 最大255文字です。 | データベースのカラム定義と合わせます。 |
-| `'size:13'` | 正確に13文字である必要があります。 | ISBNは13桁の固定長です。 |
-| `'unique:books'` | `books`テーブルで一意である必要があります。 | 同じISBNの書籍は登録できません。 |
-| `'genres.*'` | 配列の各要素に対するルールです。 | `genres`配列の各IDが`genres`テーブルに存在することを確認します。 |
-
-### 5.3.2. UpdateBookRequest（更新用）
-
-```php
-// app/Http/Requests/UpdateBookRequest.php
-
-<?php
-
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateBookRequest extends FormRequest
+public function rules(): array
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    public function rules(): array
-    {
-        return [
-            'title' => ['required', 'string', 'max:255'],
-            'author' => ['required', 'string', 'max:255'],
-            'isbn' => [
-                'required',
-                'string',
-                'size:13',
-                Rule::unique('books')->ignore($this->book),
-            ],
-            'published_date' => ['required', 'date'],
-            'description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url'],
-            'genres' => ['required', 'array', 'min:1'],
-            'genres.*' => ['exists:genres,id'],
-        ];
-    }
+    return [
+        // ... 他はStoreBookRequestと同じ
+        'isbn' => [
+            'required',
+            'string',
+            'size:13',
+            Rule::unique('books')->ignore($this->book),
+        ],
+        // ...
+    ];
 }
 ```
 
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `Rule::unique('books')->ignore($this->book)` | `books`テーブルで一意であることを確認しますが、現在編集中の書籍は除外します。 | 更新時に「自分自身のISBN」と重複チェックされないようにします。 |
-| `$this->book` | ルートパラメータから取得した`Book`モデルのインスタンスです。 | ルートモデルバインディングにより、自動的に注入されます。 |
+### 6.2.4. BookControllerの実装
 
----
+最後に、`BookController`にCRUDの各処理を実装します。
 
-## 5.4. BookControllerの実装
 ```php
 // app/Http/Controllers/BookController.php
-
-<?php
-
-namespace App\Http\Controllers;
 
 use App\Models\Book;
 use App\Models\Genre;
@@ -273,72 +262,5 @@ class BookController extends Controller
     }
 }
 ```
-
-### 5.4.1. コードリーディング：`store`メソッド
-
-```php
-public function store(StoreBookRequest $request)
-{
-    $book = Auth::user()->books()->create($request->validated());
-    $book->genres()->attach($request->genres);
-
-    return redirect()->route('books.show', $book)->with('success', '書籍を登録しました。');
-}
-```
-
-| 部分 | 説明 | 戻り値 |
-|:---|:---|:---|
-| `Auth::user()` | 現在ログインしているユーザーを取得します。 | `User` |
-| `->books()` | `User`モデルの`books`リレーションを取得します。 | `HasMany` |
-| `->create($request->validated())` | バリデーション済みのデータで新しい`Book`を作成します。 | `Book` |
-| `$book->genres()` | `Book`モデルの`genres`リレーションを取得します。 | `BelongsToMany` |
-| `->attach($request->genres)` | 中間テーブル（`book_genre`）にレコードを追加します。 | `void` |
-
-> **💡 ポイント: `attach` vs `sync`**
-> - **`attach`**: 既存のリレーションを保持したまま、新しいリレーションを追加します。
-> - **`sync`**: 既存のリレーションを全て削除し、指定したリレーションで置き換えます。
-> 新規作成時は`attach`、更新時は`sync`を使うのが一般的です。
-
----
-
-## 5.5. ルートの定義
-
-```php
-// routes/web.php
-
-use App\Http\Controllers\BookController;
-
-// ... (他のルート)
-
-// 認証が必要なルート
-Route::middleware('auth')->group(function () {
-    // Book management
-    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
-    Route::post('/books', [BookController::class, 'store'])->name('books.store');
-    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
-    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
-    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
-});
-
-// 認証不要のルート
-Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-```
-
----
-
-## 5.6. ビューの作成
-
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/books
-touch resources/views/books/index.blade.php
-touch resources/views/books/create.blade.php
-touch resources/views/books/show.blade.php
-touch resources/views/books/edit.blade.php
-touch resources/views/books/_form.blade.php
-```
-
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
 
 これで、書籍管理機能（CRUD）の実装が完了しました。次のChapterでは、レビュー機能を実装していきます。
