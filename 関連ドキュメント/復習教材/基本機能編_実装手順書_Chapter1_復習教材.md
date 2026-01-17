@@ -36,7 +36,7 @@
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
-    -w /var/wsl/html \
+    -w /var/www/html \
     -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
     laravelsail/php82-composer:latest \
     composer create-project laravel/laravel:^10.0 book-review-app
@@ -52,7 +52,7 @@ docker run --rm \
 | `--rm` | コンテナ停止時に自動的にコンテナを削除する | なし | 一時的なコマンド実行に便利。不要なコンテナが残りません。 |
 | `-u "$(id -u):$(id -g)"` | 現在のユーザーのIDとグループIDでコンテナを実行する | なし | ✅ これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。 |
 | `-v "$(pwd):/var/www/html"` | 現在のディレクトリをコンテナの`/var/www/html`にマウントする | なし | ローカルのファイルをコンテナ内で直接編集できるようになります。 |
-| `-w /var/wsl/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
+| `-w /var/www/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
 | `laravelsail/php82-composer:latest` | 使用するDockerイメージを指定 | なし | PHP 8.2とComposerがプリインストールされたLaravel Sail公式イメージです。 |
 | `composer create-project ...` | Composerを使ってLaravelプロジェクトを作成するコマンド | (プロジェクトファイル) | `laravel/laravel:^10.0`でバージョン10を指定しています。 |
 
@@ -164,7 +164,11 @@ export default {
 }
 ```
 
-**5. Vite開発サーバーの起動**
+**5. bladeファイルの挿入**  
+本プロジェクトのresourseファイルを[Preparedblade-mockcase-BookShelf](https://github.com/coachtech-material/Preparedblade-mockcase-BookShelf) リポジトリのbasicブランチにあるresourseファイルと入れ替えてください。  
+openコマンドを利用してcloneしてきたファイルをGUIで移動する、もしくはmvコマンドを活用して入れ替えるのが最も早い方法です。
+
+**6. Vite開発サーバーの起動**
 
 ```bash
 # 新しいターミナルを開いて実行
@@ -194,7 +198,20 @@ sail npm run dev
 
 ### 1.4.3. Sailの起動とエイリアス設定
 
-- `./vendor/bin/sail up -d`: `compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
-- `alias sail=\'...\[ -f sail ] && bash sail || bash vendor/bin/sail\''`: 長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
+以下のコマンドで、`compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
+```bash
+./vendor/bin/sail up -d
+```
+
+以下のコマンドで、長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
+```bash
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
+```
 
 これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。
+
+### 1.4.4. アプリケーションキーの生成
+以下のコマンドで、Laravel がアプリを安全に動かすために必要な「暗号化の元になる秘密鍵（APP_KEY）」 を .env に入れておきます。
+```php
+sail artisan key:generate
+```
