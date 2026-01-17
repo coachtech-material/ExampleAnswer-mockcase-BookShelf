@@ -164,7 +164,11 @@ export default {
 }
 ```
 
-**5. Vite開発サーバーの起動**
+**5. bladeファイルの挿入**  
+本プロジェクトのresourseファイルを[Preparedblade-mockcase-BookShelf](https://github.com/coachtech-material/Preparedblade-mockcase-BookShelf) リポジトリのbasicブランチにあるresourseファイルと入れ替えてください。  
+openコマンドを利用してcloneしてきたファイルをGUIで移動する、もしくはmvコマンドを活用して入れ替えるのが最も早い方法です。
+
+**6. Vite開発サーバーの起動**
 
 ```bash
 # 新しいターミナルを開いて実行
