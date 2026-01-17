@@ -67,26 +67,26 @@ sail artisan make:migration create_review_likes_table
 ### 2.2.1. `create_genres_table`
 
 ```php
-// database/migrations/YYYY_MM_DD_XXXXXX_create_genres_table.php
+<?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'genres\', function (Blueprint $table) {
+        Schema::create('genres', function (Blueprint $table) {
             $table->id();
-            $table->string(\'name\', 50)->unique();
+            $table->string('name')->unique();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'genres\');
+        Schema::dropIfExists('genres');
     }
 };
 ```
@@ -94,32 +94,29 @@ return new class extends Migration
 ### 2.2.2. `create_books_table`
 
 ```php
-// database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php
+<?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(\'books\', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId(\'user_id\')->constrained()->onDelete(\'cascade\');
-            $table->string(\'title\');
-            $table->string(\'author\');
-            $table->string(\'isbn\', 13)->unique();
-            $table->text(\'description\')->nullable();
-            $table->timestamps();
+        Schema::create('book_genre', function (Blueprint $table) {
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
+            $table->primary(['book_id', 'genre_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(\'books\');
+        Schema::dropIfExists('book_genre');
     }
 };
+
 ```
 
 （以降、`reviews`, `book_genre`, `favorites`, `review_likes`テーブルのマイグレーションコードも同様に記載）
