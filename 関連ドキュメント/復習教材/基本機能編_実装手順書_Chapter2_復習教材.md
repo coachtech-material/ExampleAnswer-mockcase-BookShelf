@@ -34,22 +34,14 @@
 ```bash
 # usersテーブルはLaravelデフォルトで存在
 sail artisan make:migration create_genres_table
-sleep 1
 sail artisan make:migration create_books_table
-sleep 1
 sail artisan make:migration create_reviews_table
-sleep 1
 sail artisan make:migration create_book_genre_table
-sleep 1
 sail artisan make:migration create_favorites_table
-sleep 1
 sail artisan make:migration create_review_likes_table
 ```
 
 > **🧠 先輩エンジニアの思考プロセス**
-> なぜ`sleep 1`を入れるのか？
-> マイグレーションファイルは、ファイル名の先頭にあるタイムスタンプ順に実行されます。しかし、コマンドを連続で実行すると、タイムスタンプが同じになり、実行順序が保証されなくなる可能性があります。`sleep 1`で1秒待つことで、タイムスタンプを確実にずらし、**Chapter 0のER図で定義した依存関係（例：`books`テーブルは`users`テーブルに依存）**を担保しています。
-
 > **重要：マイグレーションの実行順序について**
 > マイグレーションファイルはタイムスタンプ順に実行されます。`book_genre` テーブルは `genres` テーブルと `books` テーブルに外部キーで依存しているため、必ず **`genres` と `books` のマイグレーションが先に実行される必要があります**。
 > コマンドをそのまま実行すれば問題ないとは思われますが、問題が起きた場合はファイル名を修正してマイグレーションが順番に行われるようにしてください。
@@ -413,12 +405,6 @@ return new class extends Migration
 ### 2.3.1. コマンドの実行
 
 ```bash
-# Dockerコンテナをバックグラウンドで起動
-sail up -d
-
-# MySQLコンテナが完全に起動するまで30秒ほど待機
-sleep 30
-
 # マイグレーションを実行してテーブルを作成
 sail artisan migrate
 ```
@@ -431,8 +417,8 @@ sail artisan migrate
 | `migrate` | `database/migrations`ディレクトリ内のまだ実行されていないマイグレーションを実行するコマンド | `void` | 実行済みのマイグレーションは`migrations`テーブルに記録され、二重実行はされません。 |
 
 > **🧠 先輩エンジニアの思考プロセス**
-> なぜ`sail up -d`の後に`sleep 30`を入れるのか？
-> `sail up -d`コマンドはコンテナの「起動開始」を指示するだけで、MySQLデータベースがリクエストを受け付けられる状態になるまでには少し時間がかかります。その前に`migrate`を実行すると「`Connection refused`（接続拒否）」エラーが発生してしまうのです。`sleep`コマンドで意図的に待ち時間を作ることで、この問題を確実かつシンプルに回避できます。実務でもよく使われる堅実なテクニックです。
+> なぜ`sail up -d`の後すぐに`sail artisan migrate`を実行すると失敗する場合があるのか？
+> `sail up -d`コマンドはコンテナの「起動開始」を指示するだけで、MySQLデータベースがリクエストを受け付けられる状態になるまでには少し時間がかかります。その前に`migrate`を実行すると「`Connection refused`（接続拒否）」エラーが発生してしまうのです。したがって、30秒ほどコンテナが正常に立ち上がるのを待ってマイグレーションを実行するのがポイントです。
 
 > **注意：Dockerボリュームについて**
 > 以前に同じプロジェクト名やポートでDockerを使用したことがある場合、MySQLのデータボリュームに古いデータが残っている可能性があります。後のステップでマイグレーションを実行した際に「Table already exists」エラーが発生した場合は、以下のコマンドでボリュームをクリアしてください：
