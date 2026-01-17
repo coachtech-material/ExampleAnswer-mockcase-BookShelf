@@ -66,42 +66,49 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
 use Illuminate\Support\Facades\Route;
 
-// ... (中略)
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
 // --- 1. 具体的な名前を持つ公開ルート (最優先) ---
-Route::get(\'/\', [BookController::class, \'index\'])->name(\'home\');
-Route::get(\'/books\', [BookController::class, \'index\'])->name(\'books.index\');
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
-Route::get(\'/ranking\', [RankingController::class, \'index\'])->name(\'ranking.index\');
+Route::get('/', [BookController::class, 'index'])->name('home');
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
+Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+
 
 // --- 2. 認証必須ルート ---
-Route::middleware(\'auth\')->group(function () {
+Route::middleware('auth')->group(function () {
+
     // 書籍管理 (Resource)
-    Route::resource(\'books\', BookController::class)->except([\'index\', \'show\']);
+    Route::resource('books', BookController::class)->except(['index', 'show']);
 
     // ジャンル管理
-    Route::resource(\'genres\', GenreController::class)->except([\'show\']);
+    Route::resource('genres', GenreController::class)->except(['show']);
 
     // レビュー管理
-    Route::post(\'/books/{book}/reviews\', [ReviewController::class, \'store\'])->name(\'reviews.store\');
-    Route::get(\'/reviews/{review}/edit\', [ReviewController::class, \'edit\'])->name(\'reviews.edit\');
-    Route::put(\'/reviews/{review}\', [ReviewController::class, \'update\'])->name(\'reviews.update\');
-    Route::delete(\'/reviews/{review}\', [ReviewController::class, \'destroy\'])->name(\'reviews.destroy\');
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 
-    // お気に入り機能
-    Route::post(\'/books/{book}/favorites\', [FavoriteController::class, \'toggle\'])->name(\'favorites.toggle\');
-    Route::get(\'/favorites\', [FavoriteController::class, \'index\'])->name(\'favorites.index\');
+    // お気に入り機能 (Bladeに合わせて toggle に変更)
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
 
-    // レビューいいね機能
-    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'toggle\'])->name(\'reviews.like\');
+    // レビューいいね機能 (▼ここを修正: Bladeに合わせて reviews.like / toggle に変更)
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
 
-// --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
-Route::get(\'/books/{book}\', [BookController::class, \'show\'])->name(\'books.show\');
-Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
 
-// 認証機能用ルート
-require __DIR__.\'/auth.php\';
+// --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+
+// 認証機能用ルート、RouteServiceProvider.phpでミドルウェアを設定している場合は必要ない
+//require __DIR__.'/auth.php';
 ```
 
 ---
@@ -124,25 +131,29 @@ sail artisan make:request UpdateBookRequest
 **StoreBookRequest (`app/Http/Requests/StoreBookRequest.php`)**
 ```php
 <?php
+
 namespace App\Http\Requests;
+
 use Illuminate\Foundation\Http\FormRequest;
+
 class StoreBookRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
     }
+
     public function rules(): array
     {
         return [
-            \'title\' => [\'required\', \'string\', \'max:255\'],
-            \'author\' => [\'required\', \'string\', \'max:255\'],
-            \'isbn\' => [\'required\', \'string\', \'size:13\', \'unique:books,isbn\'],
-            \'published_date\' => [\'required\', \'date\'],
-            \'description\' => [\'nullable\', \'string\'],
-            \'image_url\' => [\'nullable\', \'url\'],
-            \'genres\' => [\'required\', \'array\'],
-            \'genres.*\' => [\'exists:genres,id\'],
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url'],
+            'genres' => ['required', 'array'],
+            'genres.*' => ['exists:genres,id'],
         ];
     }
 }
@@ -151,26 +162,30 @@ class StoreBookRequest extends FormRequest
 **UpdateBookRequest (`app/Http/Requests/UpdateBookRequest.php`)**
 ```php
 <?php
+
 namespace App\Http\Requests;
+
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+
 class UpdateBookRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
     }
+
     public function rules(): array
     {
         return [
-            \'title\' => [\'required\', \'string\', \'max:255\'],
-            \'author\' => [\'required\', \'string\', \'max:255\'],
-            \'isbn\' => [\'required\', \'string\', \'size:13\', Rule::unique(\'books\')->ignore($this->book)],
-            \'published_date\' => [\'required\', \'date\'],
-            \'description\' => [\'nullable\', \'string\'],
-            \'image_url\' => [\'nullable\', \'url\'],
-            \'genres\' => [\'required\', \'array\'],
-            \'genres.*\' => [\'exists:genres,id\'],
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url'],
+            'genres' => ['required', 'array'],
+            'genres.*' => ['exists:genres,id'],
         ];
     }
 }
@@ -182,7 +197,9 @@ class UpdateBookRequest extends FormRequest
 
 ```php
 <?php
+
 namespace App\Http\Controllers;
+
 use App\Models\Book;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
@@ -190,6 +207,7 @@ use App\Models\Genre;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
+
 class BookController extends Controller
 {
     public function index(): View
@@ -197,6 +215,7 @@ class BookController extends Controller
         $books = Book::with("genres")->latest()->paginate(10);
         return view("books.index", compact("books"));
     }
+
     public function search(Request $request): View
     {
         $query = $request->input("query");
@@ -205,43 +224,53 @@ class BookController extends Controller
             ->with("genres")
             ->latest()
             ->paginate(10);
+
         return view("books.index", compact("books", "query"));
     }
+
     public function create(): View
     {
         $genres = Genre::all();
         return view("books.create", compact("genres"));
     }
+
     public function store(StoreBookRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $bookData = collect($validated)->except(\'genres\')->toArray();
+        $bookData = collect($validated)->except('genres')->toArray();
         $book = $request->user()->books()->create($bookData);
-        $book->genres()->attach($validated[\'genres\']);
+        $book->genres()->attach($validated['genres']);
+
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
+
     public function show(Book $book): View
     {
         $book->load(["reviews.user", "genres"]);
         return view("books.show", compact("book"));
     }
+
     public function edit(Book $book): View
     {
         // $this->authorize("update", $book);
         $genres = Genre::all();
         return view("books.edit", compact("book", "genres"));
     }
+
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
         // $this->authorize("update", $book);
         $book->update($request->validated());
         $book->genres()->sync($request->genres);
+
         return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
+
     public function destroy(Book $book): RedirectResponse
     {
         // $this->authorize("delete", $book);
         $book->delete();
+
         return redirect()->route("books.index")->with("success", "書籍を削除しました。");
     }
 }
@@ -262,15 +291,19 @@ sail artisan make:policy BookPolicy --model=Book
 
 ```php
 <?php
+
 namespace App\Policies;
+
 use App\Models\Book;
 use App\Models\User;
+
 class BookPolicy
 {
     public function update(User $user, Book $book): bool
     {
         return $user->id === $book->user_id;
     }
+
     public function delete(User $user, Book $book): bool
     {
         return $user->id === $book->user_id;
@@ -285,6 +318,7 @@ class BookPolicy
 `app/Providers/AuthServiceProvider.php`の`$policies`配列に`BookPolicy`を追加します。
 
 ```php
+// ...
 use App\Models\Book;
 use App\Policies\BookPolicy;
 
@@ -302,32 +336,35 @@ class AuthServiceProvider extends ServiceProvider
 最後に、`BookController`の`edit`, `update`, `destroy`メソッドのコメントアウトを解除し、権限チェックを有効にします。
 
 ```php
-// app/Http/Controllers/BookController.php (修正箇所のみ)
-
 public function edit(Book $book): View
-{
-    // 権限チェックを追加
-    $this->authorize("update", $book);
-    $genres = Genre::all();
-    return view("books.edit", compact("book", "genres"));
-}
+    {
+        // 権限チェックを追加
+        $this->authorize("update", $book);
 
-public function update(UpdateBookRequest $request, Book $book): RedirectResponse
-{
-    // 権限チェックを追加
-    $this->authorize("update", $book);
-    $book->update($request->validated());
-    $book->genres()->sync($request->genres);
-    return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
-}
+        $genres = Genre::all();
+        return view("books.edit", compact("book", "genres"));
+    }
 
-public function destroy(Book $book): RedirectResponse
-{
-    // 権限チェックを追加
-    $this->authorize("delete", $book);
-    $book->delete();
-    return redirect()->route("books.index")->with("success", "書籍を削除しました。");
-}
+    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    {
+        // 権限チェックを追加
+        $this->authorize("update", $book);
+
+        $book->update($request->validated());
+        $book->genres()->sync($request->genres);
+
+        return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
+    }
+
+    public function destroy(Book $book): RedirectResponse
+    {
+        // 権限チェックを追加
+        $this->authorize("delete", $book);
+
+        $book->delete();
+
+        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
+    }
 ```
 
 > **✅ 動作確認**
