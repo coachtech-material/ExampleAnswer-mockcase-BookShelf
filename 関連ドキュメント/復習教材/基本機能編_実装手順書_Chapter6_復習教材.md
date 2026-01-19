@@ -92,8 +92,8 @@ Route::middleware('auth')->group(function () {
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
-// 認証機能用ルート
-require __DIR__.'/auth.php';
+// 認証機能用ルート,ここはrouteServiceProviderでauth.phpの認証ルートを設定したので、なくても問題ない。
+// require __DIR__.'/auth.php';
 ```
 
 #### 📖 コードリーディング：ルート定義 (`web.php`)
