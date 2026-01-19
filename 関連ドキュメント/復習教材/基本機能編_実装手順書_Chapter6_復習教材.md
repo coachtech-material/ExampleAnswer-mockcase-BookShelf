@@ -40,12 +40,15 @@
 まずは、このアプリケーションで必要となるすべてのコントローラーを`artisan`コマンドで一括作成します。
 
 ```bash
+# 書籍・ジャンル用 (Resourceコントローラー)
 sail artisan make:controller BookController --resource
-sail artisan make:controller ReviewController --resource
-sail artisan make:controller FavoriteController --resource
-sail artisan make:controller ReviewLikeController --resource
-sail artisan make:controller RankingController --resource
 sail artisan make:controller GenreController --resource
+
+# その他機能用
+sail artisan make:controller ReviewController
+sail artisan make:controller FavoriteController
+sail artisan make:controller ReviewLikeController
+sail artisan make:controller RankingController
 ```
 
 ### 6.1.3. ルート定義の作成 (`web.php`)
@@ -55,37 +58,57 @@ sail artisan make:controller GenreController --resource
 ```php
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ReviewLikeController;
-use App\Http\Controllers\RankingController;
 use App\Http\Controllers\GenreController;
+use App\Http\Controllers\RankingController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
 // --- 1. 具体的な名前を持つ公開ルート (最優先) ---
 Route::get('/', [BookController::class, 'index'])->name('home');
-Route::get('/search', [BookController::class, 'search'])->name('books.search');
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+
 
 // --- 2. 認証必須ルート ---
 Route::middleware('auth')->group(function () {
-    // 書籍関連
+
+    // 書籍管理 (Resource)
     Route::resource('books', BookController::class)->except(['index', 'show']);
-    // レビュー関連
-    Route::resource('books.reviews', ReviewController::class)->except(['index', 'show']);
-    // お気に入り関連
-    Route::resource('books.favorites', FavoriteController::class)->only(['store', 'destroy']);
-    // レビューいいね関連
-    Route::resource('reviews.likes', ReviewLikeController::class)->only(['store', 'destroy']);
+
     // ジャンル管理
-    Route::resource('genres', GenreController::class)->except(['index', 'show']);
+    Route::resource('genres', GenreController::class)->except(['show']);
+
+    // レビュー管理
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    // お気に入り機能 (Bladeに合わせて toggle に変更)
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+
+    // レビューいいね機能 (▼ここを修正: Bladeに合わせて reviews.like / toggle に変更)
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
 
-// --- 3. ワイルドカードルート (最後に配置) ---
-Route::get('/{book}', [BookController::class, 'show'])->name('books.show');
+
+// --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
+// 認証機能用ルート
+require __DIR__.'/auth.php';
 ```
 
 ---
@@ -225,6 +248,7 @@ class BookController extends Controller
             ->with("genres")
             ->latest()
             ->paginate(10);
+
         return view("books.index", compact("books", "query"));
     }
 
@@ -240,6 +264,7 @@ class BookController extends Controller
         $bookData = collect($validated)->except('genres')->toArray();
         $book = $request->user()->books()->create($bookData);
         $book->genres()->attach($validated['genres']);
+
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
 
@@ -259,10 +284,9 @@ class BookController extends Controller
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
         // $this->authorize("update", $book);
-        $validated = $request->validated();
-        $bookData = collect($validated)->except('genres')->toArray();
-        $book->update($bookData);
-        $book->genres()->sync($validated['genres']);
+        $book->update($request->validated());
+        $book->genres()->sync($request->genres);
+
         return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
 
@@ -270,7 +294,8 @@ class BookController extends Controller
     {
         // $this->authorize("delete", $book);
         $book->delete();
-        return redirect()->route("home")->with("success", "書籍を削除しました。");
+
+        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
     }
 }
 ```
