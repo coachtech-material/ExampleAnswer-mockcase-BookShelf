@@ -195,6 +195,12 @@ class GenreController extends Controller
 
 ### 📖 コードリーディング：`destroy`メソッドの詳細
 
+> **💡 なぜ`destroy`メソッドだけ詳細な解説があるのか？**
+>
+> 他のCRUDメソッド（`index`, `create`, `store`, `edit`, `update`）は、書籍管理機能（Chapter 6）で学んだパターンとほぼ同じです。しかし、`destroy`メソッドには**「書籍が紐付いている場合は削除を禁止する」という特別なロジック**が含まれています。
+>
+> これは、データの整合性を保つための重要な実装パターンです。もし書籍が紐付いているジャンルを削除してしまうと、その書籍のジャンル情報が失われてしまいます。そのため、このメソッドだけは詳細な解説を追加しています。
+
 ```php
 public function destroy(Genre $genre)
 {
