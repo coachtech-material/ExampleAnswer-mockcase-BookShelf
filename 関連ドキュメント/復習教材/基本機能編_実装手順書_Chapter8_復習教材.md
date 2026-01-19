@@ -87,20 +87,4 @@ class FavoriteController extends Controller
 
 ---
 
-### 8.2. ルート定義について
-
-お気に入り機能のルート定義は、Chapter 6の「ルート定義とコントローラーの準備」で既に`toggle`メソッドを使用する形で定義済みです。そのため、`routes/web.php`を修正する必要はありません。
-
-**参考: `routes/web.php`の該当箇所**
-```php
-// ...
-Route::middleware('auth')->group(function () {
-    // ...
-    // お気に入り機能
-    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
-    // ...
-});
-```
-
 これで、お気に入り機能の実装は完了です。次のChapterでは、レビューに対する「いいね」機能を実装していきます。
