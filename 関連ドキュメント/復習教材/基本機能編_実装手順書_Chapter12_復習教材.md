@@ -1,135 +1,219 @@
-# Chapter 12: ジャンル別一覧機能
+# Chapter 12: ジャンル管理機能（CRUD）
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、特定のジャンルに属する書籍の一覧を表示する機能を実装します。
+このセクションでは、ジャンルの登録・編集・削除機能を実装します。Chapter 6で学んだ書籍管理機能（CRUD）と同様のパターンを、別のリソースで再度実践します。
 
-- **リレーションを活用した絞り込み**: `belongsToMany`リレーションを使って、特定のジャンルに紐づく書籍を取得する方法を学びます。
-- **ルートモデルバインディング**: URLパラメータから自動的にモデルインスタンスを取得する仕組みを学びます。
+- **CRUDパターンの再実践**: 書籍管理で学んだパターンを、ジャンル管理に適用します。
+- **学習の定着**: 同じパターンを繰り返し実装することで、理解を深めます。
+- **削除時の制約**: 書籍が紐付いているジャンルは削除できないようにする実装を学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：ジャンル別一覧の設計
+## 🧠 先輩エンジニアの思考プロセス：ジャンル管理機能の設計
 
-ジャンル別一覧機能を実装する際、以下の点を考慮します。
+ジャンル管理機能を設計する際、先輩エンジニアは以下のような思考プロセスを経ています。
+
+### 書籍管理との共通パターン
+
+書籍管理とジャンル管理は、技術的にはほぼ同じCRUDパターンです。
+
+| 機能 | 書籍管理 | ジャンル管理 |
+|:---|:---|:---|
+| 一覧表示 | `BookController@index` | `GenreController@index` |
+| 新規作成 | `BookController@create/store` | `GenreController@create/store` |
+| 編集 | `BookController@edit/update` | `GenreController@edit/update` |
+| 削除 | `BookController@destroy` | `GenreController@destroy` |
+
+### ジャンル管理特有の考慮点
 
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
-| URLの設計 | `/genres/{genre}` | RESTfulな設計で、「ジャンルの詳細」を表示するイメージ。 |
-| データの取得方法 | `$genre->books()` | `Genre`モデルに定義した`books`リレーションを活用する。 |
-| 既存のビューを再利用するか | 専用のビューを作成 | ジャンル名を表示するなど、ジャンル固有の情報を含めたい。 |
+| ジャンル名の一意性 | `unique`バリデーション | 同じ名前のジャンルが複数存在すると混乱を招く。 |
+| 書籍が紐付いているジャンルの削除 | 削除を禁止 | 書籍のジャンル情報が失われるのを防ぐ。 |
+| 一覧での書籍数表示 | `withCount`で取得 | 各ジャンルに何冊の書籍があるかを表示できる。 |
 
 ---
 
-## 11.1. GenreControllerにshowメソッドを追加
+## 12.1. フォームリクエストの作成
 
-ジャンル管理用の`GenreController`に、ジャンル別一覧を表示する`show`メソッドを追加します。
+まず、バリデーションを行うフォームリクエストを作成します。
+
+```bash
+sail artisan make:request StoreGenreRequest
+sail artisan make:request UpdateGenreRequest
+```
+
+---
+
+## 12.2. フォームリクエストの実装
+
+### StoreGenreRequest
+
+`app/Http/Requests/StoreGenreRequest.php`を開き、以下の内容を記述してください。
 
 ```php
-// app/Http/Controllers/GenreController.php
+<?php
 
-// ... (既存のコード)
+namespace App\Http\Requests;
 
-use App\Models\Genre;
+use Illuminate\Foundation\Http\FormRequest;
 
-// ... (既存のコード)
-
-public function show(Genre $genre)
+class StoreGenreRequest extends FormRequest
 {
-    $books = $genre->books()->paginate(10);
-    return view(\'genres.show\', compact(\'genre\', \'books\'));
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', 'unique:genres,name'],
+        ];
+    }
 }
 ```
 
-### 11.1.1. コードリーディング：メソッドチェーンの分解
+### 📖 コードリーディング：StoreGenreRequest
 
-```php
-$books = $genre->books()->paginate(10);
-```
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `$genre` | ルートモデルバインディングにより、URLの`{genre}`から自動的に取得された`Genre`モデルのインスタンスです。 | `Genre` | URLが`/genres/1`の場合、ID=1のジャンルが自動的に取得されます。 |
-| `->books()` | `Genre`モデルの`books`リレーション（`belongsToMany`）を取得します。 | `BelongsToMany` | Chapter 3で定義したリレーションを活用します。 |
-| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
-
-> **💡 ポイント: ルートモデルバインディング**
-> Laravelは、ルートパラメータ名（`{genre}`）とメソッド引数の型ヒント（`Genre $genre`）を照合し、自動的にデータベースからモデルを取得します。
-> 
-> ```php
-> // ルート定義
-> Route::get(\'/genres/{genre}\', [GenreController::class, \'show\']);
-> 
-> // コントローラー
-> public function show(Genre $genre) // 自動的にGenre::findOrFail($id)が実行される
-> ```
-
----
-
-## 11.2. ルートの追加
-
-```php
-// routes/web.php
-
-// ... (他のルート)
-
-Route::get(\'/genres/{genre}\', [GenreController::class, \'show\'])->name(\'genres.show\');
-```
-
----
-
-## 11.3. ビューの作成
-
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/genres
-touch resources/views/genres/show.blade.php
-```
-
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
-
----
-
-## 11.4. Bladeテンプレートでのジャンル別一覧表示例
-
-```blade
-{{-- ジャンル別一覧 --}}
-<h1>ジャンル: {{ $genre->name }}</h1>
-
-<ul>
-    @foreach ($books as $book)
-        <li>
-            <a href="{{ route(\'books.show\', $book) }}">{{ $book->title }}</a>
-        </li>
-    @endforeach
-</ul>
-
-{{ $books->links() }}
-```
-
-| 部分 | 説明 | 💡 ポイント |
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `$genre->name` | 現在表示しているジャンルの名前です。 | - |
-| `$books->links()` | ページネーションリンクを表示します。 | Tailwind CSSに対応したスタイルが自動的に適用されます。 |
+| `'name' => ['required', 'string', 'max:255', 'unique:genres,name']` | `name`フィールドのバリデーションルールを定義。 | 必須、文字列、最大255文字、`genres`テーブルの`name`カラムで一意であること。 |
+| `'unique:genres,name'` | `genres`テーブルの`name`カラムで重複がないかチェック。 | 同じ名前のジャンルは登録できない。 |
+
+### UpdateGenreRequest
+
+`app/Http/Requests/UpdateGenreRequest.php`を開き、以下の内容を記述してください。
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateGenreRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', Rule::unique('genres')->ignore($this->genre)],
+        ];
+    }
+}
+```
+
+### 📖 コードリーディング：UpdateGenreRequest
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `use Illuminate\Validation\Rule;` | `Rule`クラスをインポート。 | 複雑なバリデーションルールを構築するために必要。 |
+| `Rule::unique('genres')->ignore($this->genre)` | `genres`テーブルで一意性をチェックするが、現在編集中のレコードは除外する。 | 名前を変更しない場合でも、自分自身と重複しているとエラーになるのを防ぐ。 |
 
 ---
 
-## 11.5. ジャンル一覧からのリンク
+## 12.3. GenreController.php の完全実装
 
-ヘッダーやサイドバーにジャンル一覧を表示し、各ジャンルへのリンクを設置する例です。
+Chapter 11で`show`メソッドを実装した`GenreController`に、CRUD機能を追加します。
 
-```blade
-{{-- ジャンル一覧 --}}
-<ul>
-    @foreach (\App\Models\Genre::all() as $genre)
-        <li>
-            <a href="{{ route(\'genres.show\', $genre) }}">{{ $genre->name }}</a>
-        </li>
-    @endforeach
-</ul>
+`app/Http/Controllers/GenreController.php`を開き、以下の内容に更新してください。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Genre;
+use App\Http\Requests\StoreGenreRequest;
+use App\Http\Requests\UpdateGenreRequest;
+
+class GenreController extends Controller
+{
+    public function index()
+    {
+        $genres = Genre::withCount('books')->get();
+        return view('genres.index', compact('genres'));
+    }
+
+    public function create()
+    {
+        return view('genres.create');
+    }
+
+    public function store(StoreGenreRequest $request)
+    {
+        Genre::create($request->validated());
+        return redirect()->route('genres.index')->with('success', 'ジャンルを作成しました。');
+    }
+
+    public function show(Genre $genre)
+    {
+        $books = $genre->books()->with('genres')->paginate(10);
+        return view('genres.show', compact('genre', 'books'));
+    }
+
+    public function edit(Genre $genre)
+    {
+        return view('genres.edit', compact('genre'));
+    }
+
+    public function update(UpdateGenreRequest $request, Genre $genre)
+    {
+        $genre->update($request->validated());
+        return redirect()->route('genres.index')->with('success', 'ジャンルを更新しました。');
+    }
+
+    public function destroy(Genre $genre)
+    {
+        if ($genre->books()->count() > 0) {
+            return redirect()->route('genres.index')->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
+        }
+        $genre->delete();
+        return redirect()->route('genres.index')->with('success', 'ジャンルを削除しました。');
+    }
+}
 ```
 
-> **⚠️ 注意: N+1問題**
-> 上記のコードは、ビューで直接`Genre::all()`を呼び出しています。これは簡易的な実装ですが、パフォーマンスを考慮する場合は、コントローラーでジャンル一覧を取得し、ビューに渡す方が良いでしょう。
+### 📖 コードリーディング：各メソッドの解説
 
-これで、ジャンル別一覧機能の実装が完了しました。次のChapterでは、ジャンル管理機能（CRUD）を実装していきます。
+| メソッド | 処理内容 | ポイント |
+|:---|:---|:---|
+| `index()` | ジャンル一覧を表示。`withCount('books')`で各ジャンルの書籍数も取得。 | 一覧画面で「このジャンルには○冊の書籍があります」と表示できる。 |
+| `create()` | ジャンル作成フォームを表示。 | シンプルにビューを返すだけ。 |
+| `store()` | フォームから送信されたデータでジャンルを作成。 | `$request->validated()`でバリデーション済みのデータのみを使用。 |
+| `show()` | 特定のジャンルに属する書籍一覧を表示。 | Chapter 11で実装済み。 |
+| `edit()` | ジャンル編集フォームを表示。 | 編集対象のジャンルをビューに渡す。 |
+| `update()` | フォームから送信されたデータでジャンルを更新。 | `$genre->update()`でモデルを更新。 |
+| `destroy()` | ジャンルを削除。ただし書籍が紐付いている場合は削除不可。 | データの整合性を保つための重要なチェック。 |
+
+### 📖 コードリーディング：`destroy`メソッドの詳細
+
+```php
+public function destroy(Genre $genre)
+{
+    if ($genre->books()->count() > 0) {
+        return redirect()->route('genres.index')->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
+    }
+    $genre->delete();
+    return redirect()->route('genres.index')->with('success', 'ジャンルを削除しました。');
+}
+```
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `$genre->books()->count()` | このジャンルに紐付いている書籍の数を取得。 | `belongsToMany`リレーションの`count()`メソッドを使用。 |
+| `> 0` | 書籍が1冊以上紐付いているかをチェック。 | 紐付いている場合は削除を禁止する。 |
+| `->with('error', ...)` | セッションにエラーメッセージを保存。 | ビューで`session('error')`として取得できる。 |
+| `$genre->delete()` | ジャンルを削除。 | Eloquentの`delete()`メソッドでレコードを削除。 |
+
+> **📝 ルート定義について**
+> ジャンル管理機能のルート定義も、Chapter 6で既に定義済みです。そのため、`routes/web.php`を修正する必要はありません。
+
+これで、ジャンル管理機能（CRUD）の実装が完了しました。次のChapterでは、最終確認を行います。
