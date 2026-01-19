@@ -44,6 +44,7 @@ sail artisan make:request UpdateReviewRequest
 
 `app/Http/Requests/StoreReviewRequest.php` と `app/Http/Requests/UpdateReviewRequest.php` を以下のように編集します。
 
+``app/Http/Requests/StoreReviewRequest.php``
 ```php
 <?php
 
@@ -52,6 +53,32 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReviewRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
+}
+```
+
+``app/Http/Requests/UpdateReviewRequest.php``
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateReviewRequest extends FormRequest
 {
     public function authorize(): bool
     {
