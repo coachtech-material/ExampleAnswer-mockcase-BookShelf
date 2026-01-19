@@ -87,47 +87,20 @@ class FavoriteController extends Controller
 
 ---
 
-### 8.2. ルート定義の修正
+### 8.2. ルート定義について
 
-Chapter 6で仮置きしたルート定義を、`toggle`メソッドを使用するように修正します。
+お気に入り機能のルート定義は、Chapter 6の「ルート定義とコントローラーの準備」で既に`toggle`メソッドを使用する形で定義済みです。そのため、`routes/web.php`を修正する必要はありません。
 
-`routes/web.php`を開き、お気に入り関連のルートを以下のように変更してください。
-
-**変更前**
+**参考: `routes/web.php`の該当箇所**
 ```php
-// routes/web.php
-
 // ...
-Route::middleware("auth")->group(function () {
+Route::middleware('auth')->group(function () {
     // ...
-    Route::post("/books/{book}/favorite", [FavoriteController::class, "store"])->name("favorites.store");
-    Route::delete("/books/{book}/unfavorite", [FavoriteController::class, "destroy"])->name("favorites.destroy");
-    Route::get("/favorites", [FavoriteController::class, "index"])->name("favorites.index");
+    // お気に入り機能
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     // ...
 });
 ```
-
-**変更後**
-```php
-// routes/web.php
-
-// ...
-Route::middleware("auth")->group(function () {
-    // ...
-    Route::post("/books/{book}/favorite", [FavoriteController::class, "toggle"])->name("favorites.toggle"); // 変更
-    Route::get("/favorites", [FavoriteController::class, "index"])->name("favorites.index");
-    // ...
-});
-```
-
-`store`と`destroy`の2つのルートを、`toggle`を呼び出す1つの`POST`ルートにまとめました。これにより、Blade側からの呼び出しもシンプルになります。
-
-#### 📖 コードリーディング：ルート定義
-
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `Route::post("/books/{book}/favorite", ...)` | `POST`メソッドで`/books/{book}/favorite`というURLへのリクエストを処理するルートを定義。 | `POST`はデータの状態を変更する操作（今回はお気に入り状態の変更）に適したHTTPメソッド。 |
-| `[FavoriteController::class, "toggle"]` | このルートがリクエストを受け取った際に、`FavoriteController`の`toggle`メソッドを実行するよう指定。 | `Controller::class`という記法でコントローラーの完全修飾名を指定するのが現在の標準的な書き方。 |
-| `->name("favorites.toggle")` | このルートに`favorites.toggle`という名前を付ける。 | `name()`でルートに名前を付けておくことで、Blade側で`route("favorites.toggle", $book)`のように簡単にURLを生成できる。URLの構造が変わっても、Bladeファイルを修正する必要がないため、非常に便利。 |
 
 これで、お気に入り機能の実装は完了です。次のChapterでは、レビューに対する「いいね」機能を実装していきます。
