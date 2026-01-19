@@ -62,14 +62,28 @@ class FavoriteController extends Controller
         $books = Auth::user()->favoriteBooks()->paginate(10);
 
         // favorites.indexビューを返す
-        return view('favorites.index', compact('books'));
+        return view("favorites.index", compact("books"));
     }
 }
 ```
 
-> **📝 注意**
-> 完全手順書.mdでは、`store`と`destroy`の代わりに`toggle`メソッドを実装しています。これは、UI/UXの観点から、1つのボタンで登録と解除を切り替える方が一般的であるためです。しかし、Chapter 6で定義したルートは`favorites.store`と`favorites.destroy`のままで問題ありません。Blade側で、お気に入り状態に応じてどちらのルートにフォームを送信するかを切り替えることで、結果的に`toggle`と同じような動作を実現できるためです。
-> ここでは、よりシンプルで推奨される`toggle`メソッドの実装を採用し、ルート定義は後ほど`toggle`を呼び出すように修正します。
+#### 📖 コードリーディング：`toggle`メソッド
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `public function toggle(Book $book)` | `toggle`という名前の公開メソッドを定義。引数で`Book`モデルを受け取る。 | `(Book $book)`は「ルートモデルバインディング」というLaravelの機能。URLの`{book}`の部分に対応するIDを持つ`Book`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| `Auth::user()` | ログインしているユーザーの`User`モデルインスタンスを取得する。 | `Auth`ファサード（Laravelの便利な機能への入り口）を経由して、セッション情報から認証済みユーザーを取得している。 |
+| `->favoriteBooks()` | `User`モデルに定義した`favoriteBooks`リレーション（`belongsToMany`）を取得する。 | これにより、`favorites`中間テーブルを操作するためのクエリビルダが返される。 |
+| `->toggle($book->id)` | `belongsToMany`リレーションの`toggle`メソッドを実行。`$book->id`を中間テーブルに追加、または削除する。 | `toggle`は「切り替える」という意味。中間テーブルに`($user->id, $book->id)`の組み合わせが存在すれば削除し、存在しなければ追加する、という処理を自動で行ってくれる非常に便利なメソッド。 |
+| `return back();` | ユーザーを直前のページにリダイレクトさせる。 | お気に入りボタンを押した元のページ（書籍詳細ページなど）にユーザーを戻すことで、シームレスなUXを提供する。`back()`はLaravelが提供するヘルパー関数。 |
+
+#### 📖 コードリーディング：`index`メソッド
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `public function index()` | お気に入り一覧ページを表示するためのメソッド。 | `Route::get("/favorites", ...)`に対応する。 |
+| `$books = Auth::user()->favoriteBooks()->paginate(10);` | ログインユーザーがお気に入りに登録した書籍を10件ずつ取得する。 | `favoriteBooks()`で中間テーブルを経由して`books`テーブルからデータを取得し、`paginate(10)`でページネーションを適用している。 |
+| `return view("favorites.index", compact("books"));` | `resources/views/favorites/index.blade.php`ビューを返す。その際に`$books`変数をビューに渡す。 | `compact("books")`はPHPの関数で、`["books" => $books]`という連想配列を作成するのと同じ意味。ビュー側では`$books`という変数名でデータにアクセスできる。 |
 
 ---
 
@@ -84,11 +98,11 @@ Chapter 6で仮置きしたルート定義を、`toggle`メソッドを使用す
 // routes/web.php
 
 // ...
-Route::middleware('auth')->group(function () {
+Route::middleware("auth")->group(function () {
     // ...
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'store'])->name('favorites.store');
-    Route::delete('/books/{book}/unfavorite', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post("/books/{book}/favorite", [FavoriteController::class, "store"])->name("favorites.store");
+    Route::delete("/books/{book}/unfavorite", [FavoriteController::class, "destroy"])->name("favorites.destroy");
+    Route::get("/favorites", [FavoriteController::class, "index"])->name("favorites.index");
     // ...
 });
 ```
@@ -98,17 +112,22 @@ Route::middleware('auth')->group(function () {
 // routes/web.php
 
 // ...
-Route::middleware('auth')->group(function () {
+Route::middleware("auth")->group(function () {
     // ...
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle'); // 変更
-    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post("/books/{book}/favorite", [FavoriteController::class, "toggle"])->name("favorites.toggle"); // 変更
+    Route::get("/favorites", [FavoriteController::class, "index"])->name("favorites.index");
     // ...
 });
 ```
 
 `store`と`destroy`の2つのルートを、`toggle`を呼び出す1つの`POST`ルートにまとめました。これにより、Blade側からの呼び出しもシンプルになります。
 
-> **💡 ポイント**
-> `name()`でルートに名前を付けておくことで、Blade側で`route('favorites.toggle', $book)`のように簡単にURLを生成できます。URLの構造が変わっても、Bladeファイルを修正する必要がないため、非常に便利です。
+#### 📖 コードリーディング：ルート定義
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `Route::post("/books/{book}/favorite", ...)` | `POST`メソッドで`/books/{book}/favorite`というURLへのリクエストを処理するルートを定義。 | `POST`はデータの状態を変更する操作（今回はお気に入り状態の変更）に適したHTTPメソッド。 |
+| `[FavoriteController::class, "toggle"]` | このルートがリクエストを受け取った際に、`FavoriteController`の`toggle`メソッドを実行するよう指定。 | `Controller::class`という記法でコントローラーの完全修飾名を指定するのが現在の標準的な書き方。 |
+| `->name("favorites.toggle")` | このルートに`favorites.toggle`という名前を付ける。 | `name()`でルートに名前を付けておくことで、Blade側で`route("favorites.toggle", $book)`のように簡単にURLを生成できる。URLの構造が変わっても、Bladeファイルを修正する必要がないため、非常に便利。 |
 
 これで、お気に入り機能の実装は完了です。次のChapterでは、レビューに対する「いいね」機能を実装していきます。
