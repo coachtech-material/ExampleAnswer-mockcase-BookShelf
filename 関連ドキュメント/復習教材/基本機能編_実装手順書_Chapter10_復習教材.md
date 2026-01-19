@@ -4,9 +4,9 @@
 
 このセクションでは、レビューの平均評価に基づいて書籍をランキング表示する機能を実装します。
 
-- **集計クエリ**: `withAvg`や`withCount`を使って、リレーション先のデータを集計する方法を学びます。
+- **集計クエリ**: `join`と`DB::raw`を使って、リレーション先のデータを集計する方法を学びます。
 - **並び替え**: 集計結果に基づいてデータを並び替える方法を学びます。
-- **Eloquentの強力な機能**: 複雑なSQLを書かずに、Eloquentのメソッドチェーンで集計・並び替えを実現します。
+- **SQLの基礎**: `AVG`、`GROUP BY`、`ORDER BY`といったSQLの集計・並び替え構文を理解します。
 
 ---
 
@@ -17,130 +17,84 @@
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
 | 何を基準にランキングするか | レビューの平均評価 | ユーザーにとって最も参考になる指標。 |
-| レビューがない書籍はどうするか | ランキングから除外 | 評価がない書籍を上位に表示しても意味がない。 |
-| 同点の場合はどうするか | レビュー数が多い方を上位に | より多くの評価を受けている方が信頼性が高い。 |
+| レビューがない書籍はどうするか | ランキングから除外 | `join`を使用するため、レビューがない書籍は自動的に除外される。 |
+| 何件表示するか | 上位10件 | ランキングとして適切な件数。 |
 
 ---
 
-## 9.1. コントローラーの作成
+## 10.1. RankingController.php の実装
 
-```bash
-sail artisan make:controller RankingController
-```
+`RankingController`はChapter 6の「ルート定義とコントローラーの準備」で既に作成済みです。早速、中身を実装していきましょう。
 
----
-
-## 9.2. RankingControllerの実装
+`app/Http/Controllers/RankingController.php`を開き、以下の内容を記述してください。
 
 ```php
-// app/Http/Controllers/RankingController.php
-
 <?php
 
 namespace App\Http\Controllers;
 
 use App\Models\Book;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RankingController extends Controller
 {
     public function index()
     {
-        $books = Book::withAvg(\'reviews\
-', \'rating\')
-            ->orderByDesc(\'reviews_avg_rating\')
+        $rankedBooks = Book::select('books.*', DB::raw('AVG(reviews.rating) as average_rating'))
+            ->join('reviews', 'books.id', '=', 'reviews.book_id')
+            ->groupBy('books.id')
+            ->orderByDesc('average_rating')
             ->take(10)
             ->get();
 
-        return view(\'ranking.index\
-', compact(\'books\'));
+        return view('ranking.index', compact('rankedBooks'));
     }
 }
 ```
 
-### 9.2.1. コードリーディング：メソッドチェーンの分解
+### 📖 コードリーディング：メソッドチェーンの分解
 
-```php
-$books = Book::withAvg(\'reviews\
-', \'rating\')
-    ->orderByDesc(\'reviews_avg_rating\')
-    ->take(10)
-    ->get();
-```
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `Book::withAvg(\'reviews\
-', \'rating\')` | `reviews`リレーションの`rating`カラムの平均値を計算し、`reviews_avg_rating`という仮想カラムとして追加します。 | `Builder` | 生成されるSQL: `SELECT *, (SELECT AVG(rating) FROM reviews WHERE books.id = reviews.book_id) AS reviews_avg_rating` |
-| `->orderByDesc(\'reviews_avg_rating\')` | `reviews_avg_rating`の降順（高い順）で並び替えます。 | `Builder` | 平均評価が高い書籍が上位に来ます。 |
-| `->take(10)` | 上位10件のみ取得します。 | `Builder` | ランキングなので、全件取得する必要はありません。 |
-| `->get()` | クエリを実行し、結果をコレクションとして取得します。 | `Collection` | - |
-
----
-
-## 9.3. ルートの追加
-```php
-// routes/web.php
-
-use App\Http\Controllers\RankingController;
-
-// ... (他のルート)
-
-Route::get(\'/ranking\', [RankingController::class, \'index\'])->name(\'ranking.index\');
-```
-
----
-
-## 9.4. ビューの作成
-
-```bash
-# ディレクトリとファイルを作成
-mkdir -p resources/views/ranking
-touch resources/views/ranking/index.blade.php
-```
-
-各bladeファイルは「Preparedblade-mockcase-BookShelf」リポジトリを参照してください。
-
----
-
-## 9.5. Bladeテンプレートでのランキング表示例
-
-```blade
-{{-- ランキング一覧 --}}
-<ol>
-    @foreach ($books as $book)
-        <li>
-            <a href="{{ route(\'books.show\
-', $book) }}">
-                {{ $book->title }}
-            </a>
-            <span>★{{ number_format($book->reviews_avg_rating, 1) }}</span>
-        </li>
-    @endforeach
-</ol>
-```
-
-| 部分 | 説明 | 💡 ポイント |
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `$book->reviews_avg_rating` | `withAvg`で追加された仮想カラムにアクセスします。 | 通常のプロパティと同じようにアクセスできます。 |
-| `number_format($book->reviews_avg_rating, 1)` | 小数点以下1桁で表示します。 | 例: `4.5` |
+| `use Illuminate\Support\Facades\DB;` | Laravelの`DB`ファサードをインポート。生のSQL式を書くために必要。 | ファサードを使うことで、`DB::raw()`などのデータベース操作メソッドにアクセスできる。 |
+| `Book::select('books.*', DB::raw('...'))` | 取得するカラムを明示的に指定。`books.*`で書籍テーブルの全カラムを取得。 | `select()`メソッドで取得カラムをカスタマイズ。`DB::raw()`で生のSQL式を埋め込める。 |
+| `DB::raw('AVG(reviews.rating) as average_rating')` | レビューの評価（rating）の平均値を計算し、`average_rating`という別名で取得。 | `AVG()`はSQLの集計関数。`as`で別名を付けることで、後から`$book->average_rating`でアクセス可能。 |
+| `->join('reviews', 'books.id', '=', 'reviews.book_id')` | `books`テーブルと`reviews`テーブルを結合。 | 内部結合（INNER JOIN）のため、レビューがない書籍は結果に含まれない。 |
+| `->groupBy('books.id')` | 書籍ごとにグループ化。 | `AVG()`などの集計関数を使う場合、`GROUP BY`で何を基準にグループ化するかを指定する必要がある。 |
+| `->orderByDesc('average_rating')` | `average_rating`の降順（高い順）で並び替え。 | 平均評価が高い書籍が上位に来る。 |
+| `->take(10)` | 上位10件のみ取得。 | ランキングなので、全件取得する必要はない。 |
+| `->get()` | クエリを実行し、結果をコレクションとして取得。 | この時点で実際にSQLが発行される。 |
+| `compact('rankedBooks')` | 変数`$rankedBooks`をビューに渡す。 | `['rankedBooks' => $rankedBooks]`と同じ意味。 |
+
+> **📝 ルート定義について**
+> ランキング機能のルート定義も、Chapter 6で既に定義済みです。そのため、`routes/web.php`を修正する必要はありません。
 
 ---
 
-## 9.6. 発展：生SQLとの比較
+## 10.2. 発展：生成されるSQLの理解
 
-Eloquentのメソッドチェーンは、内部的に以下のようなSQLを生成しています。
+上記のEloquentメソッドチェーンは、内部的に以下のようなSQLを生成しています。
 
 ```sql
 SELECT 
     books.*,
-    (SELECT AVG(rating) FROM reviews WHERE books.id = reviews.book_id) AS reviews_avg_rating
+    AVG(reviews.rating) as average_rating
 FROM books
-ORDER BY reviews_avg_rating DESC
+INNER JOIN reviews ON books.id = reviews.book_id
+GROUP BY books.id
+ORDER BY average_rating DESC
 LIMIT 10
 ```
 
-> **🧠 先輩エンジニアの思考プロセス**
-> Eloquentを使うことで、複雑なSQLを書かずに同じ結果を得られます。ただし、パフォーマンスが重要な場面では、生SQLや`DB::raw()`を使うことも検討します。
+| SQL構文 | 説明 |
+|:---|:---|
+| `SELECT books.*, AVG(reviews.rating) as average_rating` | 書籍の全カラムと、レビュー評価の平均値を取得 |
+| `INNER JOIN reviews ON books.id = reviews.book_id` | 書籍とレビューを結合（レビューがない書籍は除外） |
+| `GROUP BY books.id` | 書籍ごとにグループ化して集計 |
+| `ORDER BY average_rating DESC` | 平均評価の高い順に並び替え |
+| `LIMIT 10` | 上位10件のみ取得 |
 
-これで、ランキング機能の実装が完了しました。次のChapterでは、検索機能を実装していきます。
+> **🧠 先輩エンジニアの思考プロセス**
+> `join`と`DB::raw`を使うことで、SQLの集計機能を直接活用できます。Eloquentの`withAvg`などのメソッドもありますが、複雑な集計やパフォーマンスが重要な場面では、このように生のSQL式を使うことも有効な選択肢です。
+
+これで、ランキング機能の実装が完了しました。次のChapterでは、ジャンル別一覧機能を実装していきます。
