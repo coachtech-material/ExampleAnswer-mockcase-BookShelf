@@ -22,133 +22,34 @@
 
 ---
 
-## 8.1. コントローラーの作成
+## 9.1. ReviewLikeController.php の実装
 
-```bash
-sail artisan make:controller ReviewLikeController
-```
+`ReviewLikeController`はChapter 6の「ルート定義とコントローラーの準備」で既に作成済みです。早速、中身を実装していきましょう。
 
----
-
-## 8.2. ReviewLikeControllerの実装
+`app/Http/Controllers/ReviewLikeController.php`を開き、以下の内容を記述してください。
 
 ```php
-// app/Http/Controllers/ReviewLikeController.php
-
 <?php
 
 namespace App\Http\Controllers;
 
 use App\Models\Review;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReviewLikeController extends Controller
 {
-    public function store(Review $review)
+    // Bladeの要求に合わせて toggle メソッドに変更
+    public function toggle(Review $review)
     {
-        Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
-
-        return back();
-    }
-
-    public function destroy(Review $review)
-    {
-        Auth::user()->likedReviews()->detach($review->id);
+        // ユーザーがすでにいいねしていれば解除、していなければ登録を自動で行う
+        Auth::user()->likedReviews()->toggle($review->id);
 
         return back();
     }
 }
 ```
 
-### 8.2.1. コードリーディング：お気に入り機能との比較
+> **📝 ルート定義について**
+> レビューいいね機能のルート定義も、Chapter 6で既に`toggle`メソッドを使用する形で定義済みです。そのため、`routes/web.php`を修正する必要はありません。
 
-| お気に入り機能 | レビューいいね機能 | 説明 |
-|:---|:---|:---|
-| `Auth::user()->favoriteBooks()` | `Auth::user()->likedReviews()` | リレーション名が異なるだけ |
-| `->syncWithoutDetaching($book->id)` | `->syncWithoutDetaching($review->id)` | 対象のIDが異なるだけ |
-| `->detach($book->id)` | `->detach($review->id)` | 対象のIDが異なるだけ |
-
-> **💡 ポイント: DRY原則とパターン認識**
-> 同じパターンを認識できるようになると、新しい機能を実装する際に「これは〇〇と同じパターンだ」と気づけるようになります。これにより、実装スピードが上がり、バグも減ります。
-
----
-
-## 8.3. ルートの追加
-
-```php
-// routes/web.php
-
-use App\Http\Controllers\ReviewLikeController;
-
-// ... (他のルート)
-
-Route::middleware(\'auth\')->group(function () {
-    // ... 既存のルート
-
-    // Review Like management
-    Route::post(\'/reviews/{review}/like\', [ReviewLikeController::class, \'store\'])->name(\'likes.store\');
-    Route::delete(\'/reviews/{review}/unlike\', [ReviewLikeController::class, \'destroy\'])->name(\'likes.destroy\');
-});
-```
-
-| ルート | HTTPメソッド | 説明 |
-|:---|:---|:---|
-| `/reviews/{review}/like` | POST | レビューにいいねを追加 |
-| `/reviews/{review}/unlike` | DELETE | レビューのいいねを解除 |
-
----
-
-## 8.4. Bladeテンプレートでのいいねボタン実装例
-
-レビュー表示部分で、いいねボタンを表示する際の実装例です。
-
-```blade
-{{-- いいねボタン --}}
-@auth
-    @if (Auth::user()->isLiking($review))
-        <form action="{{ route(\'likes.destroy\', $review) }}" method="POST">
-            @csrf
-            @method(\'DELETE\')
-            <button type="submit">いいね解除</button>
-        </form>
-    @else
-        <form action="{{ route(\'likes.store\', $review) }}" method="POST">
-            @csrf
-            <button type="submit">いいね</button>
-        </form>
-    @endif
-@endauth
-```
-
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `Auth::user()->isLiking($review)` | ログインユーザーがいいね済みか確認します。 | このメソッドはUserモデルに独自実装する必要があります。 |
-
----
-
-## 8.5. Reviewモデルへのリレーション追加
-
-いいね数を表示するために、`Review`モデルに`likedByUsers`リレーションを追加します。
-
-```php
-// app/Models/Review.php
-
-// ... (既存のコード)
-
-public function likedByUsers()
-{
-    return $this->belongsToMany(User::class, \'review_likes\');
-}
-```
-
-| 部分 | 説明 | 💡 ポイント |
-|:---|:---|:---|
-| `belongsToMany(User::class, \'review_likes\')` | `review_likes`中間テーブルを通じて、このレビューにいいねしたユーザーを取得します。 | `User`モデルの`likedReviews`リレーションの「逆方向」です。 |
-
-> **🧠 先輩エンジニアの思考プロセス**
-> 多対多リレーションは、両方向から定義することで、どちらのモデルからでも関連データにアクセスできるようになります。
-> - `$user->likedReviews`: ユーザーがいいねしたレビュー一覧
-> - `$review->likedByUsers`: レビューにいいねしたユーザー一覧
-
-これで、レビューいいね機能の実装が完了しました。次のChapterでは、ランキング機能を実装していきます。
+これで、レビューいいね機能の実装は完了です。次のChapterでは、ランキング機能を実装していきます。
