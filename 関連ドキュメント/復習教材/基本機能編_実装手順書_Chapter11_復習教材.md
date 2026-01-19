@@ -1,137 +1,88 @@
-# Chapter 11: 検索機能
+# Chapter 11: ジャンル別一覧機能
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、書籍のタイトルや著者名で検索する機能を実装します。
+このセクションでは、特定のジャンルに属する書籍を一覧表示する機能を実装します。
 
-- **クエリパラメータの取得**: URLの`?query=xxx`からキーワードを取得する方法を学びます。
-- **LIKE検索**: 部分一致検索をEloquentで実装する方法を学びます。
-- **`orWhere`**: 複数条件のOR検索を実装する方法を学びます。
+- **リレーションを活用した絞り込み**: ジャンルから関連する書籍を取得する方法を学びます。
+- **Eagerロード**: N+1問題を防ぐための`with()`メソッドの使い方を復習します。
+- **ページネーション**: 大量のデータを分割して表示する方法を学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：検索機能の設計
+## 🧠 先輩エンジニアの思考プロセス：ジャンル別一覧機能の設計
 
-検索機能を実装する際、以下の点を考慮します。
+ジャンル別一覧機能を実装する際、以下の点を考慮します。
 
 | 考慮点 | 設計判断 | 理由 |
 |:---|:---|:---|
-| 何を検索対象にするか | タイトルと著者名 | ユーザーが最もよく検索する項目。 |
-| 完全一致か部分一致か | 部分一致（LIKE検索） | ユーザーが正確なタイトルを覚えていなくても検索できる。 |
-| 検索結果の表示方法 | 既存の一覧ページを再利用 | 新しいビューを作る必要がなく、UIの一貫性も保てる。 |
+| どのようにジャンルを指定するか | URLパラメータ（`/genres/{genre}`） | RESTfulなURL設計に従い、リソースを明確に表現できる。 |
+| 書籍のジャンル情報も表示するか | する（Eagerロードで取得） | 各書籍がどのジャンルに属するかを表示することで、ユーザーの利便性が向上する。 |
+| 一度に何件表示するか | 10件（ページネーション） | 大量の書籍があっても、適切な件数で分割表示できる。 |
 
 ---
 
-## 10.1. BookControllerにsearchメソッドを追加
+## 11.1. GenreController.php の show メソッド実装
 
-既存の`BookController`に検索メソッドを追加します。
+`GenreController`はChapter 6の「ルート定義とコントローラーの準備」で既に作成済みです。ここでは`show`メソッドを実装します。
+
+`app/Http/Controllers/GenreController.php`を開き、以下の内容を記述してください。
 
 ```php
-// app/Http/Controllers/BookController.php
+<?php
 
-// ... (既存のコード)
+namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Genre;
+// 他のuse宣言はChapter 12で追加します
 
-// ... (既存のコード)
-
-public function search(Request $request)
+class GenreController extends Controller
 {
-    $query = $request->input(\'query\');
+    // Chapter 12で他のメソッドを追加します
 
-    $books = Book::where(\'title\', \'like\', "%{$query}%")
-        ->orWhere(\'author\', \'like\', "%{$query}%")
-        ->paginate(10);
-
-    return view(\'books.index\', compact(\'books\', \'query\'));
+    public function show(Genre $genre)
+    {
+        $books = $genre->books()->with('genres')->paginate(10);
+        return view('genres.show', compact('genre', 'books'));
+    }
 }
 ```
 
-### 10.1.1. コードリーディング：メソッドチェーンの分解
+### 📖 コードリーディング：`show`メソッド
 
-```php
-$books = Book::where(\'title\', \'like\', "%{$query}%")
-    ->orWhere(\'author\', \'like\', "%{$query}%")
-    ->paginate(10);
-```
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `$request->input(\'query\')` | リクエストから`query`パラメータを取得します。 | `string\|null` | URLが`/books/search?query=Laravel`の場合、`\'Laravel\'`が取得されます。 |
-| `Book::where(\'title\', \'like\', "%{$query}%")` | `title`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `%`はワイルドカードで、任意の文字列にマッチします。 |
-| `->orWhere(\'author\', \'like\', "%{$query}%")` | または、`author`カラムに`$query`が含まれるレコードを検索します。 | `Builder` | `where`と`orWhere`はOR条件で結合されます。 |
-| `->paginate(10)` | 10件ずつページネーションします。 | `LengthAwarePaginator` | - |
-
-> **💡 ポイント: LIKE検索のワイルドカード**
-> - `%Laravel%`: 「Laravel」を含む文字列にマッチ（例: 「入門Laravel」「Laravel実践」）
-> - `Laravel%`: 「Laravel」で始まる文字列にマッチ（例: 「Laravel入門」）
-> - `%Laravel`: 「Laravel」で終わる文字列にマッチ（例: 「入門Laravel」）
-
----
-
-## 10.2. ルートの追加
-
-```php
-// routes/web.php
-
-// ... (他のルート)
-
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
-```
-
-> **⚠️ 注意: ルートの順序**
-> `/books/search`は`/books/{book}`よりも**先に**定義する必要があります。そうしないと、`search`が書籍IDとして解釈されてしまいます。
-
-```php
-// ✅ 正しい順序
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\');
-Route::resource(\'books\', BookController::class);
-
-// ❌ 間違った順序
-Route::resource(\'books\', BookController::class);
-Route::get(\'/books/search\', [BookController::class, \'search\'])->name(\'books.search\'); // 到達しない
-```
-
----
-
-## 10.3. 検索フォームの実装例
-
-ヘッダーやサイドバーに検索フォームを設置する例です。
-
-```blade
-{{-- 検索フォーム --}}
-<form action="{{ route(\'books.search\') }}" method="GET">
-    <input type="text" name="query" value="{{ $query ?? \'\' }}" placeholder="書籍を検索">
-    <button type="submit">検索</button>
-</form>
-```
-
-| 部分 | 説明 | 💡 ポイント |
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `method="GET"` | 検索はGETメソッドで行います。 | URLに検索キーワードが含まれるため、ブックマークや共有が可能になります。 |
-| `value="{{ $query ?? \'\' }}"` | 検索後も入力欄にキーワードを表示します。 | `??`はnull合体演算子で、`$query`がnullの場合は空文字を返します。 |
+| `use App\Models\Genre;` | `Genre`モデルをインポート。 | コントローラー内で`Genre`クラスを使用するために必要。 |
+| `public function show(Genre $genre)` | `show`という名前の公開メソッドを定義。引数で`Genre`モデルを受け取る。 | `(Genre $genre)`は「ルートモデルバインディング」。URLの`{genre}`の部分に対応するIDを持つ`Genre`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| `$genre->books()` | `Genre`モデルに定義した`books`リレーション（`belongsToMany`）を取得する。 | これにより、そのジャンルに属する書籍を取得するためのクエリビルダが返される。 |
+| `->with('genres')` | 書籍に紐づくジャンル情報をEagerロードする。 | N+1問題を防ぐため。各書籍のジャンルを表示する際に、追加のクエリが発生しない。 |
+| `->paginate(10)` | 10件ずつページネーションして取得する。 | 大量の書籍があっても、適切な件数で分割表示できる。 |
+| `compact('genre', 'books')` | 変数`$genre`と`$books`をビューに渡す。 | `['genre' => $genre, 'books' => $books]`と同じ意味。 |
+
+> **📝 ルート定義について**
+> ジャンル別一覧機能のルート定義も、Chapter 6で既に定義済みです。そのため、`routes/web.php`を修正する必要はありません。
 
 ---
 
-## 10.4. 検索結果の表示
+## 11.2. リレーションの流れを理解する
 
-`books.index`ビューを再利用し、検索結果を表示します。検索キーワードがある場合は、検索結果であることを示すメッセージを表示します。
+ジャンル別一覧機能では、以下のようなリレーションの流れでデータを取得しています。
 
-```blade
-{{-- 検索結果のメッセージ --}}
-@if (isset($query) && $query)
-    <p>「{{ $query }}」の検索結果: {{ $books->total() }}件</p>
-@endif
-
-{{-- 書籍一覧（既存のコード） --}}
-@foreach ($books as $book)
-    {{-- ... --}}
-@endforeach
+```
+Genre (ジャンル)
+  ↓ belongsToMany (多対多)
+Book (書籍)
+  ↓ belongsToMany (多対多) - Eagerロード
+Genre (ジャンル) ※各書籍に紐づくジャンル
 ```
 
-| 部分 | 説明 | 💡 ポイント |
+| ステップ | 処理内容 | 取得されるデータ |
 |:---|:---|:---|
-| `isset($query) && $query` | `$query`が存在し、かつ空でない場合に表示します。 | 通常の一覧表示時には表示しません。 |
-| `$books->total()` | ページネーション全体の件数を取得します。 | 現在のページの件数ではなく、検索結果全体の件数です。 |
+| 1 | `$genre->books()` | 指定されたジャンルに属する書籍のクエリビルダ |
+| 2 | `->with('genres')` | 各書籍に紐づくジャンル情報をEagerロード |
+| 3 | `->paginate(10)` | 10件ずつページネーションされた書籍コレクション |
 
-これで、検索機能の実装が完了しました。次のChapterでは、ジャンル別一覧機能を実装していきます。
+> **🧠 先輩エンジニアの思考プロセス**
+> `with('genres')`でEagerロードしているのは、書籍一覧を表示する際に「この書籍は○○、△△というジャンルに属しています」という情報を表示するためです。Eagerロードしないと、書籍ごとにジャンル取得のクエリが発行されてしまい、N+1問題が発生します。
+
+これで、ジャンル別一覧機能の実装が完了しました。次のChapterでは、ジャンル管理機能（CRUD）を実装していきます。
