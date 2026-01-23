@@ -67,7 +67,6 @@ use Illuminate\Support\Facades\Route;
 // --- 1. 具体的な名前を持つ公開ルート (最優先) ---
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
 
 // --- 2. 認証必須ルート ---
@@ -102,7 +101,7 @@ Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.sh
 
 | グループ | コード / 構文 | 解説 |
 |:---|:---|:---|
-| **1. 具体的な名前を持つ公開ルート** | `Route::get('/', ...)`<br>`Route::get('/books/search', ...)` | **最も具体的で固定的なURL**を最初に定義します。もしワイルドカードルート（例：`/books/{book}`）を先に定義してしまうと、`/books/search`へのアクセスが「`search`という名前の書籍を探している」と誤解釈されてしまいます。これを避けるため、具体的なルートは必ず先に書きます。`'/'`と`'/books'`が同じコントローラーのアクションを指しているのは、トップページと書籍一覧ページを同じものとして扱うためです。 |
+| **1. 具体的な名前を持つ公開ルート** | `Route::get('/', ...)` | **最も具体的で固定的なURL**を最初に定義します。`'/'`と`'/books'`が同じコントローラーのアクションを指しているのは、トップページと書籍一覧ページを同じものとして扱うためです。 |
 | **2. 認証必須ルート** | `Route::middleware('auth')->group(...)` | このグループ内のルートは、**ログインしているユーザーしかアクセスできません**。`auth`ミドルウェアが「門番」の役割を果たし、未ログインのユーザーをログインページにリダイレクトします。 |
 | | `Route::resource('books', ...)` | `Route::resource`は、CRUD操作に必要な7つのルートを一行で定義する便利な機能です。`except([...])`で、この中から不要なルート（今回は公開ルートとして別途定義済みの`index`と`show`）を除外しています。 |
 | | `Route::post('/books/{book}/reviews', ...)` | `Route::resource`を使わず、個別にルートを定義しています。これにより、`Route::resource`が自動生成するURL（例：`/books/{book}/reviews/{review}`）とは異なる、より直感的なURL（お気に入り登録など）を柔軟に設定できます。 |
