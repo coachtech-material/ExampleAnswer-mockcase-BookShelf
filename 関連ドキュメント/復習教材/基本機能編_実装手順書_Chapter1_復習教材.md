@@ -201,13 +201,13 @@ sail npm run dev
 
 ```yaml
     phpmyadmin:
-        image: \'phpmyadmin:latest\'
+        image: 'phpmyadmin:latest'
         ports:
-            - \'${FORWARD_PHPMYADMIN_PORT:-8080}:80\'
+            - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
         environment:
             PMA_HOST: mysql
-            PMA_USER: \'${DB_USERNAME}\'
-            PMA_PASSWORD: \'${DB_PASSWORD}\'
+            PMA_USER: '${DB_USERNAME}'
+            PMA_PASSWORD: '${DB_PASSWORD}'
         networks:
             - sail
         depends_on:
