@@ -119,14 +119,32 @@ DB_PASSWORD=password
 
 ## 1.4. フロントエンドとツールのセットアップ
 
-最後に、開発を効率化するための周辺ツールを導入します。
+ここでは、コンテナを起動し、開発を効率化するための周辺ツールを導入します。
 
-### 1.4.1. フロントエンドのセットアップ (Vite & Tailwind CSS)
+### 1.4.1. Sailの起動とエイリアス設定
+
+まず、Dockerコンテナを起動し、以降のコマンドを短く打てるように設定します。
+
+**1. Sailの起動**
+
+以下のコマンドで、compose.yamlの設計図を元にコンテナをバックグラウンドで起動します。
+
+```bash
+./vendor/bin/sail up -d
+```
+
+**2. エイリアスの設定**
+
+長いコマンドを sail という短いエイリアスで実行できるように設定します。
+
+```bash
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 1.4.2. フロントエンドのセットアップ (Vite & Tailwind CSS)
 
 **1. NPM依存パッケージのインストール**
-
-> **重要:** `sail npm install` を実行する前に、必ずSailコンテナが起動していることを確認してください。
-> コンテナが起動していない場合は、先に `./vendor/bin/sail up -d` を実行してください。
 
 ```bash
 sail npm install
@@ -175,7 +193,7 @@ openコマンドを利用してcloneしてきたファイルをGUIで移動す�
 sail npm run dev
 ```
 
-### 1.4.2. phpMyAdminの追加
+### 1.4.3. phpMyAdminの追加
 
 `compose.yaml` を開き、`mysql` サービスの後に以下の設定を追加してください。
 
@@ -196,7 +214,7 @@ sail npm run dev
             - mysql
 ```
 
-### 1.4.3. Sailの起動とエイリアス設定
+### 1.4.4. Sailの起動とエイリアス設定
 
 以下のコマンドで、`compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
 ```bash
@@ -210,7 +228,7 @@ echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
 
 これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。
 
-### 1.4.4. アプリケーションキーの生成
+### 1.4.5. アプリケーションキーの生成
 以下のコマンドで、Laravel がアプリを安全に動かすために必要な「暗号化の元になる秘密鍵（APP_KEY）」 を .env に入れておきます。
 ```php
 sail artisan key:generate
