@@ -16,7 +16,7 @@
 多くの初学者は、一つの機能（例えば「書籍の登録」）を完成させてから次の機能に取り掛かろうとします。しかし、経験豊富なエンジニアは、まずアプリケーション全体の「骨格」となる部分から組み立て始めます。これは、家を建てる際に、内装工事の前にまず土台と柱を組み上げるのと同じです。
 
 | 課題 | 解決策 | なぜこのChapterでやるのか？ |
-|:---|:---|
+|:---|:---|:---|
 | 配布されたビューには`route()`ヘルパーが多数あり、ルートが未定義だとエラーになる | **最初にすべてのルートとコントローラーを準備**する | どのページにアクセスしても`RouteNotDefined`エラーが発生しない状態を先に作ることで、ビューの表示確認をしながらスムーズに開発を進められる。 |
 | 機能ごとに行き当たりばったりで実装すると、全体像が見えなくなる | **トップダウン**で実装を進める | まず全体のURL設計（ルート）と司令塔（コントローラー）を決め、その後に各機能の詳細（ロジック）を肉付けしていくことで、一貫性のある設計を維持できる。 |
 | どこに何を書くべきか迷う | **責務の分離**を意識する | 「URLの交通整理はルート」「リクエストの検証はフォームリクエスト」「権限の確認はポリシー」「具体的な処理はコントローラー」というように、役割分担を明確にすることで、見通しが良くメンテナンスしやすいコードになる。 |
@@ -226,29 +226,22 @@ use App\Models\Genre;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
+
 class BookController extends Controller
 {
-    public function index(): View
+    public function index()
     {
         $books = Book::with("genres")->latest()->paginate(10);
         return view("books.index", compact("books"));
     }
-    public function search(Request $request): View
-    {
-        $query = $request->input("query");
-        $books = Book::where("title", "like", "%{$query}%")
-            ->orWhere("author", "like", "%{$query}%")
-            ->with("genres")
-            ->latest()
-            ->paginate(10);
-        return view("books.index", compact("books", "query"));
-    }
-    public function create(): View
+
+    public function create()
     {
         $genres = Genre::all();
         return view("books.create", compact("genres"));
     }
-    public function store(StoreBookRequest $request): RedirectResponse
+
+    public function store(StoreBookRequest $request)
     {
         $validated = $request->validated();
         $bookData = collect($validated)->except('genres')->toArray();
@@ -256,25 +249,29 @@ class BookController extends Controller
         $book->genres()->attach($validated['genres']);
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
-    public function show(Book $book): View
+
+    public function show(Book $book)
     {
         $book->load(["reviews.user", "genres"]);
         return view("books.show", compact("book"));
     }
-    public function edit(Book $book): View
+
+    public function edit(Book $book)
     {
         // $this->authorize("update", $book);
         $genres = Genre::all();
         return view("books.edit", compact("book", "genres"));
     }
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+
+    public function update(UpdateBookRequest $request, Book $book)
     {
         // $this->authorize("update", $book);
         $book->update($request->validated());
         $book->genres()->sync($request->genres);
         return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
-    public function destroy(Book $book): RedirectResponse
+
+    public function destroy(Book $book)
     {
         // $this->authorize("delete", $book);
         $book->delete();
@@ -288,7 +285,6 @@ class BookController extends Controller
 | メソッド | コード解説 |
 |:---|:---|
 | `index()` | `Book::with("genres")->latest()->paginate(10);` → `with("genres")`でN+1問題を回避しつつ、`latest()`で新しい順に並べ替え、`paginate(10)`で10件ずつページ分割して取得します。`compact("books")`でビューに`$books`変数を渡します。 |
-| `search()` | `$request->input("query")`で検索クエリを取得し、`where("title", "like", "%{$query}%")`で書籍名と著者名の部分一致検索を行います。 |
 | `create()` | `Genre::all()`で全てのジャンルを取得し、登録フォームのチェックボックスを表示するためにビューに渡します。 |
 | `store()` | `collect($validated)->except('genres')`でバリデーション済みデータから`genres`キーを除外し、`$request->user()->books()->create(...)`でログインユーザーに紐付いた書籍を作成します。`$book->genres()->attach(...)`で中間テーブルにジャンル情報を保存します。 |
 | `show()` | `$book->load(["reviews.user", "genres"]);`で、書籍情報に加えて関連するレビュー（とその投稿者）とジャンルの情報を後から読み込みます（遅延Eagerローディング）。 |
@@ -374,14 +370,14 @@ class AuthServiceProvider extends ServiceProvider
 `app/Http/Controllers/BookController.php` (変更箇所のみ)
 
 ```php
-    public function edit(Book $book): View
+    public function edit(Book $book)
     {
         $this->authorize("update", $book);
         $genres = Genre::all();
         return view("books.edit", compact("book", "genres"));
     }
 
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    public function update(UpdateBookRequest $request, Book $book)
     {
         $this->authorize("update", $book);
         $book->update($request->validated());
@@ -389,7 +385,7 @@ class AuthServiceProvider extends ServiceProvider
         return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
 
-    public function destroy(Book $book): RedirectResponse
+    public function destroy(Book $book)
     {
         $this->authorize("delete", $book);
         $book->delete();
