@@ -70,13 +70,10 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
 
     public function books()
     {
@@ -106,7 +103,7 @@ class User extends Authenticatable
 |:---|:---|:---|
 | `protected $fillable = [...]` | `name`（ユーザー名）、`email`（メールアドレス）、`password`（パスワード）の3つのカラムに対して、`create()`メソッドなどによる一括代入を許可します。これにより、ユーザー登録フォームから送られてきたデータを一度にモデルにセットして保存できます。 | `protected`は、このプロパティ（変数）がこのクラス内と、このクラスを継承したクラス内からのみアクセスできることを示すPHPのアクセス修飾子です。`$fillable`はEloquentモデルの特別なプロパティで、マスアサインメントの脆弱性を防ぐための「ホワイトリスト」として機能します。 |
 | `protected $hidden = [...]` | `password`（パスワード）と`remember_token`（ログイン維持用のトークン）を、モデルがJSONや配列形式で出力される際に自動的に隠します。これにより、APIなどでユーザー情報を返す際に、これらの機密情報が外部に漏れるのを防ぎます。 | `$hidden`もEloquentの特別なプロパティです。こちらはマスアサインメントとは逆で、意図しない情報漏洩を防ぐための「ブラックリスト」として機能します。 |
-| `protected function casts()` | `email_verified_at`カラムの値を、Laravelが提供する便利な日付操作オブジェクト（`Carbon`）に自動変換します。また、`password`カラムに値がセットされる際に、自動的に安全なハッシュ値に変換します。これにより、パスワードを生の文字列のままデータベースに保存する危険を回避できます。 | `casts()`メソッドは、データベースから取得した値を特定のデータ型に、またはデータベースに保存する値を特定の形式に自動で変換する機能を提供します。これにより、モデルは常に扱いやすいデータ型を保つことができます。 |
+|` protected $casts = [...] `| `email_verified_at` カラムの値を日付操作オブジェクト（Carbon）として扱えるように自動変換します。また、 `password` カラムに値がセットされる際に自動的にハッシュ化します。 | Laravel 10の属性キャストは `$casts` プロパティで定義します。`'password' => 'hashed'` を指定すると、モデルにパスワードを代入して保存する時に自動でハッシュ化されます。 |
 | `public function books()` | 1人のユーザーが投稿した複数の書籍（`Book`モデル）を取得するためのリレーションを定義します。このメソッドを定義することで、`$user->books`という形で簡単に関連データを取得できるようになります。 | `public`は、このメソッドがクラスの外部からでも呼び出せることを示すアクセス修飾子です。`function books()`で`books`という名前のメソッドを定義しています。`$this->hasMany(Book::class)`は、「このUserモデルは、Bookモデルを多数持っている（1対多）」という関係性をEloquentに伝えています。 |
 | `public function reviews()` | 1人のユーザーが投稿した複数のレビュー（`Review`モデル）を取得するためのリレーションを定義します。`$user->reviews`で取得できます。 | `hasMany`は「1対多」のリレーションを定義するメソッドです。`User`が「1」で、`Review`が「多」の関係になります。 |
 | `public function favoriteBooks()` | ユーザーがお気に入り登録した書籍（`Book`モデル）の一覧を取得するためのリレーションを定義します。`$user->favoriteBooks`で取得できます。 | `belongsToMany` は「多対多」のリレーションを定義します。中間テーブル `favorites` を介してデータを取得します。Laravelの命名規則（`book_user`）とは異なるテーブル名を使用しているため、第二引数でテーブル名を指定しています。 |
