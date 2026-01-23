@@ -113,7 +113,25 @@ Fortifyはデフォルトで自身の持つビューを使おうとします。�
 'views' => false,
 ```
 
-### 4.3.2. Fortifyのサービスプロバイダを登録
+### 4.3.2. ログイン後のリダイレクト先を設定
+
+ログインに成功した後の遷移先を、この後設定する `RouteServiceProvider` の定義と同期させます。
+
+`config/fortify.php` を開き、ファイルの冒頭で `RouteServiceProvider` をインポート（use）した上で、`home` の値を書き換えます。
+
+```php
+// config/fortify.php
+
+// ファイルの先頭付近（他のuse文が並んでいる場所）に追記
+use App\Providers\RouteServiceProvider;
+
+// ...
+
+// 修正箇所
+'home' => RouteServiceProvider::HOME,
+```
+
+### 4.3.3. Fortifyのサービスプロバイダを登録
 
 Fortifyをアプリケーションに正式に登録するため、`config/app.php`の`providers`配列に`FortifyServiceProvider`を追加します。
 
@@ -127,7 +145,7 @@ Fortifyをアプリケーションに正式に登録するため、`config/app.p
 ])->toArray(),
 ```
 
-### 4.3.3. Fortifyが使用するビューの指定
+### 4.3.4. Fortifyが使用するビューの指定
 
 `app/Providers/FortifyServiceProvider.php` を開き、`boot` メソッド内で、Fortifyがログイン画面や新規登録画面としてどのBladeファイルを呼び出すべきかを明示的に指定します。
 
