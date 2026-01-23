@@ -109,8 +109,8 @@ class User extends Authenticatable
 | `protected function casts()` | `email_verified_at`カラムの値を、Laravelが提供する便利な日付操作オブジェクト（`Carbon`）に自動変換します。また、`password`カラムに値がセットされる際に、自動的に安全なハッシュ値に変換します。これにより、パスワードを生の文字列のままデータベースに保存する危険を回避できます。 | `casts()`メソッドは、データベースから取得した値を特定のデータ型に、またはデータベースに保存する値を特定の形式に自動で変換する機能を提供します。これにより、モデルは常に扱いやすいデータ型を保つことができます。 |
 | `public function books()` | 1人のユーザーが投稿した複数の書籍（`Book`モデル）を取得するためのリレーションを定義します。このメソッドを定義することで、`$user->books`という形で簡単に関連データを取得できるようになります。 | `public`は、このメソッドがクラスの外部からでも呼び出せることを示すアクセス修飾子です。`function books()`で`books`という名前のメソッドを定義しています。`$this->hasMany(Book::class)`は、「このUserモデルは、Bookモデルを多数持っている（1対多）」という関係性をEloquentに伝えています。 |
 | `public function reviews()` | 1人のユーザーが投稿した複数のレビュー（`Review`モデル）を取得するためのリレーションを定義します。`$user->reviews`で取得できます。 | `hasMany`は「1対多」のリレーションを定義するメソッドです。`User`が「1」で、`Review`が「多」の関係になります。 |
-| `public function favoriteBooks()` | ユーザーがお気に入り登録した書籍（`Book`モデル）の一覧を取得するためのリレーションを定義します。`$user->favoriteBooks`で取得できます。 | `belongsToMany`は「多対多」のリレーションを定義します。`User`と`Book`の間に`favorites`という中間テーブルが存在し、両者を結びつけています。第二引数でその中間テーブル名を明示的に指定しています。 |
-| `public function likedReviews()` | ユーザーがいいねしたレビュー（`Review`モデル）の一覧を取得するためのリレーションを定義します。`$user->likedReviews`で取得できます。 | こちらも「多対多」のリレーションです。`User`と`Review`の間に`review_likes`という中間テーブルが存在します。 |
+| `public function favoriteBooks()` | ユーザーがお気に入り登録した書籍（`Book`モデル）の一覧を取得するためのリレーションを定義します。`$user->favoriteBooks`で取得できます。 | `belongsToMany` は「多対多」のリレーションを定義します。中間テーブル `favorites` を介してデータを取得します。Laravelの命名規則（`book_user`）とは異なるテーブル名を使用しているため、第二引数でテーブル名を指定しています。 |
+| `public function likedReviews()` | ユーザーがいいねしたレビュー（`Review`モデル）の一覧を取得するためのリレーションを定義します。`$user->likedReviews`で取得できます。 | こちらも「多対多」です。中間テーブル `review_likes` を使用します。「誰がどのレビューをいいねしたか」という情報を管理する専用のテーブルを介して、関連する情報を結びつけています。 |
 
 ### 3.2.2. `Book`モデル
 `app/Models/Book.php`を以下のように編集します。
@@ -167,7 +167,7 @@ class Book extends Model
 | `public function user()` | この書籍を登録したユーザー（`User`モデル）の情報を取得するためのリレーションを定義します。`$book->user`で取得できます。 | `belongsTo`は「多対1」のリレーションを定義し、`hasMany`の逆の関係を示します。`books`テーブルが持つ`user_id`カラムを元に、`users`テーブルの対応するレコードを探しに行きます。 |
 | `public function reviews()` | この書籍に投稿された複数のレビュー（`Review`モデル）を取得するためのリレーションを定義します。`$book->reviews`で取得できます。 | `Book`が「1」で、`Review`が「多」の「1対多」の関係です。 |
 | `public function genres()` | この書籍が属する複数のジャンル（`Genre`モデル）を取得するためのリレーションを定義します。`$book->genres`で取得できます。 | `belongsToMany`による「多対多」リレーションです。中間テーブル名は`book_genre`となり、Laravelの命名規則（モデル名をアルファベット順に並べてアンダースコアで繋ぐ）に従っているため、第二引数のテーブル名指定は省略できます。 |
-| `public function favoritedByUsers()` | この書籍をお気に入り登録している複数のユーザー（`User`モデル）を取得するためのリレーションを定義します。`$book->favoritedByUsers`で取得できます。 | こちらも`belongsToMany`による「多対多」リレーションです。中間テーブルとして`favorites`を指定しています。 |
+| `public function favoritedByUsers()` | この書籍をお気に入り登録している複数のユーザー（`User`モデル）を取得するためのリレーションを定義します。`$book->favoritedByUsers`で取得できます。 | こちらも`belongsToMany`による「多対多」リレーションです。命名規則（`book_user`）とは異なるテーブル名（`favorites`）を使用するため、第二引数で明示的に指定しています。 |
 
 ### 3.2.3. `Review`モデル
 
@@ -216,7 +216,7 @@ class Review extends Model
 | `protected $fillable = [...]` | `user_id`（投稿者ID）、`book_id`（対象書籍ID）、`rating`（評価点）、`comment`（コメント内容）の4つのカラムへの一括代入を許可します。 | これにより、レビュー投稿フォームからのリクエストデータを使って、`Review::create($request->all())`のようなシンプルなコードでレコードを作成できます。 |
 | `public function user()` | このレビューを投稿したユーザー（`User`モデル）の情報を取得します。`$review->user`で取得できます。 | `belongsTo`による「多対1」のリレーションです。`reviews`テーブルの`user_id`カラムを外部キーとして使用します。 |
 | `public function book()` | このレビューがどの書籍（`Book`モデル）に対するものかを取得します。`$review->book`で取得できます。 | こちらも`belongsTo`による「多対1」のリレーションです。`reviews`テーブルの`book_id`カラムを外部キーとして使用します。 |
-| `public function likedByUsers()` | このレビューに「いいね」した複数のユーザー（`User`モデル）を取得します。`$review->likedByUsers`で取得できます。 | `belongsToMany`による「多対多」のリレーションです。中間テーブルとして`review_likes`を指定しています。 |
+| `public function likedByUsers()` | このレビューに「いいね」した複数のユーザー（`User`モデル）を取得します。`$review->likedByUsers`で取得できます。 | `belongsToMany`による「多対多」のリレーションです。命名規則（`review_user`）とは異なるテーブル名（`review_likes`）を使用するため、第二引数で明示的に指定しています。|
 
 ### 3.2.4. `Genre`モデル
 
