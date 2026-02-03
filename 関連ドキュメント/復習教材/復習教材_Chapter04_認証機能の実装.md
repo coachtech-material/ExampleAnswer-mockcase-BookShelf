@@ -8,6 +8,7 @@
 - **認証ルートの構築と分割**: ログイン、登録などの認証関連ルートを`auth.php`に分離する理由と、そのメリットを学びます。
 - **Fortifyのカスタマイズ**: 設定ファイルやサービスプロバイダを調整し、自作のビューを使って認証機能を提供する方法を学びます。
 - **RouteServiceProviderの役割**: 分離したルートファイルをアプリケーションに認識させる「配線役」の重要性を理解します。
+- **型定義の活用**: ルートやサービスプロバイダ内のクロージャに戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
 
 ---
 
@@ -20,6 +21,7 @@ LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を�
 | Breeze等が提供するUIは、今回のデザインと異なる | **Laravel Fortify**を使い、認証のバックエンド処理のみを導入する | UI（Bladeファイル）は自前で用意したもの（`Preparedblade-mockcase-BookShelf`）を使い、機能だけをLaravelに任せることで、要件通りの画面と機能を両立できる。 |
 | 認証の仕組みがブラックボックス化しやすい | 認証ルートや設定を**手動で構築**する | ログイン画面がどう表示され、ログイン処理がどう実行されるのか、一連の流れをコードレベルで追うことで、認証の仕組みを深く理解できる。 |
 | ログイン後の遷移先などを柔軟に変更したい | **ServiceProvider**や設定ファイルをカスタマイズする | アプリケーションの仕様に合わせて、認証に関する様々な動作を自由に変更できるようになる。 |
+| クロージャが何を返すか分かりにくい | **戻り値の型定義**を追加する | `function (): View` のように型を明記することで、クロージャの意図が明確になり、コードの信頼性が向上する。 |
 
 Fortifyは、認証機能の「エンジン」部分だけを提供してくれるパッケージです。車のボディ（UI）は自分たちで自由にデザインし、そこに強力なエンジン（Fortify）を搭載する、というイメージを持つと分かりやすいでしょう。
 
@@ -67,16 +69,17 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
+use Illuminate\View\View;
 
 // 未ログインユーザー向けのルート
 Route::middleware("guest")->group(function () {
     // ログイン画面表示
-    Route::get("/login", function () {
+    Route::get("/login", function (): View {
         return view("auth.login");
     })->name("login");
 
     // 新規登録画面表示
-    Route::get("/register", function () {
+    Route::get("/register", function (): View {
         return view("auth.register");
     })->name("register");
 });
@@ -88,6 +91,13 @@ Route::middleware("auth")->group(function () {
         ->name("logout");
 });
 ```
+
+**🔬 コードリーディング**
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `use Illuminate\View\View;` | `View`クラスをインポートします。これにより、クロージャの戻り値の型として`View`を短い名前で指定できるようになります。 | `view()`ヘルパー関数は、`Illuminate\View\View`クラスのインスタンスを返します。この型を明記するためにインポートが必要です。 |
+| `function (): View` | このクロージャ（無名関数）が`View`オブジェクトを返すことを明示します。 | **`: View`が戻り値の型定義です。** これにより、このルートにアクセスすると必ずビューが返されることがコード上から明確に分かり、意図しない型の値（例えば`string`や`null`）が返されるといったバグを防ぎやすくなります。 |
 
 > **💡 ポイント**
 > この`auth.php`ファイルは、このままではアプリケーションに認識されません。次のステップで`RouteServiceProvider`から読み込む設定を追加します。この時点ではファイルを作成するだけで問題ありません。
@@ -152,6 +162,7 @@ Fortifyをアプリケーションに正式に登録するため、`config/app.p
 ```php
 // app/Providers/FortifyServiceProvider.php
 
+use Illuminate\View\View;
 use Laravel\Fortify\Fortify;
 
 // ...
@@ -159,12 +170,20 @@ use Laravel\Fortify\Fortify;
 public function boot(): void
 {
     // Fortifyに、ログイン画面として `auth.login` ビューを使うよう指示
-    Fortify::loginView(fn () => view("auth.login"));
+    Fortify::loginView(fn (): View => view("auth.login"));
 
     // Fortifyに、新規登録画面として `auth.register` ビューを使うよう指示
-    Fortify::registerView(fn () => view("auth.register"));
+    Fortify::registerView(fn (): View => view("auth.register"));
 }
 ```
+
+**🔬 コードリーディング**
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `use Illuminate\View\View;` | `View`クラスをインポートします。 | `auth.php`と同様に、アロー関数の戻り値の型として`View`を指定するために必要です。 |
+| `public function boot(): void` | この`boot`メソッドが値を返さない（`void`）ことを示します。サービスプロバイダの`boot`メソッドは、他のすべてのサービスプロバイダが登録された後に実行される初期化処理を記述する場所であり、通常は値を返す必要がありません。 | 戻り値の型を`void`と明記することで、このメソッドの役割が「設定処理」に限定されていることが明確になります。 |
+| `fn (): View => view("auth.login")` | Fortifyがログインビューを要求した際に、`auth.login`ビューを返すアロー関数を定義しています。 | **`fn ()`** はPHP 7.4から導入されたアロー関数構文で、`function () { ... }` をより簡潔に書くためのものです。ここでも **`: View`** を使って戻り値の型を明示することで、この関数が`View`オブジェクトを返すことを保証しています。 |
 
 ---
 
