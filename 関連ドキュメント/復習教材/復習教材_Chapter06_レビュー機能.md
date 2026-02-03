@@ -1,4 +1,3 @@
-
 # Chapter 6: レビュー機能
 
 このChapterでは、書籍に対してレビュー（評価とコメント）を投稿・編集・削除できる機能を実装します。書籍という「親」のデータに紐付く「子」のデータ（レビュー）をどう扱うかがポイントです。
@@ -163,11 +162,13 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class ReviewController extends Controller
 {
-    public function store(StoreReviewRequest $request, Book $book)
+    public function store(StoreReviewRequest $request, Book $book): RedirectResponse
     {
         $book->reviews()->create([
             'user_id' => Auth::id(),
@@ -178,13 +179,13 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
 
-    public function edit(Review $review)
+    public function edit(Review $review): View
     {
         $this->authorize('update', $review);
         return view('reviews.edit', compact('review'));
     }
 
-    public function update(UpdateReviewRequest $request, Review $review)
+    public function update(UpdateReviewRequest $request, Review $review): RedirectResponse
     {
         $this->authorize('update', $review);
         $review->update([
@@ -195,7 +196,7 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
     }
 
-    public function destroy(Review $review)
+    public function destroy(Review $review): RedirectResponse
     {
         $this->authorize('delete', $review);
         $book = $review->book;
@@ -273,7 +274,7 @@ touch resources/views/reviews/edit.blade.php
 ```
 
 > **【学習のポイント】**
-> `@can('update', $review)いうBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
+> `@can('update', $review)`というBladeディレクティブに注目してください。これは`ReviewPolicy`の`update`メソッドを呼び出し、認可がある場合のみ内部のHTML（編集ボタン）を表示します。これにより、コントローラーだけでなくビュー層でも認可チェックが簡単に行えます。
 
 ---
 
@@ -286,4 +287,3 @@ touch resources/views/reviews/edit.blade.php
 5.  削除ボタンを押し、レビューが一覧から消えることを確認します。
 
 これで、レビュー機能の実装が完了しました。
-'''

@@ -55,6 +55,8 @@ sail artisan make:model Genre
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -99,7 +101,7 @@ class User extends Authenticatable
     /**
      * このユーザーが登録した書籍。（1対多）
      */
-    public function books()
+    public function books(): HasMany
     {
         return $this->hasMany(Book::class);
     }
@@ -107,7 +109,7 @@ class User extends Authenticatable
     /**
      * このユーザーが投稿したレビュー。（1対多）
      */
-    public function reviews()
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
@@ -115,7 +117,7 @@ class User extends Authenticatable
     /**
      * このユーザーがお気に入りに登録した書籍。（多対多）
      */
-    public function favoriteBooks()
+    public function favoriteBooks(): BelongsToMany
     {
         // 第2引数で中間テーブル名を指定
         return $this->belongsToMany(Book::class, 'favorites');
@@ -124,7 +126,7 @@ class User extends Authenticatable
     /**
      * このユーザーがいいねしたレビュー。（多対多）
      */
-    public function likedReviews()
+    public function likedReviews(): BelongsToMany
     {
         // 第2引数で中間テーブル名を指定
         return $this->belongsToMany(Review::class, 'review_likes');
@@ -141,6 +143,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Book extends Model
 {
@@ -149,7 +154,7 @@ class Book extends Model
     /**
      * マスアサインメント可能な属性。
      *
-     * @var array
+     * @var array<int, string>
      */
     protected $fillable = [
         "user_id",
@@ -164,7 +169,7 @@ class Book extends Model
     /**
      * この書籍を登録したユーザー。（多対1）
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
@@ -172,7 +177,7 @@ class Book extends Model
     /**
      * この書籍に紐付くレビュー。（1対多）
      */
-    public function reviews()
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
@@ -180,7 +185,7 @@ class Book extends Model
     /**
      * この書籍が属するジャンル。（多対多）
      */
-    public function genres()
+    public function genres(): BelongsToMany
     {
         return $this->belongsToMany(Genre::class);
     }
@@ -188,7 +193,7 @@ class Book extends Model
     /**
      * この書籍をお気に入りに登録しているユーザー。（多対多）
      */
-    public function favoritedByUsers()
+    public function favoritedByUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'favorites');
     }
@@ -207,6 +212,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Review extends Model
 {
@@ -217,7 +224,7 @@ class Review extends Model
     /**
      * このレビューを投稿したユーザー。（多対1）
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
@@ -225,7 +232,7 @@ class Review extends Model
     /**
      * このレビューが紐付く書籍。（多対1）
      */
-    public function book()
+    public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
     }
@@ -233,7 +240,7 @@ class Review extends Model
     /**
      * このレビューをいいねしたユーザー。（多対多）
      */
-    public function likedByUsers()
+    public function likedByUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'review_likes');
     }
@@ -249,6 +256,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Genre extends Model
 {
@@ -259,7 +267,7 @@ class Genre extends Model
     /**
      * このジャンルに属する書籍。（多対多）
      */
-    public function books()
+    public function books(): BelongsToMany
     {
         return $this->belongsToMany(Book::class);
     }
