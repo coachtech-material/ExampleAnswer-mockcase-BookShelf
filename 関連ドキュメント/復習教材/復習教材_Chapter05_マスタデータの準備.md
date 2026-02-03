@@ -8,6 +8,7 @@
 - **複数Seederの作成**: `make:seeder`コマンドを使い、リソースごとにSeederファイルを作成します。
 - **Seederの実装**: `run`メソッド内に、`User`や`Book`モデルを使って実際にデータを作成するロジックを記述します。
 - **Seederの実行と依存関係**: `DatabaseSeeder`を使って複数のSeederを正しい順序で実行する方法と、`migrate:fresh --seed`コマンドの便利な使い方を学びます。
+- **型定義の活用**: Seeder内のアロー関数に型定義を追加し、データ変換処理の意図を明確にします。
 
 ---
 
@@ -20,6 +21,7 @@
 | 機能テストのたびに手動でデータを登録するのが面倒 | **Seeder**を使って、コマンド一つで必要な初期データを全て投入できるようにする | `migrate:fresh --seed`を実行するだけで、いつでも「まっさら」で「データが揃った」状態からテストを開始できる。開発効率が劇的に向上する。 |
 | 複数人で開発する際に、各自のローカル環境のデータがバラバラになる | 全員が同じSeederを共有する | 開発者全員が同じデータセットを元に開発を進めることができ、「自分の環境では動いたのに」といった問題を減らせる。 |
 | どんなデータが必要だったか忘れてしまう | Seederファイルを見れば、どのような初期データが使われているか一目瞭然 | Seederは「動く仕様書」としての役割も果たし、アプリケーションが必要とするデータの構造を明確にする。 |
+| データ変換の意図が分かりにくい | **アロー関数に型定義**を追加する | `fn(int $i): int` のように型を明記することで、インデックスをIDに変換している、といった処理の意図が明確になる。 |
 
 Seederは、レストランを開店する前の「仕込み」作業に似ています。お客様（ユーザー）が来店したときにすぐに料理（機能）を提供できるよう、あらかじめ野菜を切ったり（ユーザー登録）、スープのベースを作ったり（ジャンル登録）しておくことで、本番の作業がスムーズに進むのです。
 
@@ -275,8 +277,8 @@ class BookSeeder extends Seeder
         }
     }
 }
-
 ```
+
 ### 5.2.4. ReviewSeeder
 
 作成された `database/seeders/ReviewSeeder.php` を開き、`run` メソッドに初期ジャンルを登録する処理を記述します。  
@@ -307,7 +309,6 @@ class ReviewSeeder extends Seeder
             ['book_index' => 1, 'user_index' => 0, 'rating' => 5, 'comment' => 'ビジネスパーソン必読の一冊。人間関係の基本が学べます。'],
             ['book_index' => 1, 'user_index' => 2, 'rating' => 4, 'comment' => '具体的な事例が豊富で実践しやすい内容です。'],
             ['book_index' => 1, 'user_index' => 3, 'rating' => 5, 'comment' => '何度も読み返しています。読むたびに新しい気づきがあります。'],
-            ['book_index' => 1, 'user_index' => 4, 'rating' => 4, 'comment' => '古い本ですが、内容は今でも十分通用します。'],
             
             // リーダブルコード
             ['book_index' => 2, 'user_index' => 0, 'rating' => 5, 'comment' => 'エンジニア必読！コードの可読性について深く考えさせられました。'],
@@ -372,7 +373,7 @@ class ReviewSeeder extends Seeder
 }
 ```
 
-### 5.2.4. FavoriteSeeder
+### 5.2.5. FavoriteSeeder
 
 作成された `database/seeders/FavoriteSeeder.php` を開き、`run` メソッドに初期ジャンルを登録する処理を記述します。  
 ```php
@@ -407,14 +408,22 @@ class FavoriteSeeder extends Seeder
 
         foreach ($favorites as $favoriteData) {
             $user = $users[$favoriteData['user_index']];
-            $bookIds = collect($favoriteData['book_indices'])->map(fn($i) => $books[$i]->id)->toArray();
+            $bookIds = collect($favoriteData['book_indices'])
+                ->map(fn(int $i): int => $books[$i]->id)
+                ->toArray();
             $user->favoriteBooks()->syncWithoutDetaching($bookIds);
         }
     }
 }
 ```
 
-### 5.2.4. ReviewLikeSeeder
+**🔬 コードリーディング**
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `fn(int $i): int` | アロー関数の引数`$i`が整数(`int`)であり、戻り値も整数(`int`)であることを明示します。 | ここでの`$i`は`book_indices`配列の各要素（書籍のインデックス番号）を指します。`map`メソッドはこのインデックス番号を受け取り、対応する書籍のID（`$books[$i]->id`）を返します。引数と戻り値の両方に型を定義することで、「書籍のインデックス番号の配列を、書籍IDの配列に変換する」という処理の意図がコード上から明確になります。 |
+
+### 5.2.6. ReviewLikeSeeder
 
 作成された `database/seeders/ReviewLikeSeeder.php` を開き、`run` メソッドに初期ジャンルを登録する処理を記述します。  
 ```php
