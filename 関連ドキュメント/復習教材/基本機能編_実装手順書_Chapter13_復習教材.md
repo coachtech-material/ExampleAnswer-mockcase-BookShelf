@@ -4,46 +4,52 @@
 
 ## 🎯 このセクションで学ぶこと
 
-- PHPUnitを使ったFeatureテストの基本
-- Laravelのテストヘルパーの使い方
-- 認証が必要な機能のテスト方法
-- データベースを使ったテストの書き方
+- PHPUnitを使った**Unitテスト**と**Featureテスト**の基本
+- Laravelのテストヘルパーとアサーションメソッドの活用
+- **モデルのリレーションシップ**を検証するUnitテスト
+- **CRUD操作**（作成、読み取り、更新、削除）を網羅するFeatureテスト
+- **認証**・**認可**（ポリシー）が必要な機能のテスト
+- **バリデーション**ルールを検証するテスト
+- テスト用のダミーデータを生成する**ファクトリ**の作り方と使い方
 
 ---
 
 ## 🧠 先輩エンジニアの思考プロセス
 
-### なぜテストを書くのか
+### なぜテストを書くのか？
 
-実装が完了したら、次に考えるべきは「この機能が正しく動作することをどう保証するか」です。手動でブラウザを操作して確認することもできますが、機能が増えるたびに確認作業が膨大になります。
+実装が完了したら、次に考えるべきは「**このアプリケーションが仕様通りに、そして安定して動作することをどう保証するか**」です。手動でブラウザをポチポチとクリックして確認することもできますが、機能が増え、アプリケーションが複雑になるにつれて、その確認作業は膨大かつ非効率になります。一度確認した機能が、新しい機能を追加したことで壊れてしまう「**デグレード**」も頻繁に発生します。
 
-テストコードを書くことで、以下のメリットが得られます：
+そこで「**テストコード**」の出番です。テストコードは「コードでコードをテストする」仕組みであり、一度書いてしまえば、コマンド一つで何度でも一瞬でアプリケーション全体の動作を検証できます。
 
 | メリット | 説明 |
 |:---|:---|
-| **回帰テストの自動化** | 新機能を追加しても、既存機能が壊れていないことを自動で確認できる |
-| **リファクタリングの安心感** | コードを改善しても、テストが通れば動作が保証される |
-| **仕様のドキュメント化** | テストコードを読めば、その機能が何をすべきかが分かる |
-| **バグの早期発見** | 開発中にバグを発見でき、本番環境でのトラブルを防げる |
+| **品質の保証と回帰テストの自動化** | 新機能を追加したり、既存のコードを修正（リファクタリング）したりしても、既存の機能が壊れていないこと（デグレードしていないこと）を自動で確認できます。これにより、常に安定した品質を保つことができます。 |
+| **リファクタリングの安心感** | 「このコード、もっと綺麗に書けるな」と思っても、変更による影響範囲が分からず、修正をためらうことがあります。テストがあれば、修正後もテストが通ることを確認するだけで、動作が保証されるという安心感が得られます。 |
+| **生きたドキュメント** | テストコードを読めば、その機能が「何をすべきか」「どのような入力に対して、どのような出力を期待しているか」という**仕様**が明確に分かります。仕様書が古くなることはあっても、テストコードは常に最新の仕様を反映した「生きたドキュメント」になります。 |
+| **バグの早期発見** | 開発の早い段階でバグを発見できます。本番環境でユーザーがバグに遭遇してから慌てて修正するよりも、開発中に発見して修正する方が、はるかにコストもリスクも低くなります。 |
 
-### テストの種類
+### テストの種類：Unitテスト vs Featureテスト
 
-Laravelでは主に2種類のテストを書きます：
+Laravelでは主に2種類のテストを書きます。今回はその両方を実装します。
 
-| 種類 | 説明 | 配置場所 |
-|:---|:---|:---|
-| **Unitテスト** | 個々のクラスやメソッドを単体でテスト | `tests/Unit/` |
-| **Featureテスト** | HTTPリクエストを通じて機能全体をテスト | `tests/Feature/` |
+| 種類 | テスト対象 | 説明 | 配置場所 |
+|:---|:---|:---|:---|
+| **Unitテスト (単体テスト)** | 個々のクラスやメソッド | アプリケーションの小さな部品（例えば、モデルのリレーションシップ定義など）が正しく機能するかを個別にテストします。他の部品から隔離してテストするため、高速に実行できます。 | `tests/Unit/` |
+| **Featureテスト (機能テスト)** | HTTPリクエストを通じた機能全体 | 実際のユーザー操作を模倣し、HTTPリクエストを送信してからレスポンスが返ってくるまでの一連の流れをテストします。複数のコンポーネント（コントローラー、モデル、ビューなど）が連携して正しく動作するかを確認します。 | `tests/Feature/` |
 
-今回は、実際のユーザー操作に近い**Featureテスト**を中心に学びます。
+> **💡 テスト戦略**
+> 一般的には、アプリケーションの安定性を確保するために、**Featureテストで主要な機能の正常系・異常系のシナリオを網羅**しつつ、**Unitテストでモデルの複雑なロジックや重要なメソッドを個別にテスト**する、という組み合わせが効果的です。
 
 ---
 
-## 13.1. テスト環境の確認
+## 13.1. テスト環境の準備
 
 ### テスト用データベースの設定
 
-Laravelでは、テスト実行時に本番データベースとは別のデータベースを使用します。`phpunit.xml`に以下の設定があることを確認してください：
+Laravelは、テスト実行時に本番のデータベースを汚さないよう、別のデータベースを使用する仕組みがデフォルトで備わっています。
+
+まず、プロジェクトのルートにある`phpunit.xml`ファイルを確認してください。このファイルはPHPUnitの設定ファイルです。
 
 ```xml
 <!-- phpunit.xml -->
@@ -51,7 +57,9 @@ Laravelでは、テスト実行時に本番データベースとは別のデー�
     <env name="APP_ENV" value="testing"/>
     <env name="BCRYPT_ROUNDS" value="4"/>
     <env name="CACHE_DRIVER" value="array"/>
-    <env name="DB_DATABASE" value="testing"/>
+    <!-- ↓ この2行に注目！ -->
+    <env name="DB_CONNECTION" value="sqlite"/>
+    <env name="DB_DATABASE" value=":memory:"/>
     <env name="MAIL_MAILER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SESSION_DRIVER" value="array"/>
@@ -59,38 +67,319 @@ Laravelでは、テスト実行時に本番データベースとは別のデー�
 </php>
 ```
 
-> **💡 ポイント**
-> 
-> `DB_DATABASE` が `testing` に設定されているため、テスト実行時は `testing` データベースが使用されます。これにより、本番データが影響を受けることはありません。
+> **💡 ポイント：インメモリデータベース**
+> `DB_CONNECTION` を `sqlite` に、`DB_DATABASE` を `:memory:` に設定することで、テスト実行時に**インメモリデータベース**が使用されます。これは、実際のファイルではなく、コンピュータのメモリ上に一時的にデータベースを構築する方式です。ディスクI/Oが発生しないため、**テストが非常に高速に実行できる**という大きなメリットがあります。
 
-### テストの実行方法
+### RefreshDatabase トレイト
 
-テストは以下のコマンドで実行します：
+各テストクラスで使用する `use RefreshDatabase;` は、Laravelが提供する非常に便利なトレイトです。これを使用すると、**各テストメソッドが実行される前に、データベースが自動的にリセット**されます。具体的には、マイグレーションが実行され、テーブルが再作成されます。これにより、前のテストで作成されたデータが後のテストに影響を与えることを防ぎ、各テストをクリーンな状態で実行できます。
+
+---
+
+## 13.2. ファクトリの準備
+
+テストを実行するには、前提となるデータ（ユーザー、書籍、レビューなど）が必要です。毎回手動でデータを作成するのは大変なので、Laravelでは**ファクトリ**という仕組みを使って、テスト用のダミーデータを簡単に生成できます。
+
+以下のコマンドで、各モデルに対応するファクトリを作成します。
 
 ```bash
-# 全てのテストを実行
-sail artisan test
+sail artisan make:factory GenreFactory --model=Genre
+sail artisan make:factory BookFactory --model=Book
+sail artisan make:factory ReviewFactory --model=Review
+```
 
-# 特定のテストファイルを実行
-sail artisan test tests/Feature/BookTest.php
+作成されたファクトリファイルを、以下のように編集します。
 
-# 特定のテストメソッドを実行
-sail artisan test --filter=test_user_can_create_book
+### GenreFactory.php
+
+`database/factories/GenreFactory.php`
+
+```php
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Genre;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+class GenreFactory extends Factory
+{
+    protected $model = Genre::class;
+
+    public function definition(): array
+    {
+        return [
+            'name' => fake()->unique()->words(2, true),
+        ];
+    }
+}
+```
+
+- `fake()->unique()->words(2, true)`: Fakerライブラリを使い、ユニーク（重複しない）な2つの単語からなるジャンル名を生成します。
+
+### BookFactory.php
+
+`database/factories/BookFactory.php`
+
+```php
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Book;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+class BookFactory extends Factory
+{
+    protected $model = Book::class;
+
+    public function definition(): array
+    {
+        return [
+            'user_id' => User::factory(),
+            'title' => fake()->sentence(3),
+            'author' => fake()->name(),
+            'isbn' => fake()->unique()->numerify(str_repeat('#', 13)),
+            'published_date' => fake()->date(),
+            'description' => fake()->paragraph(),
+            'image_url' => fake()->url(),
+        ];
+    }
+}
+```
+
+- `User::factory()`: この書籍を所有する`User`モデルも同時に作成します。
+- `fake()->unique()->numerify('#############')`: ユニークな13桁の数字（ISBN）を生成します。
+
+### ReviewFactory.php
+
+`database/factories/ReviewFactory.php`
+
+```php
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\
+Database\Eloquent\Factories\Factory;
+
+class ReviewFactory extends Factory
+{
+    protected $model = Review::class;
+
+    public function definition(): array
+    {
+        return [
+            'user_id' => User::factory(),
+            'book_id' => Book::factory(),
+            'rating' => fake()->numberBetween(1, 5),
+            'comment' => fake()->sentence(),
+        ];
+    }
+}
+```
+
+- `fake()->numberBetween(1, 5)`: 1から5までのランダムな整数（評価）を生成します。
+
+---
+
+## 13.3. Unitテスト：モデルのリレーションシップ
+
+最初に、アプリケーションの心臓部であるモデルのリレーションシップが正しく定義されているかを確認するUnitテストを作成します。
+
+### UserModelTest
+
+ユーザーが書籍、レビュー、お気に入り、いいねを正しく関連付けられるかテストします。
+
+`tests/Unit/UserModelTest.php`
+
+```php
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class UserModelTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_relationships_are_defined(): void
+    {
+        // 1. Arrange (準備)
+        $user = User::factory()->create();
+        $ownedBook = Book::factory()->for($user)->create();
+        $ownedReview = Review::factory()->for($ownedBook)->for($user)->create();
+        $favoriteBook = Book::factory()->create();
+        $user->favoriteBooks()->attach($favoriteBook->id);
+        $likedReview = Review::factory()->create();
+        $user->likedReviews()->attach($likedReview->id);
+
+        // 2. Assert (検証)
+        $this->assertTrue($user->books->contains($ownedBook));
+        $this->assertTrue($user->reviews->contains($ownedReview));
+        $this->assertTrue($user->favoriteBooks->contains($favoriteBook));
+        $this->assertTrue($user->likedReviews->contains($likedReview));
+    }
+}
+```
+
+### BookModelTest
+
+書籍がユーザー、レビュー、ジャンル、お気に入りを正しく関連付けられるかテストします。
+
+`tests/Unit/BookModelTest.php`
+
+```php
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class BookModelTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_book_relationships_are_defined(): void
+    {
+        // 1. Arrange (準備)
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $review = Review::factory()->for($book)->for($user)->create();
+        $book->genres()->attach($genre);
+        $book->favoritedByUsers()->attach($user->id);
+
+        // 2. Assert (検証)
+        $this->assertTrue($book->user->is($user));
+        $this->assertTrue($book->reviews->contains($review));
+        $this->assertTrue($book->genres->contains($genre));
+        $this->assertTrue($book->favoritedByUsers->contains($user));
+    }
+}
+```
+
+### ReviewModelTest
+
+レビューがユーザー、書籍、いいねを正しく関連付けられるかテストします。
+
+`tests/Unit/ReviewModelTest.php`
+
+```php
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ReviewModelTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_review_relationships_are_defined(): void
+    {
+        // 1. Arrange (準備)
+        $author = User::factory()->create();
+        $book = Book::factory()->for($author)->create();
+        $review = Review::factory()->for($book)->for($author)->create();
+        $liker = User::factory()->create();
+        $review->likedByUsers()->attach($liker->id);
+
+        // 2. Assert (検証)
+        $this->assertTrue($review->user->is($author));
+        $this->assertTrue($review->book->is($book));
+        $this->assertTrue($review->likedByUsers->contains($liker));
+    }
+}
 ```
 
 ---
 
-## 13.2. 書籍機能のテスト
+## 13.4. Featureテスト：各機能の振る舞い
 
-### テストファイルの作成
+次に、ユーザーの操作を模倣して、各機能が全体として正しく動作するかを検証するFeatureテストを作成します。
 
-```bash
-sail artisan make:test BookTest
+### 認可（Policy）の有効化
+
+Featureテストで認可（Policy）のテストを行う前に、コメントアウトされている`authorize`メソッドを有効化します。
+
+`app/Http/Controllers/BookController.php`
+
+```php
+// ...
+    public function edit(Book $book): View
+    {
+        $this->authorize("update", $book); // コメントを解除
+        $genres = Genre::all();
+        return view("books.edit", compact("book", "genres"));
+    }
+
+    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    {
+        $this->authorize("update", $book); // コメントを解除
+        // ...
+    }
+
+    public function destroy(Book $book): RedirectResponse
+    {
+        $this->authorize("delete", $book); // コメントを解除
+        // ...
+    }
+// ...
 ```
 
-このコマンドで `tests/Feature/BookTest.php` が作成されます。
+また、`AuthServiceProvider`にPolicyが正しく登録されていることを確認します。
 
-### BookTest.php の実装
+`app/Providers/AuthServiceProvider.php`
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Policies\BookPolicy;
+use App\Policies\ReviewPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+        Review::class => ReviewPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        //
+    }
+}
+```
+
+### BookTest (書籍管理機能)
+
+書籍のCRUD操作、検索、認可などをテストします。
+
+`tests/Feature/BookTest.php`
 
 ```php
 <?php
@@ -107,128 +396,128 @@ class BookTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * 書籍一覧ページが表示できることをテスト
-     */
+    // 書籍一覧ページが表示される
     public function test_book_index_page_can_be_rendered(): void
     {
-        $response = $this->get(route('books.index'));
-
-        $response->assertStatus(200);
+        Book::factory()->count(2)->create();
+        $this->get(route('books.index'))->assertOk();
     }
 
-    /**
-     * 認証済みユーザーが書籍を登録できることをテスト
-     */
+    // 書籍検索が機能する
+    public function test_book_search_returns_matching_results(): void
+    {
+        Book::factory()->create(['title' => 'Laravel Testing Guide']);
+        Book::factory()->create(['title' => 'Another Book']);
+
+        $this->get(route('books.search', ['query' => 'Laravel']))
+            ->assertOk()
+            ->assertSee('Laravel Testing Guide')
+            ->assertDontSee('Another Book');
+    }
+
+    // 認証済みユーザーは登録フォームを表示できる
+    public function test_authenticated_user_can_view_create_form(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user)->get(route('books.create'))->assertOk();
+    }
+
+    // 未認証ユーザーは登録フォームを表示できない
+    public function test_guest_cannot_view_create_form(): void
+    {
+        $this->get(route('books.create'))->assertRedirect(route('login'));
+    }
+
+    // 認証済みユーザーは書籍を登録できる
     public function test_authenticated_user_can_create_book(): void
     {
-        // テスト用のユーザーとジャンルを作成
         $user = User::factory()->create();
-        $genre = Genre::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
+        $payload = $this->validBookData(['genres' => $genres->pluck('id')->toArray()]);
 
-        // ユーザーとしてログイン
-        $response = $this->actingAs($user)->post(route('books.store'), [
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'description' => 'これはテスト用の書籍です。',
-            'genres' => [$genre->id],
-        ]);
+        $response = $this->actingAs($user)->post(route('books.store'), $payload);
 
-        // リダイレクトされることを確認
-        $response->assertRedirect(route('books.index'));
-
-        // データベースに書籍が登録されていることを確認
-        $this->assertDatabaseHas('books', [
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'user_id' => $user->id,
-        ]);
+        $book = Book::first();
+        $this->assertNotNull($book);
+        $response->assertRedirect(route('books.show', $book));
+        $this->assertDatabaseHas('books', ['title' => $payload['title']]);
+        $this->assertTrue($book->genres->contains($genres[0]));
     }
 
-    /**
-     * 未認証ユーザーは書籍を登録できないことをテスト
-     */
-    public function test_guest_cannot_create_book(): void
+    // 書籍登録時のバリデーションが機能する
+    public function test_book_store_validation_errors(): void
     {
-        $genre = Genre::factory()->create();
-
-        $response = $this->post(route('books.store'), [
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'description' => 'これはテスト用の書籍です。',
-            'genres' => [$genre->id],
-        ]);
-
-        // ログインページにリダイレクトされることを確認
-        $response->assertRedirect(route('login'));
+        $user = User::factory()->create();
+        $this->actingAs($user)->post(route('books.store'), ['title' => ''])
+            ->assertSessionHasErrors(['title', 'author', 'isbn', 'published_date', 'genres']);
     }
 
-    /**
-     * 書籍の所有者のみが編集できることをテスト
-     */
-    public function test_only_owner_can_edit_book(): void
+    // 書籍詳細ページが表示される
+    public function test_book_show_page_can_be_rendered(): void
     {
-        $owner = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $book = Book::factory()->create(['user_id' => $owner->id]);
-
-        // 所有者は編集ページにアクセスできる
-        $response = $this->actingAs($owner)->get(route('books.edit', $book));
-        $response->assertStatus(200);
-
-        // 他のユーザーは編集ページにアクセスできない（403 Forbidden）
-        $response = $this->actingAs($otherUser)->get(route('books.edit', $book));
-        $response->assertStatus(403);
+        $book = Book::factory()->create(['title' => 'Detail Book']);
+        $this->get(route('books.show', $book))->assertOk()->assertSee('Detail Book');
     }
 
-    /**
-     * 書籍の所有者のみが削除できることをテスト
-     */
-    public function test_only_owner_can_delete_book(): void
+    // 認証済みユーザーは書籍を更新できる
+    public function test_authenticated_user_can_update_book(): void
     {
-        $owner = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $book = Book::factory()->create(['user_id' => $owner->id]);
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $newGenres = Genre::factory()->count(2)->create();
+        $payload = $this->validBookData(['title' => 'Updated Title', 'genres' => $newGenres->pluck('id')->toArray()]);
 
-        // 他のユーザーは削除できない
-        $response = $this->actingAs($otherUser)->delete(route('books.destroy', $book));
-        $response->assertStatus(403);
+        $this->actingAs($user)->put(route('books.update', $book), $payload)
+            ->assertRedirect(route('books.show', $book));
 
-        // 所有者は削除できる
-        $response = $this->actingAs($owner)->delete(route('books.destroy', $book));
-        $response->assertRedirect(route('books.index'));
+        $this->assertDatabaseHas('books', ['title' => 'Updated Title']);
+        $this->assertTrue($book->fresh()->genres->contains($newGenres[0]));
+    }
 
-        // データベースから削除されていることを確認
+    // 認証済みユーザーは書籍を削除できる
+    public function test_authenticated_user_can_delete_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $this->actingAs($user)->delete(route('books.destroy', $book))
+            ->assertRedirect(route('books.index'));
+
         $this->assertDatabaseMissing('books', ['id' => $book->id]);
+    }
+
+    // 所有者のみが編集フォームを表示できる（認可テスト）
+    public function test_only_owner_can_view_edit_form(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($owner)->get(route('books.edit', $book))->assertOk();
+        $this->actingAs($otherUser)->get(route('books.edit', $book))->assertForbidden();
+    }
+
+    // テストデータ生成用のヘルパーメソッド
+    private function validBookData(array $overrides = []): array
+    {
+        return array_merge([
+            'title' => 'Sample Book',
+            'author' => 'Sample Author',
+            'isbn' => fake()->unique()->numerify(str_repeat('#', 13)),
+            'published_date' => '2024-01-01',
+            'description' => 'Sample description',
+            'image_url' => 'https://example.com/image.jpg',
+            'genres' => Genre::factory()->create()->pluck('id')->toArray(),
+        ], $overrides);
     }
 }
 ```
 
-### 📖 コードリーディング：テストメソッドの解説
+### ReviewTest (レビュー機能)
 
-| コード | 説明 | 役割 |
-|:---|:---|:---|
-| `use RefreshDatabase` | トレイトの使用 | 各テスト実行前にデータベースをリセットし、マイグレーションを実行する |
-| `User::factory()->create()` | ファクトリの使用 | テスト用のユーザーをデータベースに作成する |
-| `$this->actingAs($user)` | 認証のシミュレート | 指定したユーザーとしてログインした状態でリクエストを送信する |
-| `$this->get(route('...'))` | GETリクエスト | 指定したルートにGETリクエストを送信する |
-| `$this->post(route('...'), [...])` | POSTリクエスト | 指定したルートにPOSTリクエストとデータを送信する |
-| `$response->assertStatus(200)` | ステータスコードの検証 | レスポンスのHTTPステータスコードが200であることを確認する |
-| `$response->assertRedirect(...)` | リダイレクトの検証 | 指定したURLにリダイレクトされることを確認する |
-| `$this->assertDatabaseHas(...)` | データベースの検証 | 指定したテーブルに指定したデータが存在することを確認する |
-| `$this->assertDatabaseMissing(...)` | データベースの検証 | 指定したテーブルに指定したデータが存在しないことを確認する |
+レビューの投稿、更新、削除、認可などをテストします。
 
----
-
-## 13.3. レビュー機能のテスト
-
-### テストファイルの作成
-
-```bash
-sail artisan make:test ReviewTest
-```
-
-### ReviewTest.php の実装
+`tests/Feature/ReviewTest.php`
 
 ```php
 <?php
@@ -245,304 +534,128 @@ class ReviewTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * 認証済みユーザーがレビューを投稿できることをテスト
-     */
+    // 認証済みユーザーはレビューを投稿できる
     public function test_authenticated_user_can_create_review(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
 
-        $response = $this->actingAs($user)->post(route('books.reviews.store', $book), [
-            'rating' => 5,
-            'comment' => 'とても良い本でした！',
-        ]);
+        $this->actingAs($user)->post(route('reviews.store', $book), ['rating' => 5, 'comment' => 'Great read'])
+            ->assertRedirect(route('books.show', $book));
 
-        $response->assertRedirect(route('books.show', $book));
-
-        $this->assertDatabaseHas('reviews', [
-            'book_id' => $book->id,
-            'user_id' => $user->id,
-            'rating' => 5,
-            'comment' => 'とても良い本でした！',
-        ]);
+        $this->assertDatabaseHas('reviews', ['user_id' => $user->id, 'book_id' => $book->id, 'rating' => 5]);
     }
 
-    /**
-     * レビューの所有者のみが編集できることをテスト
-     */
+    // 未認証ユーザーはレビューを投稿できない
+    public function test_guest_cannot_create_review(): void
+    {
+        $book = Book::factory()->create();
+        $this->post(route('reviews.store', $book), ['rating' => 4])->assertRedirect(route('login'));
+    }
+
+    // レビュー投稿時のバリデーションが機能する
+    public function test_review_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+
+        $this->actingAs($user)->post(route('reviews.store', $book), ['rating' => 6])
+            ->assertSessionHasErrors(['rating']);
+    }
+
+    // 所有者のみが編集フォームを表示できる
+    public function test_only_owner_can_edit_review(): void
+    {
+        $owner = User::factory()->create();
+        $review = Review::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($owner)->get(route('reviews.edit', $review))->assertOk();
+        $this->actingAs($otherUser)->get(route('reviews.edit', $review))->assertForbidden();
+    }
+
+    // 所有者のみがレビューを更新できる
     public function test_only_owner_can_update_review(): void
     {
         $owner = User::factory()->create();
+        $review = Review::factory()->for($owner)->create(['rating' => 3]);
         $otherUser = User::factory()->create();
-        $book = Book::factory()->create();
-        $review = Review::factory()->create([
-            'book_id' => $book->id,
-            'user_id' => $owner->id,
-        ]);
 
-        // 他のユーザーは更新できない
-        $response = $this->actingAs($otherUser)->put(
-            route('books.reviews.update', [$book, $review]),
-            ['rating' => 3, 'comment' => '変更されたコメント']
-        );
-        $response->assertStatus(403);
+        $this->actingAs($owner)->put(route('reviews.update', $review), ['rating' => 4, 'comment' => 'Updated'])
+            ->assertRedirect(route('books.show', $review->book));
+        $this->assertDatabaseHas('reviews', ['id' => $review->id, 'rating' => 4]);
 
-        // 所有者は更新できる
-        $response = $this->actingAs($owner)->put(
-            route('books.reviews.update', [$book, $review]),
-            ['rating' => 3, 'comment' => '変更されたコメント']
-        );
-        $response->assertRedirect(route('books.show', $book));
-
-        $this->assertDatabaseHas('reviews', [
-            'id' => $review->id,
-            'rating' => 3,
-            'comment' => '変更されたコメント',
-        ]);
+        $this->actingAs($otherUser)->put(route('reviews.update', $review), ['rating' => 2])->assertForbidden();
     }
 
-    /**
-     * バリデーションエラーのテスト
-     */
-    public function test_review_validation_errors(): void
+    // 所有者のみがレビューを削除できる
+    public function test_only_owner_can_delete_review(): void
     {
-        $user = User::factory()->create();
-        $book = Book::factory()->create();
+        $owner = User::factory()->create();
+        $review = Review::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
 
-        // ratingが範囲外の場合
-        $response = $this->actingAs($user)->post(route('books.reviews.store', $book), [
-            'rating' => 6, // 1-5の範囲外
-            'comment' => 'コメント',
-        ]);
+        $this->actingAs($otherUser)->delete(route('reviews.destroy', $review))->assertForbidden();
+        $this->assertDatabaseHas('reviews', ['id' => $review->id]);
 
-        $response->assertSessionHasErrors('rating');
+        $this->actingAs($owner)->delete(route('reviews.destroy', $review))
+            ->assertRedirect(route('books.show', $review->book));
+        $this->assertDatabaseMissing('reviews', ['id' => $review->id]);
     }
 }
 ```
+
+### その他のFeatureテスト
+
+同様に、お気に入り、レビューいいね、ランキング、ジャンル管理のテストも作成します。これらのテストは、各機能が仕様通りに動作することを保証するために不可欠です。
+
+- **FavoriteTest**: お気に入りの追加・解除（toggle）、一覧表示、未認証ユーザーのアクセス制限をテストします。
+- **ReviewLikeTest**: レビューへのいいねの追加・解除（toggle）、未認証ユーザーのアクセス制限をテストします。
+- **RankingTest**: ランキングページが表示され、書籍がレビューの平均評価順に正しく並んでいることをテストします。
+- **GenreTest**: ジャンルのCRUD操作、バリデーション、そして「書籍が紐付いているジャンルは削除できない」という特殊なビジネスロジックをテストします。
 
 ---
 
-## 13.4. お気に入り機能のテスト
+## 13.5. テストの実行
 
-### テストファイルの作成
-
-```bash
-sail artisan make:test FavoriteTest
-```
-
-### FavoriteTest.php の実装
-
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Book;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class FavoriteTest extends TestCase
-{
-    use RefreshDatabase;
-
-    /**
-     * お気に入りの追加と解除ができることをテスト
-     */
-    public function test_user_can_toggle_favorite(): void
-    {
-        $user = User::factory()->create();
-        $book = Book::factory()->create();
-
-        // お気に入りに追加
-        $response = $this->actingAs($user)->post(route('favorites.toggle', $book));
-        $response->assertRedirect();
-
-        $this->assertDatabaseHas('favorites', [
-            'user_id' => $user->id,
-            'book_id' => $book->id,
-        ]);
-
-        // お気に入りから解除
-        $response = $this->actingAs($user)->post(route('favorites.toggle', $book));
-        $response->assertRedirect();
-
-        $this->assertDatabaseMissing('favorites', [
-            'user_id' => $user->id,
-            'book_id' => $book->id,
-        ]);
-    }
-
-    /**
-     * お気に入り一覧ページが表示できることをテスト
-     */
-    public function test_favorite_index_page_can_be_rendered(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get(route('favorites.index'));
-
-        $response->assertStatus(200);
-    }
-}
-```
-
----
-
-## 13.5. ファクトリの準備
-
-テストで使用するファクトリが必要です。以下のファクトリを作成・更新してください。
-
-### GenreFactory.php
+全てのテストコードを書き終えたら、以下のコマンドでテストを実行します。
 
 ```bash
-sail artisan make:factory GenreFactory
-```
-
-```php
-<?php
-
-namespace Database\Factories;
-
-use Illuminate\Database\Eloquent\Factories\Factory;
-
-class GenreFactory extends Factory
-{
-    public function definition(): array
-    {
-        return [
-            'name' => fake()->unique()->word(),
-        ];
-    }
-}
-```
-
-### BookFactory.php
-
-```bash
-sail artisan make:factory BookFactory
-```
-
-```php
-<?php
-
-namespace Database\Factories;
-
-use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\Factory;
-
-class BookFactory extends Factory
-{
-    public function definition(): array
-    {
-        return [
-            'title' => fake()->sentence(3),
-            'author' => fake()->name(),
-            'description' => fake()->paragraph(),
-            'user_id' => User::factory(),
-        ];
-    }
-}
-```
-
-### ReviewFactory.php
-
-```bash
-sail artisan make:factory ReviewFactory
-```
-
-```php
-<?php
-
-namespace Database\Factories;
-
-use App\Models\Book;
-use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\Factory;
-
-class ReviewFactory extends Factory
-{
-    public function definition(): array
-    {
-        return [
-            'rating' => fake()->numberBetween(1, 5),
-            'comment' => fake()->paragraph(),
-            'user_id' => User::factory(),
-            'book_id' => Book::factory(),
-        ];
-    }
-}
-```
-
----
-
-## 13.6. テストの実行と確認
-
-全てのテストを実行して、結果を確認します。
-
-```bash
+# 全てのテストを実行
 sail artisan test
+
+# 特定のテストファイルを実行
+sail artisan test tests/Feature/BookTest.php
+
+# 特定のテストメソッドを実行
+sail artisan test --filter=test_authenticated_user_can_create_book
 ```
 
-成功すると以下のような出力が表示されます：
+コマンドを実行すると、PHPUnitがテストを一つずつ実行し、結果をコンソールに表示します。全てのテストが緑色の `PASS` で表示されれば、アプリケーションの基本機能が正しく動作していることの証明になります。
 
 ```
-   PASS  Tests\Feature\BookTest
-  ✓ book index page can be rendered
-  ✓ authenticated user can create book
-  ✓ guest cannot create book
-  ✓ only owner can edit book
-  ✓ only owner can delete book
+   PASS  Tests/Unit/BookModelTest
+   PASS  Tests/Unit/ReviewModelTest
+   PASS  Tests/Unit/UserModelTest
+   PASS  Tests/Feature/BookTest
+   PASS  Tests/Feature/FavoriteTest
+   PASS  Tests/Feature/GenreTest
+   PASS  Tests/Feature/RankingTest
+   PASS  Tests/Feature/RedirectIfAuthenticatedTest
+   PASS  Tests/Feature/ReviewLikeTest
+   PASS  Tests/Feature/ReviewTest
 
-   PASS  Tests\Feature\ReviewTest
-  ✓ authenticated user can create review
-  ✓ only owner can update review
-  ✓ review validation errors
-
-   PASS  Tests\Feature\FavoriteTest
-  ✓ user can toggle favorite
-  ✓ favorite index page can be rendered
-
-  Tests:  10 passed
-  Time:   1.23s
+  Tests:  33 passed
+  Time:   ...s
 ```
 
 ---
 
-## 📝 まとめ
-
-このChapterでは、Laravelのテスト機能を使って基本機能のテストを実装しました。
-
-### 学んだこと
-
-| 項目 | 内容 |
-|:---|:---|
-| **RefreshDatabase** | 各テスト実行前にデータベースをリセットする |
-| **Factory** | テスト用のダミーデータを簡単に作成する |
-| **actingAs()** | 認証済みユーザーとしてリクエストを送信する |
-| **assertStatus()** | HTTPステータスコードを検証する |
-| **assertRedirect()** | リダイレクト先を検証する |
-| **assertDatabaseHas()** | データベースにデータが存在することを検証する |
-| **assertDatabaseMissing()** | データベースにデータが存在しないことを検証する |
-| **assertSessionHasErrors()** | バリデーションエラーを検証する |
-
-### テストを書く際のポイント
-
-1. **1つのテストメソッドでは1つのことだけをテストする**
-2. **テストメソッド名は何をテストしているか分かるように命名する**
-3. **Arrange（準備）→ Act（実行）→ Assert（検証）の流れを意識する**
-4. **正常系だけでなく、異常系（エラーケース）もテストする**
-
-テストを書くことで、コードの品質を保ちながら安心して開発を進めることができます。
-
----
-
-## 13.7. 最終確認
+## 13.6. 最終確認
 
 ### 動作確認チェックリスト
 
-全ての機能実装が完了しました。以下のチェックリストを用いて動作確認を行ってください。
+全ての機能実装とテストが完了しました。以下のチェックリストを用いて、手動でも最終的な動作確認を行ってください。
 
 | 確認項目 | チェック |
 |:---|:---:|
@@ -555,59 +668,25 @@ sail artisan test
 | レビューにいいねができる | [ ] |
 | ランキングが表示される | [ ] |
 | ジャンル別一覧が表示される | [ ] |
-| ジャンルの作成・編集・削除ができる | [ ] |
+| ジャンルの作成・編集・削除ができる（書籍が紐付いている場合は削除不可） | [ ] |
 | テストが全て通る（`sail artisan test`） | [ ] |
 
-### 実装した機能のまとめ
+### このチュートリアルで実装した機能
 
-このチュートリアルでは、以下の機能を実装しました。
+このチュートリアルでは、書籍レビューサイトの基本的な機能を網羅的に実装しました。
 
 | Chapter | 機能 | 学んだこと |
 |:---|:---|:---|
-| 0 | 要件の「行間」を読む力 | ヒアリング、データベース基本設計 |
-| 1 | 環境構築 | Laravel Sail, Docker |
-| 2 | データベース設計 | マイグレーション, 外部キー |
-| 3 | モデル | Eloquent, リレーションシップ |
-| 4 | 認証 | Laravel Fortify, ミドルウェア |
-| 5 | マスタデータの準備 | Seeder |
-| 6 | 書籍管理 | CRUD, FormRequest, Policy, ルート定義 |
-| 7 | レビュー機能 | ネストしたリソース, 認可 |
-| 8 | お気に入り | 多対多リレーション, toggle |
-| 9 | いいね | パターンの再利用 |
-| 10 | ランキング | 集計クエリ, DB::raw, join |
-| 11 | ジャンル別一覧 | リレーションを活用した絞り込み |
-| 12 | ジャンル管理 | CRUDパターンの再実践 |
-| 13 | テスト | PHPUnit, Featureテスト, ファクトリ |
-
-### 学習のポイント
-
-**パターンの認識と再利用**
-
-このチュートリアルでは、同じパターンが繰り返し登場しました。
-
-| パターン | 適用した機能 |
-|:---|:---|
-| CRUD | 書籍管理、ジャンル管理 |
-| 多対多リレーション + toggle | お気に入り、レビューいいね |
-| ルートモデルバインディング | 全てのコントローラー |
-| フォームリクエスト | 書籍、レビュー、ジャンル |
-| ポリシー | 書籍、レビュー |
-
-> **🧠 先輩エンジニアの思考プロセス**
-> 一度理解したパターンは、別の機能にも応用できます。「この機能は前に実装したあの機能と似ているな」と気づけるようになることが、エンジニアとしての成長です。
-
-**RESTfulなURL設計**
-
-| 操作 | HTTPメソッド | URL | 説明 |
-|:---|:---|:---|:---|
-| 一覧表示 | GET | `/resources` | リソースの一覧を取得 |
-| 詳細表示 | GET | `/resources/{id}` | 特定のリソースを取得 |
-| 作成フォーム | GET | `/resources/create` | 作成フォームを表示 |
-| 作成処理 | POST | `/resources` | 新しいリソースを作成 |
-| 編集フォーム | GET | `/resources/{id}/edit` | 編集フォームを表示 |
-| 更新処理 | PUT/PATCH | `/resources/{id}` | リソースを更新 |
-| 削除処理 | DELETE | `/resources/{id}` | リソースを削除 |
+| 0-5 | 設計・準備 | 要件定義、DB設計、モデル、認証、マスタデータ |
+| 6 | 書籍管理 | CRUD、FormRequest、Policy、リソースルート |
+| 7 | レビュー機能 | ネストしたリソース、認可 |
+| 8 | お気に入り機能 | 多対多リレーション、`toggle`メソッド |
+| 9 | いいね機能 | パターンの再利用（お気に入り機能との類似性） |
+| 10 | ランキング機能 | 集計クエリ (`AVG`)、`DB::raw`、`join` |
+| 11 | ジャンル別一覧 | リレーションを活用した絞り込み表示 |
+| 12 | ジャンル管理 | CRUDパターンの再実践、特殊な削除ロジック |
+| 13 | **テスト** | **Unitテスト、Featureテスト、ファクトリ、AAAパターン、各種アサーション** |
 
 ---
 
-これで、基本機能編の実装が完了しました。お疲れ様でした！
+これで、テストに裏付けされた堅牢な基本機能が完成しました。お疲れ様でした！
