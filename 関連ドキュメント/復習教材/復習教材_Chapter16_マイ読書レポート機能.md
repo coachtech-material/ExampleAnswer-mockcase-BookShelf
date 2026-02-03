@@ -1,4 +1,4 @@
-# Chapter 17: マイ読書レポート機能の実装 (Collectionメソッド活用)
+# Chapter 16: マイ読書レポート機能の実装 (Collectionメソッド活用)
 
 ## 1. はじめに
 

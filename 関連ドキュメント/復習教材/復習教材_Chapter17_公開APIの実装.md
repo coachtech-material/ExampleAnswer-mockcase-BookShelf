@@ -1,4 +1,4 @@
-# Chapter 18: 公開APIの実装
+# Chapter 17: 公開APIの実装
 
 ## 1. はじめに
 

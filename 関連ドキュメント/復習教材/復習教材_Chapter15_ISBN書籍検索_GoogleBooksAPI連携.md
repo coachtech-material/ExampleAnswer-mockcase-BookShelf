@@ -1,4 +1,4 @@
-# Chapter 16: ISBN書籍検索 (Google Books API連携)
+# Chapter 15: ISBN書籍検索 (Google Books API連携)
 
 ## 1. はじめに
 
