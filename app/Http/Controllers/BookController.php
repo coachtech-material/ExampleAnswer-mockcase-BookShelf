@@ -54,14 +54,14 @@ class BookController extends Controller
 
     public function edit(Book $book): View
     {
-        // $this->authorize("update", $book);
+        $this->authorize("update", $book);
         $genres = Genre::all();
         return view("books.edit", compact("book", "genres"));
     }
 
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
-        // $this->authorize("update", $book);
+        $this->authorize("update", $book);
         $book->update($request->validated());
         $book->genres()->sync($request->genres);
 
@@ -70,7 +70,7 @@ class BookController extends Controller
 
     public function destroy(Book $book): RedirectResponse
     {
-        // $this->authorize("delete", $book);
+        $this->authorize("delete", $book);
         $book->delete();
 
         return redirect()->route("books.index")->with("success", "書籍を削除しました。");
