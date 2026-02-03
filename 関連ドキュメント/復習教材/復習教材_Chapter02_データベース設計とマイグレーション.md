@@ -1,268 +1,89 @@
 # Chapter 2: データベース設計とマイグレーション
 
-このChapterでは、書籍レビュー管理システムに必要なデータベーステーブルを設計し、Laravelのマイグレーション機能を使ってデータベースの構造を定義します。
+## 🎯 このセクションで学ぶこと
+
+このセクションでは、**Chapter 0で策定した「データベース基本設計書」を、実際のコード（マイグレーション）に落とし込む**プロセスを学びます。具体的には以下の点を学びます。
+
+- **マイグレーションとは何か**: なぜ直接データベースを操作せず、PHPのコードでテーブル定義を管理するのかを理解します。
+- **設計書からコードへ**: Chapter 0のテーブル定義書に書かれた「VARCHAR(13)」や「UNIQUE制約」を、Laravelのマイグレーションでどう表現するかを学びます。
+- **リレーションシップと外部キー**: ER図に描かれたテーブル間の「線」を、`foreignId()`と`constrained()`を使ってコードで表現する方法を学びます。
+- **マイグレーションの実行**: 作成した設計図を元に、実際にデータベースにテーブルを作成します。
 
 ---
 
-## 2-1. 先輩エンジニアの思考プロセス：要件からテーブル設計へ
+## 🧠 先輩エンジニアの思考プロセス：なぜマイグレーションから始めるのか？
 
-アプリケーション開発において、データベース設計は「家の基礎工事」に例えられます。ここでの設計が、後の機能実装のしやすさやアプリケーション全体のパフォーマンスに大きく影響します。
+アプリケーション開発は、多くの場合「データ」を中心に進みます。**Chapter 0でPMと合意形成した「データの形」**を最初にコードで確定させることで、その後の機能開発（モデル、コントローラー、ビュー）の手戻りが格段に少なくなります。
 
-では、どのようにしてテーブル構造を考えていくのでしょうか？答えは**「要件定義書」**の中にあります。
-
-### Step 1: 要件から「モノ」と「関係」を洗い出す
-
-まず、要件定義書（`基本機能編_要件定義書_基本設計書_詳細度100%.md`）の機能要件一覧を眺めて、アプリケーションに登場する主要な「モノ（エンティティ）」を名詞として抜き出します。
-
-- **ユーザー** (USERS)
-- **書籍** (BOOKS)
-- **レビュー** (REVIEWS)
-- **ジャンル** (GENRES)
-- **お気に入り** (FAVORITES)
-- **いいね** (REVIEW_LIKES)
-- **書籍ジャンル** (BOOK_GENRE)
-
-次に、これらの「モノ」が互いにどういう「関係」にあるかを考えます。
-
-- ユーザーは、**複数の**書籍を登録する (1対多)
-- ユーザーは、**複数の**レビューを投稿する (1対多)
-- 書籍には、**複数の**レビューが投稿される (1対多)
-- ユーザーは、**複数の**書籍をお気に入り登録する (多対多)
-- ユーザーは、**複数の**レビューに「いいね」する (多対多)
-- 書籍は、**複数の**ジャンルに属する (多対多)
-
-この「1対多」「多対多」の関係性を整理することが、テーブル設計の第一歩です。
-
-### Step 2: ヒアリングで要件を具体化する
-
-要件定義書だけでは分からない細かい仕様は、プロジェクトマネージャーや顧客にヒアリングして明確にします。良いエンジニアは、的確な質問で仕様の曖昧さをなくしていきます。
-
-**【ヒアリング例】**
-
-> **エンジニア**: 「書籍とジャンルの関係ですが、1冊の書籍は1つのジャンルにしか属しませんか？例えば『ハリー・ポッター』は『ファンタジー』であり『小説』でもある、といったケースは考慮しますか？」
-> **PM**: 「良い質問ですね。複数のジャンルに属せるようにしましょう。」
-> **→ 結果**: 書籍とジャンルは「多対多」の関係だとわかる。中間テーブル `book_genre` が必要になる。
-
-> **エンジニア**: 「ユーザーが退会した場合、そのユーザーが登録した書籍やレビューはどう扱いますか？」
-> **PM**: 「ユーザーが退会したら、その人のデータは全て削除してください。」
-> **→ 結果**: 外部キー制約に `onDelete(\'cascade\')` を設定し、親レコード（ユーザー）の削除時に子レコード（書籍、レビューなど）も自動で削除されるように設計する。
-
-### Step 3: ER図とテーブル定義書を作成する
-
-洗い出した「モノ」と「関係」を元に、ER図（エンティティ関連図）とテーブル定義書を作成します。これらは、データベースの「設計図」となる重要なドキュメントです。
-
-#### ER図 (Entity-Relationship Diagram)
-
-テーブル間の関係性を視覚的に表現した図です。これにより、アプリケーション全体のデータ構造を直感的に把握できます。
-
-```mermaid
-erDiagram
-    USERS {
-        bigint id PK
-        string name
-        string email
-        timestamp email_verified_at
-        string password
-        string remember_token
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    BOOKS {
-        bigint id PK
-        bigint user_id FK
-        string title
-        string author
-        string isbn
-        date published_date
-        text description
-        string image_url
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    REVIEWS {
-        bigint id PK
-        bigint user_id FK
-        bigint book_id FK
-        tinyint rating
-        text comment
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    GENRES {
-        bigint id PK
-        string name
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    FAVORITES {
-        bigint user_id PK, FK
-        bigint book_id PK, FK
-    }
-
-    REVIEW_LIKES {
-        bigint user_id PK, FK
-        bigint review_id PK, FK
-    }
-
-    BOOK_GENRE {
-        bigint book_id PK, FK
-        bigint genre_id PK, FK
-    }
-
-    USERS ||--o{ BOOKS : "registers"
-    USERS ||--o{ REVIEWS : "writes"
-    BOOKS ||--o{ REVIEWS : "has"
-    USERS ||--|{ FAVORITES : "favorites"
-    BOOKS ||--|{ FAVORITES : "is favorited by"
-    USERS ||--|{ REVIEW_LIKES : "likes"
-    REVIEWS ||--|{ REVIEW_LIKES : "is liked by"
-    BOOKS }|--|{ BOOK_GENRE : "has"
-    GENRES }|--|{ BOOK_GENRE : "belongs to"
-```
-
-#### テーブル定義書
-
-| テーブル名 | 物理名 | 用途 |
+| 課題 | 解決策 | なぜこのChapterでやるのか？ |
 |:---|:---|:---|
-| ユーザー | `users` | アプリケーションの利用者情報を格納する |
-| 書籍 | `books` | 書籍の基本情報を格納する |
-| レビュー | `reviews` | 書籍に対するレビュー情報を格納する |
-| ジャンル | `genres` | 書籍のジャンルマスタ |
-| お気に入り | `favorites` | ユーザーと書籍のお気に入り関係を格納する中間テーブル |
-| レビューいいね | `review_likes` | ユーザーとレビューのいいね関係を格納する中間テーブル |
-| 書籍ジャンル | `book_genre` | 書籍とジャンルの中間テーブル |
+| 開発者ごとにDBのテーブル定義が微妙に違う | **マイグレーション**でテーブル定義をコードとしてバージョン管理する | 全員が同じコマンド（`sail artisan migrate`）を叩くだけで、同じ構造のデータベースを再現できる。 |
+| Chapter 0で決めた「ISBNは重複不可」が守られない | **UNIQUE制約**をマイグレーションで定義し、データベースレベルで不正なデータ入力を防ぐ | アプリケーションのバグで不正なデータが作られるのを防ぐ最後の砦。最初に定義するのが最も安全。 |
+| 後からカラムを追加・変更するのが大変 | マイグレーションファイルを追加・編集し、変更履歴をコードで管理する | 誰が、いつ、どのような理由でDB構造を変更したかが一目瞭然になり、チーム開発がスムーズに進む。 |
 
-#### テーブル定義書（詳細）
-
-**users**
-
-| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
-|:---|:---|:---:|:---:|:---:|:---|:---|
-| id | bigint | ✔ | | | | ユーザーID |
-| name | varchar(255) | | | | | ユーザー名 |
-| email | varchar(255) | | | | | メールアドレス（一意） |
-| email_verified_at | timestamp | | | ✔ | NULL | メール認証日時 |
-| password | varchar(255) | | | | | パスワード |
-| remember_token | varchar(100) | | | ✔ | NULL | ログイン維持用トークン |
-| created_at | timestamp | | | ✔ | NULL | 作成日時 |
-| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
-
-**books**
-
-| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
-|:---|:---|:---:|:---:|:---:|:---|:---|
-| id | bigint | ✔ | | | | 書籍ID |
-| user_id | bigint | | ✔ (users.id) | | | 登録したユーザーのID |
-| title | varchar(255) | | | | | 書籍タイトル |
-| author | varchar(255) | | | | | 著者名 |
-| isbn | varchar(13) | | | | | ISBN（一意） |
-| published_date | date | | | | | 出版日 |
-| description | text | | | ✔ | NULL | 書籍の説明 |
-| image_url | varchar(255) | | | ✔ | NULL | 書影画像のURL |
-| created_at | timestamp | | | ✔ | NULL | 作成日時 |
-| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
-
-**reviews**
-
-| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
-|:---|:---|:---:|:---:|:---:|:---|:---|
-| id | bigint | ✔ | | | | レビューID |
-| user_id | bigint | | ✔ (users.id) | | | 投稿したユーザーのID |
-| book_id | bigint | | ✔ (books.id) | | | レビュー対象の書籍ID |
-| rating | tinyint(unsigned) | | | | | 評価（1〜5） |
-| comment | text | | | | | レビューコメント |
-| created_at | timestamp | | | ✔ | NULL | 作成日時 |
-| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
-
-**genres**
-
-| カラム名 | データ型 | 主キー | 外部キー | Null許可 | デフォルト値 | 説明 |
-|:---|:---|:---:|:---:|:---:|:---|:---|
-| id | bigint | ✔ | | | | ジャンルID |
-| name | varchar(255) | | | | | ジャンル名（一意） |
-| created_at | timestamp | | | ✔ | NULL | 作成日時 |
-| updated_at | timestamp | | | ✔ | NULL | 更新日時 |
-
-**favorites** (中間テーブル)
-
-| カラム名 | データ型 | 主キー | 外部キー | 説明 |
-|:---|:---|:---:|:---:|:---|
-| user_id | bigint | ✔ | ✔ (users.id) | ユーザーID |
-| book_id | bigint | ✔ | ✔ (books.id) | 書籍ID |
-
-**review_likes** (中間テーブル)
-
-| カラム名 | データ型 | 主キー | 外部キー | 説明 |
-|:---|:---|:---:|:---:|:---|
-| user_id | bigint | ✔ | ✔ (users.id) | ユーザーID |
-| review_id | bigint | ✔ | ✔ (reviews.id) | レビューID |
-
-**book_genre** (中間テーブル)
-
-| カラム名 | データ型 | 主キー | 外部キー | 説明 |
-|:---|:---|:---:|:---:|:---|
-| book_id | bigint | ✔ | ✔ (books.id) | 書籍ID |
-| genre_id | bigint | ✔ | ✔ (genres.id) | ジャンルID |
+マイグレーションは、**「データベースの世界のGit」**のようなものです。変更履歴を追いかけられ、いつでも過去の状態に戻したり、他の人と共有したりできます。最初にこの仕組みを整えることが、堅牢なアプリケーション開発の第一歩です。
 
 ---
 
-## 2.2. マイグレーションファイルの作成と実行
+## 2.1. マイグレーションファイルの作成
 
-設計が固まったら、Laravelのマイグレーション機能を使ってデータベースにテーブルを作成します。
+まずは、各テーブルの設計図となるマイグレーションファイルを作成します。
 
-### Step 1: マイグレーションファイルの作成
+### 2.1.1. コマンドの実行
 
 ```bash
 # usersテーブルはLaravelデフォルトで存在
 sail artisan make:migration create_genres_table
-sleep 1
 sail artisan make:migration create_books_table
-sleep 1
 sail artisan make:migration create_reviews_table
-sleep 1
 sail artisan make:migration create_book_genre_table
-sleep 1
 sail artisan make:migration create_favorites_table
-sleep 1
 sail artisan make:migration create_review_likes_table
 ```
 
-### Step 2: マイグレーションファイルの編集
+> **🧠 先輩エンジニアの思考プロセス**
+> **重要：マイグレーションの実行順序について**
+> マイグレーションファイルはタイムスタンプ順に実行されます。`book_genre` テーブルは `genres` テーブルと `books` テーブルに外部キーで依存しているため、必ず **`genres` と `books` のマイグレーションが先に実行される必要があります**。
+> コマンドをそのまま実行すれば問題ないとは思われますが、問題が起きた場合はファイル名を修正してマイグレーションが順番に行われるようにしてください。
 
-作成された各マイグレーションファイルに、テーブルのカラム定義を追加していきます。
+### 2.1.2. コードリーディング：`make:migration`コマンド
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_genres_table.php`
+| 部分 | 説明 | 戻り値 | 💡 ポイント |
+|:---|:---|:---|:---|
+| `sail artisan` | Sailコンテナ内でLaravelのArtisanコマンドを実行するためのコマンド | (コマンドの実行結果) | `sail`は`./vendor/bin/sail`のエイリアスです。 |
+| `make:migration` | 新しいマイグレーションファイルを作成するArtisanコマンド | (ファイルパス) | `database/migrations`ディレクトリにファイルが生成されます。 |
+| `create_genres_table` | 作成するマイグレーションファイルの名前 | なし | `create_..._table`という命名規則に従うと、Laravelがテーブル作成用の定型コードを自動で生成してくれます。 |
 
-```php
-<?php
+---
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+## 2.2. マイグレーションファイルへの記述
 
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('genres', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->timestamps();
-        });
-    }
+作成された各マイグレーションファイルに、**Chapter 0のテーブル定義書**の内容をコードで記述していきます。
 
-    public function down(): void
-    {
-        Schema::dropIfExists('genres');
-    }
-};
-```
+---
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_books_table.php`
+### 2.2.1. `create_books_table`
+
+**📖 Chapter 0 テーブル定義書 (books) との対応**
+
+Chapter 0の「3.2. テーブル定義書」では、`books`テーブルは以下のように定義されていました。
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
+| ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
+| タイトル | `title` | VARCHAR(255) | No |  |
+| 著者 | `author` | VARCHAR(255) | No |  |
+| ISBN | `isbn` | VARCHAR(13) | No | **UNIQUE**, 13桁固定 |
+| 出版日 | `published_date` | DATE | No |  |
+| 概要 | `description` | TEXT | **Yes** |  |
+| 画像URL | `image_url` | VARCHAR(255) | **Yes** |  |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
 
 ```php
 <?php
@@ -295,7 +116,38 @@ return new class extends Migration
 };
 ```
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_reviews_table.php`
+**🔬 コードリーディング：設計書からコードへの変換**
+
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->id();` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義です。`unsignedBigInteger`で`auto_increment`な`id`カラムを作成します。 |
+| `$table->foreignId('user_id')` | `user_id` (BIGINT, FK) | Chapter 0のER図で「USERS ||--o{ BOOKS」と定義された関係を表現しています。`users`テーブルの`id`を参照する外部キーカラムを作成します。 |
+| `->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、これだけで`users`テーブルの`id`カラムへの参照を自動的に設定します。 |
+| `->onDelete('cascade')` | **CASCADE DELETE** | Chapter 0のヒアリングで「ユーザー退会時は全て消えて良い」と決めた仕様です。参照先の`users`レコードが削除された時、この`books`レコードも自動的に削除されます。 |
+| `$table->string('isbn', 13)` | `isbn` (VARCHAR(13)) | `string`メソッドの第2引数で桁数を指定できます。**Chapter 0のヒアリング（Q3）**で「13桁固定・ハイフンなし」と決めた仕様をコードに反映しています。 |
+| `->unique()` | **UNIQUE** | **Chapter 0のヒアリング（Q3）**で「一意（Unique）制約をかける」と決めた仕様です。同じISBNの書籍が重複登録されるのをデータベースレベルで防ぎます。 |
+| `->nullable()` | **Yes** (NULL許容) | **Chapter 0のヒアリング（Q4）**で「任意入力」と決めた仕様を実現しています。`description`と`image_url`は空でも登録可能です。 |
+| `$table->timestamps();` | `created_at`, `updated_at` (TIMESTAMP) | Laravelの標準機能で、レコードの作成日時と更新日時を自動管理します。 |
+
+---
+
+### 2.2.2. `create_reviews_table`
+
+**📖 Chapter 0 テーブル定義書 (reviews) との対応**
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
+| ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
+| 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
+| 評価 | `rating` | TINYINT | No | 1〜5の整数 |
+| コメント | `comment` | TEXT | No |  |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_reviews_table.php`
 
 ```php
 <?php
@@ -325,7 +177,83 @@ return new class extends Migration
 };
 ```
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_book_genre_table.php`
+**🔬 コードリーディング：設計書からコードへの変換**
+
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->foreignId('user_id')->constrained()->onDelete('cascade')` | FK(`users.id`), CASCADE DELETE | Chapter 0のER図「USERS ||--o{ REVIEWS」を表現。レビューを書いたユーザーが退会したら、そのレビューも削除されます。 |
+| `$table->foreignId('book_id')->constrained()->onDelete('cascade')` | FK(`books.id`), CASCADE DELETE | Chapter 0のER図「BOOKS ||--o{ REVIEWS」を表現。書籍が削除されたら、その書籍に対するレビューも削除されます。 |
+| `$table->unsignedTinyInteger('rating')` | `rating` (TINYINT) | **Chapter 0のヒアリング（Q5）**で「評価は1〜5の整数のみ」と決めた仕様です。`TINYINT`は0〜255の範囲を持つ最小の整数型で、1〜5の評価には十分です。`unsigned`で負の値を許可しません。 |
+| `$table->text('comment')` | `comment` (TEXT) | レビューのコメント本文です。長文を想定して`TEXT`型を使用しています。 |
+
+---
+
+### 2.2.3. `create_genres_table`
+
+**📖 Chapter 0 テーブル定義書 (genres) との対応**
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
+| ジャンル名 | `name` | VARCHAR(255) | No | **UNIQUE** |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_genres_table.php`
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('genres', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('genres');
+    }
+};
+```
+
+**🔬 コードリーディング：設計書からコードへの変換**
+
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->id();` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義です。 |
+| `$table->string('name')` | `name` (VARCHAR(255)) | `string`メソッドは、デフォルトで`VARCHAR(255)`型のカラムを作成します。 |
+| `->unique()` | **UNIQUE** 制約 | 同じ名前のジャンルが重複登録されるのを防ぎます。例えば「小説」というジャンルは1つだけ存在できます。 |
+
+---
+
+### 2.2.4. `create_book_genre_table`
+
+**📖 Chapter 0 テーブル定義書 (book_genre) との対応**
+
+Chapter 0のヒアリング（Q2）で「書籍とジャンルは**多対多（N対N）の関係**」と決めたため、中間テーブルが必要です。
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
+| ジャンルID | `genre_id` | BIGINT | No | FK(`genres.id`), **CASCADE DELETE** |
+
+* **複合主キー**: `(book_id, genre_id)` の組み合わせが主キーとなり、重複不可。
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_book_genre_table.php`
 
 ```php
 <?php
@@ -352,7 +280,36 @@ return new class extends Migration
 };
 ```
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_favorites_table.php`
+**🔬 コードリーディング：設計書からコードへの変換**
+
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->foreignId('book_id')->constrained()->onDelete('cascade')` | FK(`books.id`), CASCADE DELETE | Chapter 0のER図「BOOKS }|--|{ BOOK_GENRE」を表現。書籍が削除されたら、その書籍とジャンルの紐付けも削除されます。 |
+| `$table->foreignId('genre_id')->constrained()->onDelete('cascade')` | FK(`genres.id`), CASCADE DELETE | Chapter 0のER図「GENRES }|--|{ BOOK_GENRE」を表現。ジャンルが削除されたら、そのジャンルと書籍の紐付けも削除されます。 |
+| `$table->primary(['book_id', 'genre_id'])` | 複合主キー | 2つのカラムの組み合わせを主キーとして設定します。これにより、同じ書籍に同じジャンルを2回紐付けることはできなくなります。 |
+
+> **🧠 先輩エンジニアの思考プロセス**
+> なぜ中間テーブルには`id`カラムと`timestamps`がないのか？
+> 中間テーブルは「関係性」だけを記録するテーブルです。「いつ紐付けられたか」という情報が不要な場合、`timestamps`は省略できます。また、`book_id`と`genre_id`の組み合わせ自体が一意なので、別途`id`カラムを設ける必要もありません。これにより、テーブルがシンプルになり、パフォーマンスも向上します。
+
+---
+
+### 2.2.5. `create_favorites_table`
+
+**📖 Chapter 0 テーブル定義書 (favorites) との対応**
+
+Chapter 0のヒアリング（Q1）で「ユーザーと書籍の多対多関係（お気に入り）」を管理するテーブルとして定義されました。
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
+| 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
+
+* **複合主キー**: `(user_id, book_id)` の組み合わせが主キーとなり、重複不可。
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php`
 
 ```php
 <?php
@@ -379,7 +336,32 @@ return new class extends Migration
 };
 ```
 
-#### `database/migrations/xxxx_xx_xx_xxxxxx_create_review_likes_table.php`
+**🔬 コードリーディング：設計書からコードへの変換**
+
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->foreignId('user_id')->constrained()->onDelete('cascade')` | FK(`users.id`), CASCADE DELETE | Chapter 0のER図「USERS ||--|{ FAVORITES」を表現。ユーザーが退会したら、そのユーザーのお気に入り情報も削除されます。 |
+| `$table->foreignId('book_id')->constrained()->onDelete('cascade')` | FK(`books.id`), CASCADE DELETE | Chapter 0のER図「BOOKS ||--|{ FAVORITES」を表現。書籍が削除されたら、その書籍へのお気に入り情報も削除されます。 |
+| `$table->primary(['user_id', 'book_id'])` | 複合主キー | 同じユーザーが同じ書籍を2回お気に入りに追加することはできません。 |
+
+---
+
+### 2.2.6. `create_review_likes_table`
+
+**📖 Chapter 0 テーブル定義書 (review_likes) との対応**
+
+Chapter 0のヒアリング（Q1）で「ユーザーとレビューの多対多関係（いいね）」を管理するテーブルとして定義されました。
+
+| 論理名 | 物理名 | 型 | NULL | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
+| レビューID | `review_id` | BIGINT | No | FK(`reviews.id`), **CASCADE DELETE** |
+
+* **複合主キー**: `(user_id, review_id)` の組み合わせが主キーとなり、重複不可。
+
+**💻 マイグレーションコード**
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_review_likes_table.php`
 
 ```php
 <?php
@@ -406,24 +388,60 @@ return new class extends Migration
 };
 ```
 
-### Step 3: Dockerコンテナの起動とマイグレーションの実行
+**🔬 コードリーディング：設計書からコードへの変換**
 
-マイグレーションを実行してデータベースにテーブルを作成する前に、まずDockerコンテナ（Webサーバー、データベース等）を起動する必要があります。
+| コード | 設計書との対応 | 解説 |
+|:---|:---|:---|
+| `$table->foreignId('user_id')->constrained()->onDelete('cascade')` | FK(`users.id`), CASCADE DELETE | Chapter 0のER図「USERS ||--|{ REVIEW_LIKES」を表現。ユーザーが退会したら、そのユーザーの「いいね」情報も削除されます。 |
+| `$table->foreignId('review_id')->constrained()->onDelete('cascade')` | FK(`reviews.id`), CASCADE DELETE | Chapter 0のER図「REVIEWS ||--|{ REVIEW_LIKES」を表現。レビューが削除されたら、そのレビューへの「いいね」情報も削除されます。 |
+| `$table->primary(['user_id', 'review_id'])` | 複合主キー | 同じユーザーが同じレビューに2回「いいね」することはできません。 |
 
-```bash
-# コンテナをバックグラウンドで起動する
-sail up -d
+---
 
-# MySQLコンテナが完全に起動するまで30秒ほど待機する
-sleep 30
-```
+## 2.3. マイグレーションの実行
 
-> **【エラー対処】`Connection refused`エラー**
-> `sail up -d`の直後に`sail artisan migrate`を実行すると、「`SQLSTATE[HY000] [2002] Connection refused`」というエラーが発生することがあります。これは、MySQLコンテナの起動が完了する前に、Laravelがデータベースに接続しようとしたために起こります。
-> `sleep 30`コマンドは、コンテナが安定して起動するのを待つための重要な一手です。
+定義された設計図を元に、データベースにテーブルを作成します。
 
-コンテナが起動したら、マイグレーションを実行します。
+### 2.3.1. コマンドの実行
 
 ```bash
+# マイグレーションを実行してテーブルを作成
 sail artisan migrate
 ```
+
+### 2.3.2. コードリーディング：`artisan migrate`コマンド
+
+| 部分 | 説明 | 戻り値 | 💡 ポイント |
+|:---|:---|:---|:---|
+| `sail artisan` | Sailコンテナ内でLaravelのArtisanコマンドを実行するためのコマンド | (コマンドの実行結果) | `sail`は`./vendor/bin/sail`のエイリアスです。 |
+| `migrate` | `database/migrations`ディレクトリ内のまだ実行されていないマイグレーションを実行するコマンド | `void` | 実行済みのマイグレーションは`migrations`テーブルに記録され、二重実行はされません。 |
+
+> **🧠 先輩エンジニアの思考プロセス**
+> なぜ`sail up -d`の後すぐに`sail artisan migrate`を実行すると失敗する場合があるのか？
+> `sail up -d`コマンドはコンテナの「起動開始」を指示するだけで、MySQLデータベースがリクエストを受け付けられる状態になるまでには少し時間がかかります。その前に`migrate`を実行すると「`Connection refused`（接続拒否）」エラーが発生してしまうのです。したがって、30秒ほどコンテナが正常に立ち上がるのを待ってマイグレーションを実行するのがポイントです。
+
+> **注意：Dockerボリュームについて**
+> 以前に同じプロジェクト名やポートでDockerを使用したことがある場合、MySQLのデータボリュームに古いデータが残っている可能性があります。後のステップでマイグレーションを実行した際に「Table already exists」エラーが発生した場合は、以下のコマンドでボリュームをクリアしてください：
+> ```bash
+> sail down -v
+> sail up -d
+> sail artisan migrate
+> ```
+
+---
+
+## 📝 このChapterのまとめ
+
+このChapterでは、**Chapter 0で策定したデータベース基本設計書**を、Laravelのマイグレーションコードに変換するプロセスを学びました。
+
+| 設計書の項目 | Laravelのコード | 解説 |
+|:---|:---|:---|
+| BIGINT, PK, AUTO_INCREMENT | `$table->id()` | 主キーの定義 |
+| FK(`users.id`) | `$table->foreignId('user_id')->constrained()` | 外部キーの定義 |
+| CASCADE DELETE | `->onDelete('cascade')` | 親レコード削除時の連動削除 |
+| VARCHAR(13) | `$table->string('isbn', 13)` | 桁数指定の文字列 |
+| UNIQUE | `->unique()` | 重複禁止制約 |
+| NULL許容 | `->nullable()` | 空値を許可 |
+| 複合主キー | `$table->primary(['col1', 'col2'])` | 複数カラムの組み合わせを主キーに |
+
+これで、**Chapter 0で設計した通りの構造**で、アプリケーションのデータを保存するための器（テーブル）が用意できました。次のChapterでは、これらのテーブルを操作するための「モデル」を作成していきます。

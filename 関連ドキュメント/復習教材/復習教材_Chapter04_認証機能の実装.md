@@ -52,9 +52,11 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 | 目的 | 解説 |
 |:---|:---|
 | **可読性の向上** | `web.php`にはアプリケーションの主要機能（書籍、レビュー、検索など）のルートが、`auth.php`には認証関連のルートだけが存在することになります。これにより、ファイルの見通しが良くなり、「認証のルートを変更したい」と思ったときに、迷わず`auth.php`を開くことができます。 |
-| **メンテナンス性の向上** | アプリケーションが大規模になると、`web.php`は数百行、数千行に膨れ上がる可能性があります。機能ごとにファイルが適切に分割されていれば、コードの修正や追加が容易になり、修正による影響範囲も特定しやすくなります。 |
+| **メンテナンス性の向上** | アプリケーションが大規模になると、`web.php`は数百行、数千行に膨れ上がる可能性があります。機能ごとにファイルが適切に分割されていれば、コードの修正や追加が容易になり、修正による影響範囲も特定しやすくなります。これは、バグの発生を防ぎ、将来の機能拡張をスムーズに進める上で不可欠です。 |
 | **責務の明確化** | `web.php`は「アプリケーションの通常機能の交通整理」、`auth.php`は「ユーザーの出入りを管理する受付」というように、それぞれのファイルが持つ役割（責務）が明確になります。 |
 | **Laravelの標準への準拠** | Laravelの標準的なスターターキットであるBreezeなどでも、認証ルートは`auth.php`に分離されています。この「お作法」に従うことで、チームに新しい開発者が加わった際にも、コードの構造をすぐに理解してもらえます。 |
+
+料理に例えるなら、`web.php`が「メインディッシュのレシピブック」、`auth.php`が「ドリンクメニュー」です。両方を一つのノートに書いても機能しますが、別々にまとめておいた方が、探しやすく、管理しやすいのは明らかでしょう。
 
 ### `auth.php`の作成
 
@@ -67,7 +69,7 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
 // 未ログインユーザー向けのルート
-Route::middleware("guest")->group(function (): void {
+Route::middleware("guest")->group(function () {
     // ログイン画面表示
     Route::get("/login", function () {
         return view("auth.login");
@@ -80,7 +82,7 @@ Route::middleware("guest")->group(function (): void {
 });
 
 // ログイン済みユーザー向けのルート
-Route::middleware("auth")->group(function (): void {
+Route::middleware("auth")->group(function () {
     // ログアウト処理
     Route::post("/logout", [AuthenticatedSessionController::class, "destroy"])
         ->name("logout");
@@ -195,7 +197,7 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->routes(function (): void {
+        $this->routes(function () {
             // ... web.phpの読み込み設定 ...
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
@@ -215,14 +217,4 @@ class RouteServiceProvider extends ServiceProvider
 
 この設定により、`auth.php`に書かれたルート（`/login`, `/register`, `/logout`）が`web.php`のルートと同様に扱われ、アプリケーション全体で有効になります。
 
----
-
-## 4.5. 動作確認
-
-最後に、実装した認証機能が正しく動作するかを確認します。
-
-1. `/register`にアクセスして新規ユーザー登録ができるか。
-2. 登録後に自動でログインされ、トップページにリダイレクトされるか。
-3. 一度ログアウトし、`/login`から再度ログインできるか。
-
-これらの確認が取れれば、認証機能の実装は完了です。次のChapterでは、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。
+これで、認証機能のバックエンド側の設定は完了です。次のChapterでは、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。

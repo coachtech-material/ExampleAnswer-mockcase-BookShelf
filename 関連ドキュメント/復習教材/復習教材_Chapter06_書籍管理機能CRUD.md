@@ -1,376 +1,414 @@
-# Chapter 6: 書籍管理機能 (CRUD)
+# Chapter 6: 書籍管理機能 (CRUD) の実装
 
-このChapterでは、アプリケーションの中核となる書籍管理機能（CRUD: Create, Read, Update, Delete）を実装します。認証済みのユーザーが、自身で書籍を登録・編集・削除できる一連の機能を、Laravelの作法に則って構築します。
+## 🎯 このセクションで学ぶこと
 
----
+このセクションでは、Webアプリケーション開発の心臓部とも言える**CRUD（Create, Read, Update, Delete）**操作を、書籍管理機能を通じて実装します。単に機能を実装するだけでなく、エラーを未然に防ぐための開発手順や、コードの責務を分離するための設計思想についても深く学んでいきます。
 
-## 5-1. 先輩エンジニアの思考プロセス：要件をCRUDに分解し、実装に落とし込む
-
-### Step 1: 要件定義書からCRUD操作をマッピングする
-
-まず、`基本機能編_要件定義書_基本設計書_詳細度100%.md`の「書籍管理機能」の項目を、CRUDと具体的なアクション（メソッド）にマッピングします。
-
-| 要件 | CRUD | アクション (メソッド) | 役割 |
-|:---|:---|:---|:---|
-| 書籍一覧表示 | **R**ead | `index` | 登録されている全書籍の一覧を表示する |
-| 書籍詳細表示 | **R**ead | `show` | 特定の1冊の書籍の詳細情報を表示する |
-| 書籍登録 | **C**reate | `create` / `store` | `create`: 登録フォーム画面を表示 / `store`: フォームから送られたデータをDBに保存 |
-| 書籍編集 | **U**pdate | `edit` / `update` | `edit`: 編集フォーム画面を表示 / `update`: フォームから送られたデータでDBを更新 |
-| 書籍削除 | **D**elete | `destroy` | 特定の書籍をDBから削除する |
-
-> **【学習のポイント】**
-> Laravelの`--resource`オプションでコントローラーを作成すると、これらのCRUDに対応する7つのメソッド（`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`）が自動的に生成されます。これは、Webアプリケーションの基本がCRUDであることをフレームワークレベルで示唆しています。
-
-### Step 2: 各アクションの「責務」を明確にする
-
-次に、各アクションを実装するために必要な「部品」は何かを考えます。Laravelでは、役割ごとにクラスを分離する「関心の分離」が推奨されています。
-
-- **ルーティング (`routes/web.php`)**: どのURLがどのアクションを呼び出すかを定義する「交通整理」
-- **フォームリクエスト (`StoreBookRequest`, `UpdateBookRequest`)**: 「このデータは正しい形式か？」を検証する「門番」
-- **ポリシー (`BookPolicy`)**: 「この操作を実行する権限があるか？」を検証する「警備員」
-- **コントローラー (`BookController`)**: ルーティング、リクエスト、ポリシーからの情報を受け取り、モデルを使ってビジネスロジックを実行し、ビューに応答を返す「司令塔」
-- **ビュー (`*.blade.php`)**: ユーザーに見せる画面を生成する「デザイナー」
-
-この後の実装パートでは、これらの部品を一つずつ組み立てていきます。
+- **トップダウンな開発アプローチ**: なぜ機能の詳細を実装する前に、まず全体の「骨格」となるルートとコントローラーを準備するのか、その重要性を理解します。
+- **フォームリクエスト**: バリデーションロジックをコントローラーから分離し、再利用可能にする方法を学びます。
+- **ポリシー（認可）**: 「誰が」「何を」できるかを制御する認可の仕組みを学びます。
+- **段階的な実装**: まずは権限チェックなしで動作確認を行い、その後で権限チェックを追加するという、実践的な開発フローを体験します。
 
 ---
 
-## 5.2. 部品の作成 (Artisanコマンド)
+## 🧠 先輩エンジニアの思考プロセス：なぜ最初に「骨格」を作るのか？
 
-まず、`artisan`コマンドを使って、書籍管理機能に必要なコントローラー、フォームリクエスト、ポリシーの雛形を一括で作成します。
+多くの初学者は、一つの機能（例えば「書籍の登録」）を完成させてから次の機能に取り掛かろうとします。しかし、経験豊富なエンジニアは、まずアプリケーション全体の「骨格」となる部分から組み立て始めます。これは、家を建てる際に、内装工事の前にまず土台と柱を組み上げるのと同じです。
+
+| 課題 | 解決策 | なぜこのChapterでやるのか？ |
+|:---|:---|:---|
+| 配布されたビューには`route()`ヘルパーが多数あり、ルートが未定義だとエラーになる | **最初にすべてのルートとコントローラーを準備**する | どのページにアクセスしても`RouteNotDefined`エラーが発生しない状態を先に作ることで、ビューの表示確認をしながらスムーズに開発を進められる。 |
+| 機能ごとに行き当たりばったりで実装すると、全体像が見えなくなる | **トップダウン**で実装を進める | まず全体のURL設計（ルート）と司令塔（コントローラー）を決め、その後に各機能の詳細（ロジック）を肉付けしていくことで、一貫性のある設計を維持できる。 |
+| どこに何を書くべきか迷う | **責務の分離**を意識する | 「URLの交通整理はルート」「リクエストの検証はフォームリクエスト」「権限の確認はポリシー」「具体的な処理はコントローラー」というように、役割分担を明確にすることで、見通しが良くメンテナンスしやすいコードになる。 |
+
+このChapterでは、まずアプリケーション全体の「骨格」を固め、その上で書籍管理機能という「最初の部屋」の内装を仕上げていく、という流れで開発を進めます。
+
+---
+
+## 6.1. ルート定義とコントローラーの準備
+
+機能ごとの詳細な実装に入る前に、まずアプリケーション全体の「骨格」となるルートとコントローラーを準備します。これにより、開発中の`RouteNotDefined`エラーを防ぎ、スムーズに開発を進めることができます。
+
+### 6.1.1. なぜ先にルートを定義するのか？
+
+今回使用する配布済みのBladeファイル（ビュー）には、ヘッダーやボタンなどに、`route('books.create')`のような形でリンク先のルート名が多数記述されています。もし、これらのルートが`routes/web.php`に定義されていない状態でページを表示しようとすると、Laravelは「`books.create`という名前のルートは見つかりません」という`RouteNotDefinedException`エラーを発生させます。
+
+これを防ぐため、機能の中身が空であっても、先に**すべてのURL（ルート）と、その交通整理役であるコントローラーを定義**しておくのです。
+
+### 6.1.2. 全コントローラーの作成
+
+まずは、このアプリケーションで必要となるすべてのコントローラーを`artisan`コマンドで一括作成します。
 
 ```bash
-# CRUDの7メソッドを持つコントローラーを作成
+# 書籍・ジャンル用 (Resourceコントローラー)
 sail artisan make:controller BookController --resource
-
-# 書籍登録用のバリデーションルールを定義するクラスを作成
-sail artisan make:request StoreBookRequest
-
-# 書籍更新用のバリデーションルールを定義するクラスを作成
-sail artisan make:request UpdateBookRequest
-
-# 書籍の認可ロジックを定義するクラスを作成
-sail artisan make:policy BookPolicy --model=Book
+sail artisan make:controller GenreController --resource
+# その他機能用
+sail artisan make:controller ReviewController
+sail artisan make:controller FavoriteController
+sail artisan make:controller ReviewLikeController
+sail artisan make:controller RankingController
 ```
 
----
+### 6.1.3. ルート定義の作成 (`web.php`)
 
-## 5.3. 認可ルールの実装 (Policy)
-
-**要件**: 「自分が登録した書籍の情報は編集・削除できるが、他人が登録した書籍は編集・削除できない」
-
-この「操作の許可」を司るのがポリシーです。
-
-1.  **ポリシーの登録 (`app/Providers/AuthServiceProvider.php`)**
-    `Book`モデルに対する操作は`BookPolicy`で認可チェックを行う、という関連付けを定義します。
-
-    ```php
-    protected $policies = [
-        Book::class => BookPolicy::class, // この行を追加
-    ];
-    ```
-
-2.  **ポリシーの実装 (`app/Policies/BookPolicy.php`)**
-    `update`と`delete`メソッドに、具体的な認可ロジックを記述します。
-
-    ```php
-    public function update(User $user, Book $book): bool
-    {
-        // 操作しようとしているユーザー($user)のIDと、
-        // その書籍が元々持っているユーザーID($book->user_id)が一致するかを判定
-        return $user->id === $book->user_id;
-    }
-
-    public function delete(User $user, Book $book): bool
-    {
-        // ロジックはupdateと全く同じ
-        return $user->id === $book->user_id;
-    }
-    ```
-
----
-
-## 5.4. バリデーションルールの実装 (FormRequest)
-**要件**: 「タイトルと著者は必須」「ISBNは13桁で、重複してはならない」など、要件定義書に定められた入力データに関するルールを実装します。
-
-### `app/Http/Requests/StoreBookRequest.php` (登録用)
-
-```php
-public function rules(): array
-{
-    return [
-        // ルールは要件定義書通りに記述
-        'title' => ['required', 'string', 'max:255'],
-        'author' => ['required', 'string', 'max:255'],
-        'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'], // booksテーブル内でユニーク
-        'published_date' => ['required', 'date'],
-        'description' => ['nullable', 'string'],
-        'image_url' => ['nullable', 'url'],
-        'genres' => ['required', 'array'], // ジャンルは必須
-        'genres.*' => ['exists:genres,id'], // 配列内の各IDがgenresテーブルに存在するか
-    ];
-}
-```
-
-### `app/Http/Requests/UpdateBookRequest.php` (更新用)
-
-```php
-use Illuminate\Validation\Rule;
-
-public function rules(): array
-{
-    return [
-        // ... 他はStoreBookRequestと同じ
-        'isbn' => [
-            'required',
-            'string',
-            'size:13',
-            // 更新時は、自分自身のISBNはユニークチェックの対象外にする必要がある
-            Rule::unique('books')->ignore($this->book),
-        ],
-        // ...
-    ];
-}
-```
-
----
-
-## 5.5. ルーティングの定義 (`routes/web.php`)
-
-書籍管理機能に関するURLとコントローラーのアクションを紐付けます。
+次に、`routes/web.php`に、アプリケーションで必要となるすべてのルートを記述します。
 
 ```php
 <?php
-
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\ReviewLikeController;
+use App\Http\Controllers\GenreController;
+use App\Http\Controllers\RankingController;
 use Illuminate\Support\Facades\Route;
 
-// --- Public routes (誰でもアクセス可能) ---
+// --- 1. 具体的な名前を持つ公開ルート (最優先) ---
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
 
-// --- Authenticated routes (ログイン必須) ---
+// --- 2. 認証必須ルート ---
 Route::middleware('auth')->group(function () {
-    // 書籍登録
-    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
-    Route::post('/books', [BookController::class, 'store'])->name('books.store');
-
-    // 書籍編集
-    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
-    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
-
-    // 書籍削除
-    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
+    // 書籍管理 (Resource)
+    Route::resource('books', BookController::class)->except(['index', 'show']);
+    // ジャンル管理
+    Route::resource('genres', GenreController::class)->except(['show']);
+    // レビュー管理
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    // お気に入り機能
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    // レビューいいね機能
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
 
-// 認証関連のルートを読み込む
-require __DIR__.'/auth.php';
+// --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
+
+// 認証機能用ルート,ここはrouteServiceProviderでauth.phpの認証ルートを設定したので、なくても問題ない。
+// require __DIR__.'/auth.php';
 ```
+
+#### 📖 コードリーディング：ルート定義 (`web.php`)
+
+このルートファイルは、アプリケーションの「交通整理マップ」です。URLとコントローラーのアクションを紐付け、どの道がどこに繋がっているかを定義します。このマップは、上から順番に解釈されるため、**定義する順番が非常に重要**です。
+
+| グループ | コード / 構文 | 解説 |
+|:---|:---|:---|
+| **1. 具体的な名前を持つ公開ルート** | `Route::get('/', ...)` | **最も具体的で固定的なURL**を最初に定義します。`'/'`と`'/books'`が同じコントローラーのアクションを指しているのは、トップページと書籍一覧ページを同じものとして扱うためです。 |
+| **2. 認証必須ルート** | `Route::middleware('auth')->group(...)` | このグループ内のルートは、**ログインしているユーザーしかアクセスできません**。`auth`ミドルウェアが「門番」の役割を果たし、未ログインのユーザーをログインページにリダイレクトします。 |
+| | `Route::resource('books', ...)` | `Route::resource`は、CRUD操作に必要な7つのルートを一行で定義する便利な機能です。`except([...])`で、この中から不要なルート（今回は公開ルートとして別途定義済みの`index`と`show`）を除外しています。 |
+| | `Route::post('/books/{book}/reviews', ...)` | `Route::resource`を使わず、個別にルートを定義しています。これにより、`Route::resource`が自動生成するURL（例：`/books/{book}/reviews/{review}`）とは異なる、より直感的なURL（お気に入り登録など）を柔軟に設定できます。 |
+| **3. ワイルドカードを含む公開ルート** | `Route::get('/books/{book}', ...)` | `{book}`のように波括弧で囲まれた部分は「ワイルドカード」と呼ばれ、**任意の値を受け取る**ことができます。Laravelは、この部分の値を自動的に`Book`モデルとしてコントローラーのメソッドに渡してくれます（ルートモデルバインディング）。これらの汎用的なルートは、他の具体的なルートと衝突しないよう、**必ず最後に配置**します。 |
+| **4. 認証機能用ルート** | `require __DIR__.'/auth.php';` | Chapter 4で作成した認証関連のルート（ログイン、ログアウト、ユーザー登録など）が定義されている`auth.php`ファイルを読み込みます。これにより、ルート定義を機能ごとに分割し、`web.php`をスッキリさせることができます。 |
 
 ---
 
-## 5.6. コントローラーの実装 (`BookController.php`)
-いよいよ司令塔であるコントローラーを実装します。各メソッドが「要件」からどのように「実装」に落とし込まれるかを意識して読み進めてください。
+## 6.2. 書籍管理機能の実装 (CRUD)
+
+ここからは、`BookController`に具体的な処理を実装していきます。完全手順書に従い、まずは**権限チェック（ポリシー）を実装せずに**一通りのCRUD機能が動作することを確認し、その後に権限チェックを追加するという、実践的な手順で進めます。
+
+### 6.2.1. フォームリクエストの作成
+
+まずは、書籍の登録・更新時のバリデーションルールを定義する「フォームリクエスト」を作成します。
+
+```bash
+sail artisan make:request StoreBookRequest
+sail artisan make:request UpdateBookRequest
+```
+
+### 6.2.2. フォームリクエストの実装
+
+#### StoreBookRequest
+
+`app/Http/Requests/StoreBookRequest.php`
 
 ```php
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Requests;
 
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreBookRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url'],
+            'genres' => ['required', 'array'],
+            'genres.*' => ['exists:genres,id'],
+        ];
+    }
+}
+```
+
+#### 📖 コードリーディング：StoreBookRequest
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `public function authorize(): bool` | このリクエストの実行を許可するかどうかを決定します。 | `FormRequest`の機能の一つ。`true`を返すと、誰でもこのリクエストを送信できます。特定のユーザー（例：管理者）のみに許可したい場合は、ここにロジックを記述します。今回は認証済みユーザーなら誰でも書籍登録できるので`true`でOKです。 |
+| `return true;` | 常にリクエストを許可します。 | 認可（権限チェック）は後ほど`Policy`で行うため、ここでは単純に`true`を返します。 |
+| `public function rules(): array` | バリデーションルールを定義するメソッドです。 | ここに定義されたルールに違反したリクエストは、コントローラーのメソッドが実行される前に自動的に弾かれ、エラーメッセージと共に直前のページにリダイレクトされます。 |
+| `'title' => ['required', 'string', 'max:255']` | `title`（書籍名）フィールドに対するルール。 | `required`（必須）、`string`（文字列）、`max:255`（最大255文字）を要求します。 |
+| `'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn']` | `isbn`フィールドに対するルール。 | `unique:books,isbn`は`books`テーブルの`isbn`カラムに同じ値が存在しないことを保証します。これにより、同じ本が二重に登録されるのを防ぎます。 |
+| `'genres' => ['required', 'array']` | `genres`（ジャンル）フィールドに対するルール。 | `required`（必須）、`array`（配列）であることを要求します。 |
+| `'genres.*' => ['exists:genres,id']` | `genres`配列の各要素に対するルール。 | `genres`テーブルの`id`カラムに存在する値のみを受け付けます。これにより、存在しないジャンルIDが送信されるのを防ぎます。 `*`はワイルドカードで「配列のすべての要素」を意味します。 |
+
+#### UpdateBookRequest
+
+`app/Http/Requests/UpdateBookRequest.php`
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateBookRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url'],
+            'genres' => ['required', 'array'],
+            'genres.*' => ['exists:genres,id'],
+        ];
+    }
+}
+```
+
+#### 📖 コードリーディング：UpdateBookRequest
+
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `Rule::unique('books')->ignore($this->book)` | `books`テーブル内で一意である必要がありますが、**現在更新中の書籍自身のISBNはチェック対象から除外**します。 | `Rule::unique()`は高度な一意性ルールを定義するための機能です。`ignore($this->book)`がないと、自分自身のISBNを「重複している」と誤判定してしまい、ISBN以外の情報だけを更新することができなくなってしまいます。`$this->book`でルートから渡された`Book`モデルインスタンスにアクセスできます。 |
+
+### 6.2.3. BookController.php の実装 (権限チェックなし)
+
+`app/Http/Controllers/BookController.php`
+
+```php
+<?php
+namespace App\Http\Controllers;
 use App\Models\Book;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Genre;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
-    /**
-     * Read (Index): 書籍一覧表示
-     */
-    public function index(): View
+    public function index()
     {
-        // 要件：登録されている書籍を10件ずつのページネーションで一覧表示する。
-        // 思考：
-        // 1. N+1問題を避けるため、`with("genres")`でジャンル情報をEager Loadする。
-        // 2. 新しい投稿が上にくるように`latest()`でソートする。
-        // 3. 10件ごとにページを区切るため`paginate(10)`を使う。
         $books = Book::with("genres")->latest()->paginate(10);
         return view("books.index", compact("books"));
     }
 
-    /**
-     * Create (Form): 書籍登録フォーム表示
-     */
-    public function create(): View
+    public function create()
     {
-        // 要件：書籍登録フォームに、選択可能なジャンルの一覧を表示する。
-        // 思考：`Genre`モデルから全てのジャンルを取得してビューに渡すだけで良い。
         $genres = Genre::all();
         return view("books.create", compact("genres"));
     }
 
-    /**
-     * Create (Store): 書籍登録処理
-     */
-    public function store(StoreBookRequest $request): RedirectResponse
+    public function store(StoreBookRequest $request)
     {
-        // 要件：ログインユーザーが書籍を登録でき、ジャンルを紐付けられる。
-        // 思考：
-        // 1. バリデーションは`StoreBookRequest`が自動で行う。
-        // 2. `user_id`を自動で付与するため、`$request->user()->books()->create()`を使う。
-        // 3. 多対多のリレーションを保存するため、`attach()`メソッドでジャンルIDを中間テーブルに保存する。
         $validated = $request->validated();
         $bookData = collect($validated)->except('genres')->toArray();
         $book = $request->user()->books()->create($bookData);
         $book->genres()->attach($validated['genres']);
-
         return redirect()->route("books.show", $book)->with("success", "書籍を登録しました。");
     }
 
-    /**
-     * Read (Show): 書籍詳細表示
-     */
-    public function show(Book $book): View
+    public function show(Book $book)
     {
-        // 要件：書籍の詳細情報と、その書籍に紐付くレビューの一覧を表示する。
-        // 思考：
-        // 1. レビューと、各レビューを書いたユーザー情報を表示したい → `reviews.user`をEager Load。
-        // 2. 書籍のジャンルも表示したい → `genres`をEager Load。
-        // 3. `load()`は、既に取得済みのモデルインスタンスに対して後からEager Loadを行うメソッド。
         $book->load(["reviews.user", "genres"]);
         return view("books.show", compact("book"));
     }
 
-    /**
-     * Update (Form): 書籍編集フォーム表示
-     */
-    public function edit(Book $book): View
+    public function edit(Book $book)
     {
-        // 要件：自分が登録した書籍の情報を編集できる。
-        // 思考：
-        // 1. まず、この操作が許可されているか`BookPolicy`でチェックする → `$this->authorize("update", $book)`。
-        // 2. 認可されれば、登録フォームと同様に全ジャンル情報を取得してビューに渡す。
-        $this->authorize("update", $book);
+        // $this->authorize("update", $book);
         $genres = Genre::all();
         return view("books.edit", compact("book", "genres"));
     }
 
-    /**
-     * Update (Store): 書籍更新処理
-     */
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    public function update(UpdateBookRequest $request, Book $book)
     {
-        // 要件：書籍情報を更新し、ジャンルの紐付けも更新する。
-        // 思考：
-        // 1. まず`BookPolicy`で認可チェック。
-        // 2. バリデーションは`UpdateBookRequest`が行う。
-        // 3. `update()`メソッドで書籍情報を一括更新。
-        // 4. ジャンルは一度全て解除してから再度設定し直す`sync()`メソッドが便利。
-        $this->authorize("update", $book);
+        // $this->authorize("update", $book);
         $book->update($request->validated());
         $book->genres()->sync($request->genres);
-
         return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
     }
 
-    /**
-     * Delete: 書籍削除処理
-     */
-    public function destroy(Book $book): RedirectResponse
+    public function destroy(Book $book)
     {
-        // 要件：自分が登録した書籍を削除できる。
-        // 思考：
-        // 1. まず`BookPolicy`で認可チェック。
-        // 2. `delete()`メソッドで書籍を削除する。
-        // 3. 削除後は一覧ページにリダイレクトする。
-        $this->authorize("delete", $book);
+        // $this->authorize("delete", $book);
         $book->delete();
-
         return redirect()->route("books.index")->with("success", "書籍を削除しました。");
     }
 }
 ```
 
----
+#### 📖 コードリーディング：BookController
 
-## 5.7. ビューの実装 (Blade)
-最後に、ユーザーが操作する画面を作成します。登録画面と編集画面はフォームの内容がほぼ同じなため、共通パーツとして切り出すのが定石です。
+| メソッド | コード解説 |
+|:---|:---|
+| `index()` | `Book::with("genres")->latest()->paginate(10);` → `with("genres")`でN+1問題を回避しつつ、`latest()`で新しい順に並べ替え、`paginate(10)`で10件ずつページ分割して取得します。`compact("books")`でビューに`$books`変数を渡します。 |
+| `create()` | `Genre::all()`で全てのジャンルを取得し、登録フォームのチェックボックスを表示するためにビューに渡します。 |
+| `store()` | `collect($validated)->except('genres')`でバリデーション済みデータから`genres`キーを除外し、`$request->user()->books()->create(...)`でログインユーザーに紐付いた書籍を作成します。`$book->genres()->attach(...)`で中間テーブルにジャンル情報を保存します。 |
+| `show()` | `$book->load(["reviews.user", "genres"]);`で、書籍情報に加えて関連するレビュー（とその投稿者）とジャンルの情報を後から読み込みます（遅延Eagerローディング）。 |
+| `edit()` | `// $this->authorize("update", $book);` → **今はコメントアウト**。書籍の編集ページを表示します。`create()`と同様に全ジャンル情報もビューに渡します。 |
+| `update()` | `// $this->authorize("update", $book);` → **今はコメントアウト**。`$book->update($request->validated())`で`books`テーブルの情報を一括更新します。`$book->genres()->sync($request->genres)`で中間テーブルのジャンル情報を更新します（`sync`は一旦全て削除してから新しく登録し直すため、`attach`と異なり更新時に便利です）。 |
+| `destroy()` | `// $this->authorize("delete", $book);` → **今はコメントアウト**。`$book->delete()`で書籍を削除します。削除後は書籍一覧ページにリダイレクトします。 |
 
-### 共通フォーム部品 (`resources/views/books/_form.blade.php`)
+> **✅ 動作確認**
+> この時点で、書籍の登録、表示、編集、削除が一通り動作することを確認しましょう。ただし、まだ権限チェックがないため、**他のユーザーが登録した書籍も編集・削除できてしまう**状態です。
 
-まず、必要なディレクトリと空のファイルを作成します。
+### 6.2.4. ポリシーの作成と実装
+
+CRUDの基本的な動作が確認できたら、次に「認可」、つまり権限管理の仕組みを導入します。
 
 ```bash
-# ディレクトリを作成
-mkdir -p resources/views/books
-
-# 空のファイルを作成
-touch resources/views/books/_form.blade.php
-touch resources/views/books/create.blade.php
-touch resources/views/books/edit.blade.php
+sail artisan make:policy BookPolicy --model=Book
 ```
 
-登録・編集画面で共通して使われるフォーム部分を`@include`で呼び出せるように別ファイルに切り出します。これにより、コードの重複がなくなり、修正が容易になります。
+`app/Policies/BookPolicy.php`
 
-```html
-@csrf
-<!-- Title, Author, ISBN, etc. fields -->
-<div>
-    <label for="title">タイトル</label>
-    <input type="text" name="title" id="title" value="{{ old('title', $book->title ?? '') }}" required>
-    @error('title')<p>{{ $message }}</p>@enderror
-</div>
-<!-- ... other fields ... -->
-<div>
-    <label>ジャンル</label>
-    @foreach($genres as $genre)
-        <input type="checkbox" name="genres[]" value="{{ $genre->id }}" 
-               @if(in_array($genre->id, old('genres', $book->genres->pluck('id')->toArray() ?? []))) checked @endif>
-        <label>{{ $genre->name }}</label>
-    @endforeach
-    @error('genres')<p>{{ $message }}</p>@enderror
-</div>
+```php
+<?php
+
+namespace App\Policies;
+
+use App\Models\Book;
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+
+class BookPolicy
+{
+    public function update(User $user, Book $book): bool
+    {
+        return $user->id === $book->user_id;
+    }
+
+    public function delete(User $user, Book $book): bool
+    {
+        return $user->id === $book->user_id;
+    }
+}
 ```
 
-### 書籍登録ビュー (`resources/views/books/create.blade.php`)
+#### 📖 コードリーディング：BookPolicy
 
-```html
-<x-app-layout>
-    <x-slot name="header">書籍の登録</x-slot>
-    <form action="{{ route('books.store') }}" method="POST">
-        @include('books._form')
-        <button type="submit">登録する</button>
-    </form>
-</x-app-layout>
+| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
+|:---|:---|:---|
+| `public function update(User $user, Book $book): bool` | `update`アクションに対する権限をチェックします。 | Laravelは`$this->authorize('update', $book)`が呼ばれると、自動的にこのメソッドを探し出して実行します。第一引数には現在ログインしている`User`モデルが、第二引数には対象となる`Book`モデルが渡されます。 |
+| `return $user->id === $book->user_id;` | **ログインしているユーザーのID**と、 **書籍が持つ`user_id`** が一致するかどうかを判定します。 | `true`を返せば許可、`false`を返せば拒否（403 Forbiddenエラー）となります。これにより、「自分の投稿は自分で編集・削除できるが、他人の投稿はできない」という認可ロジックを実現しています。 |
+
+### 6.2.5. ポリシーの登録
+
+作成したポリシーをLaravelに認識させるため、`app/Providers/AuthServiceProvider.php`に登録します。
+
+`app/Providers/AuthServiceProvider.php`
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Policies\BookPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    protected $policies = [
+        Book::class => BookPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        //
+    }
+}
 ```
 
-### 書籍編集ビュー (`resources/views/books/edit.blade.php`)
+### 6.2.6. コントローラーへの権限チェック追加
 
-```html
-<x-app-layout>
-    <x-slot name="header">書籍の編集</x-slot>
-    <form action="{{ route('books.update', $book) }}" method="POST">
-        @method('PUT')
-        @include('books._form')
-        <button type="submit">更新する</button>
-    </form>
-</x-app-layout>
+最後に、`BookController`の`edit`, `update`, `destroy`メソッドのコメントアウトを解除して、ポリシーによる権限チェックを有効にします。
+
+`app/Http/Controllers/BookController.php` (変更箇所のみ)
+
+```php
+    public function edit(Book $book)
+    {
+        $this->authorize("update", $book);
+        $genres = Genre::all();
+        return view("books.edit", compact("book", "genres"));
+    }
+
+    public function update(UpdateBookRequest $request, Book $book)
+    {
+        $this->authorize("update", $book);
+        $book->update($request->validated());
+        $book->genres()->sync($request->genres);
+        return redirect()->route("books.show", $book)->with("success", "書籍情報を更新しました。");
+    }
+
+    public function destroy(Book $book)
+    {
+        $this->authorize("delete", $book);
+        $book->delete();
+        return redirect()->route("books.index")->with("success", "書籍を削除しました。");
+    }
 ```
 
-(一覧画面と詳細画面は、後のChapterで他の機能と合わせて実装します)
+#### 📖 コードリーディング：なぜ段階的に実装するのか？
 
----
+なぜ一度コメントアウトしてから、再度有効にするという一見面倒な手順を踏むのでしょうか？これは、**問題の切り分け**を容易にし、開発を効率的に進めるための実践的なテクニックです。
 
-## 5.8. 動作確認
+- **ステップ1：機能実装（コメントアウト状態）**
+  - **目的**: まずは「書籍の更新」という**基本機能が正しく動作するか**に集中します。
+  - **状態**: この段階では、誰でも編集・削除ができてしまう「穴」がある状態です。しかし、バリデーションエラーやデータベースエラーなど、機能そのものの問題を発見しやすくなります。
 
-1.  ログイン状態で `/books/create` にアクセスし、書籍を登録できることを確認します。
-2.  登録後、その書籍の詳細ページにリダイレクトされ、「書籍を登録しました。」というメッセージが表示されることを確認します。
-3.  詳細ページで、自分が登録した書籍にのみ「編集」「削除」ボタンが表示されることを確認します。
-4.  編集ページにアクセスし、情報を更新できることを確認します。
-5.  削除ボタンを押し、書籍が一覧から消えることを確認します。
-6.  （可能であれば）別のユーザーでログインし、他人が登録した書籍の編集・削除ボタンが表示されないこと、またURLを直接入力しても編集・削除ページにアクセスできないこと（403 Forbiddenエラー）を確認します。
+- **ステップ2：認可実装（コメントアウト解除）**
+  - **目的**: 基本機能が動作することを確認した後で、「**権限を持つユーザーだけが操作できるか**」という認可ロジックを追加します。
+  - **状態**: `$this->authorize()`のコメントアウトを外すと、`BookPolicy`が有効になります。ポリシーが`false`を返した場合、Laravelは自動的に403 Forbiddenエラーページを表示します。もしここで問題が発生すれば、原因はポリシーの設定にあるとすぐに特定できます。
 
-これで、書籍管理機能（CRUD）の基本実装が完了しました。
+もし最初から全てを実装してしまうと、エラーが発生した際に「機能自体のバグ」なのか「権限設定のミス」なのかを判断するのが難しくなります。このように段階を踏むことで、一つ一つの要素を確実にクリアしながら、安全に開発を進めることができるのです。
+
+> **✅ 最終動作確認**
+> - 自分が登録した書籍の編集・削除ができること。
+- 他人が登録した書籍の編集・削除ページにアクセスしようとすると「403 | THIS ACTION IS UNAUTHORIZED.」と表示されること。
+> 
+> 上記を確認できれば、書籍管理機能の実装は完了です。
