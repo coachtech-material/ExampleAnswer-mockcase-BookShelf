@@ -94,9 +94,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('books', function (Blueprint $table) {
+        Schema::create('books', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // 誰が登録した書籍かを記録
             $table->string('title');
@@ -109,6 +112,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('books');
@@ -128,6 +134,8 @@ return new class extends Migration
 | `->unique()` | **UNIQUE** | **Chapter 0のヒアリング（Q3）**で「一意（Unique）制約をかける」と決めた仕様です。同じISBNの書籍が重複登録されるのをデータベースレベルで防ぎます。 |
 | `->nullable()` | **Yes** (NULL許容) | **Chapter 0のヒアリング（Q4）**で「任意入力」と決めた仕様を実現しています。`description`と`image_url`は空でも登録可能です。 |
 | `$table->timestamps();` | `created_at`, `updated_at` (TIMESTAMP) | Laravelの標準機能で、レコードの作成日時と更新日時を自動管理します。 |
+| `function (Blueprint $table): void` | **型定義** | クロージャ（無名関数）の戻り値が何もないこと(`void`)を明示しています。これによりコードの可読性が向上し、意図しない戻り値を防ぎます。 |
+| `public function up(): void` | **型定義** | `up`メソッドが値を返さないことを示します。マイグレーションの実行ロジックのみを担当します。 |
 
 ---
 
@@ -158,9 +166,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('reviews', function (Blueprint $table) {
+        Schema::create('reviews', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('book_id')->constrained()->onDelete('cascade');
@@ -170,6 +181,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('reviews');
@@ -212,15 +226,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('genres', function (Blueprint $table) {
+        Schema::create('genres', function (Blueprint $table): void {
             $table->id();
             $table->string('name')->unique();
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('genres');
@@ -264,15 +284,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('book_genre', function (Blueprint $table) {
+        Schema::create('book_genre', function (Blueprint $table): void {
             $table->foreignId('book_id')->constrained()->onDelete('cascade');
             $table->foreignId('genre_id')->constrained()->onDelete('cascade');
             $table->primary(['book_id', 'genre_id']);
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('book_genre');
@@ -320,15 +346,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('favorites', function (Blueprint $table) {
+        Schema::create('favorites', function (Blueprint $table): void {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('book_id')->constrained()->onDelete('cascade');
             $table->primary(['user_id', 'book_id']);
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('favorites');
@@ -372,15 +404,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('review_likes', function (Blueprint $table) {
+        Schema::create('review_likes', function (Blueprint $table): void {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('review_id')->constrained()->onDelete('cascade');
             $table->primary(['user_id', 'review_id']);
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('review_likes');
@@ -412,7 +450,7 @@ sail artisan migrate
 ### 2.3.2. コードリーディング：`artisan migrate`コマンド
 
 | 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
+|:---|:---|:---|
 | `sail artisan` | Sailコンテナ内でLaravelのArtisanコマンドを実行するためのコマンド | (コマンドの実行結果) | `sail`は`./vendor/bin/sail`のエイリアスです。 |
 | `migrate` | `database/migrations`ディレクトリ内のまだ実行されていないマイグレーションを実行するコマンド | `void` | 実行済みのマイグレーションは`migrations`テーブルに記録され、二重実行はされません。 |
 
@@ -443,5 +481,6 @@ sail artisan migrate
 | UNIQUE | `->unique()` | 重複禁止制約 |
 | NULL許容 | `->nullable()` | 空値を許可 |
 | 複合主キー | `$table->primary(['col1', 'col2'])` | 複数カラムの組み合わせを主キーに |
+| 型定義 | `function (Blueprint $table): void` | 関数の戻り値がないことを明示 |
 
 これで、**Chapter 0で設計した通りの構造**で、アプリケーションのデータを保存するための器（テーブル）が用意できました。次のChapterでは、これらのテーブルを操作するための「モデル」を作成していきます。
