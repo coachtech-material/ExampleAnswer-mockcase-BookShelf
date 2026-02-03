@@ -164,8 +164,7 @@ namespace Database\Factories;
 use App\Models\Book;
 use App\Models\Review;
 use App\Models\User;
-use Illuminate\
-Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ReviewFactory extends Factory
 {
@@ -396,14 +395,14 @@ class BookTest extends TestCase
 {
     use RefreshDatabase;
 
-    // 書籍一覧ページが表示される
     public function test_book_index_page_can_be_rendered(): void
     {
         Book::factory()->count(2)->create();
-        $this->get(route('books.index'))->assertOk();
+
+        $this->get(route('books.index'))
+            ->assertOk();
     }
 
-    // 書籍検索が機能する
     public function test_book_search_returns_matching_results(): void
     {
         Book::factory()->create(['title' => 'Laravel Testing Guide']);
@@ -415,99 +414,154 @@ class BookTest extends TestCase
             ->assertDontSee('Another Book');
     }
 
-    // 認証済みユーザーは登録フォームを表示できる
     public function test_authenticated_user_can_view_create_form(): void
     {
         $user = User::factory()->create();
-        $this->actingAs($user)->get(route('books.create'))->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('books.create'))
+            ->assertOk();
     }
 
-    // 未認証ユーザーは登録フォームを表示できない
     public function test_guest_cannot_view_create_form(): void
     {
-        $this->get(route('books.create'))->assertRedirect(route('login'));
+        $this->get(route('books.create'))
+            ->assertRedirect(route('login'));
     }
 
-    // 認証済みユーザーは書籍を登録できる
     public function test_authenticated_user_can_create_book(): void
     {
         $user = User::factory()->create();
         $genres = Genre::factory()->count(2)->create();
-        $payload = $this->validBookData(['genres' => $genres->pluck('id')->toArray()]);
+
+        $payload = $this->validBookData([
+            'title' => 'My Test Book',
+            'isbn' => '1111111111111',
+            'genres' => $genres->pluck('id')->toArray(),
+        ]);
 
         $response = $this->actingAs($user)->post(route('books.store'), $payload);
 
-        $book = Book::first();
+        $book = Book::where('title', 'My Test Book')->first();
         $this->assertNotNull($book);
+
         $response->assertRedirect(route('books.show', $book));
-        $this->assertDatabaseHas('books', ['title' => $payload['title']]);
-        $this->assertTrue($book->genres->contains($genres[0]));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'user_id' => $user->id,
+            'title' => 'My Test Book',
+        ]);
+
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
     }
 
-    // 書籍登録時のバリデーションが機能する
     public function test_book_store_validation_errors(): void
     {
         $user = User::factory()->create();
-        $this->actingAs($user)->post(route('books.store'), ['title' => ''])
-            ->assertSessionHasErrors(['title', 'author', 'isbn', 'published_date', 'genres']);
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => '',
+            'author' => '',
+            'isbn' => '123',
+            'published_date' => 'invalid-date',
+            'genres' => [],
+        ]);
+
+        $response->assertSessionHasErrors(['title', 'isbn', 'genres']);
+        $this->assertDatabaseCount('books', 0);
     }
 
-    // 書籍詳細ページが表示される
     public function test_book_show_page_can_be_rendered(): void
     {
         $book = Book::factory()->create(['title' => 'Detail Book']);
-        $this->get(route('books.show', $book))->assertOk()->assertSee('Detail Book');
+
+        $this->get(route('books.show', $book))
+            ->assertOk()
+            ->assertSee('Detail Book');
     }
 
-    // 認証済みユーザーは書籍を更新できる
     public function test_authenticated_user_can_update_book(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->for($user)->create();
+        $originalGenre = Genre::factory()->create();
+        $book->genres()->attach($originalGenre);
         $newGenres = Genre::factory()->count(2)->create();
-        $payload = $this->validBookData(['title' => 'Updated Title', 'genres' => $newGenres->pluck('id')->toArray()]);
 
-        $this->actingAs($user)->put(route('books.update', $book), $payload)
-            ->assertRedirect(route('books.show', $book));
+        $payload = $this->validBookData([
+            'title' => 'Updated Title',
+            'isbn' => '9876543210123',
+            'genres' => $newGenres->pluck('id')->toArray(),
+        ]);
 
-        $this->assertDatabaseHas('books', ['title' => 'Updated Title']);
-        $this->assertTrue($book->fresh()->genres->contains($newGenres[0]));
+        $response = $this->actingAs($user)->put(route('books.update', $book), $payload);
+
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => 'Updated Title',
+            'isbn' => '9876543210123',
+        ]);
+
+        foreach ($newGenres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+
+        $this->assertDatabaseMissing('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $originalGenre->id,
+        ]);
     }
 
-    // 認証済みユーザーは書籍を削除できる
     public function test_authenticated_user_can_delete_book(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->for($user)->create();
 
-        $this->actingAs($user)->delete(route('books.destroy', $book))
+        $this->actingAs($user)
+            ->delete(route('books.destroy', $book))
             ->assertRedirect(route('books.index'));
 
         $this->assertDatabaseMissing('books', ['id' => $book->id]);
     }
 
-    // 所有者のみが編集フォームを表示できる（認可テスト）
     public function test_only_owner_can_view_edit_form(): void
     {
         $owner = User::factory()->create();
         $book = Book::factory()->for($owner)->create();
         $otherUser = User::factory()->create();
 
-        $this->actingAs($owner)->get(route('books.edit', $book))->assertOk();
-        $this->actingAs($otherUser)->get(route('books.edit', $book))->assertForbidden();
+        $this->actingAs($owner)
+            ->get(route('books.edit', $book))
+            ->assertOk();
+
+        $this->actingAs($otherUser)
+            ->get(route('books.edit', $book))
+            ->assertForbidden();
     }
 
-    // テストデータ生成用のヘルパーメソッド
     private function validBookData(array $overrides = []): array
     {
+        $genres = $overrides['genres'] ?? Genre::factory()->count(2)->create()->pluck('id')->toArray();
+
         return array_merge([
             'title' => 'Sample Book',
             'author' => 'Sample Author',
-            'isbn' => fake()->unique()->numerify(str_repeat('#', 13)),
+            'isbn' => '1234567890123',
             'published_date' => '2024-01-01',
             'description' => 'Sample description',
             'image_url' => 'https://example.com/image.jpg',
-            'genres' => Genre::factory()->create()->pluck('id')->toArray(),
+            'genres' => $genres,
         ], $overrides);
     }
 }
@@ -534,85 +588,542 @@ class ReviewTest extends TestCase
 {
     use RefreshDatabase;
 
-    // 認証済みユーザーはレビューを投稿できる
     public function test_authenticated_user_can_create_review(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
 
-        $this->actingAs($user)->post(route('reviews.store', $book), ['rating' => 5, 'comment' => 'Great read'])
-            ->assertRedirect(route('books.show', $book));
+        $response = $this->actingAs($user)->post(route('reviews.store', $book), [
+            'rating' => 5,
+            'comment' => 'Great read',
+        ]);
 
-        $this->assertDatabaseHas('reviews', ['user_id' => $user->id, 'book_id' => $book->id, 'rating' => 5]);
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('reviews', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'rating' => 5,
+        ]);
     }
 
-    // 未認証ユーザーはレビューを投稿できない
     public function test_guest_cannot_create_review(): void
     {
         $book = Book::factory()->create();
-        $this->post(route('reviews.store', $book), ['rating' => 4])->assertRedirect(route('login'));
+
+        $this->post(route('reviews.store', $book), [
+            'rating' => 4,
+            'comment' => 'Guest review',
+        ])->assertRedirect(route('login'));
     }
 
-    // レビュー投稿時のバリデーションが機能する
     public function test_review_store_validation_errors(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
 
-        $this->actingAs($user)->post(route('reviews.store', $book), ['rating' => 6])
-            ->assertSessionHasErrors(['rating']);
+        $response = $this->actingAs($user)->post(route('reviews.store', $book), [
+            'rating' => 6,
+            'comment' => str_repeat('a', 1001),
+        ]);
+
+        $response->assertSessionHasErrors(['rating']);
+        $this->assertDatabaseCount('reviews', 0);
     }
 
-    // 所有者のみが編集フォームを表示できる
     public function test_only_owner_can_edit_review(): void
     {
         $owner = User::factory()->create();
         $review = Review::factory()->for($owner)->create();
         $otherUser = User::factory()->create();
 
-        $this->actingAs($owner)->get(route('reviews.edit', $review))->assertOk();
-        $this->actingAs($otherUser)->get(route('reviews.edit', $review))->assertForbidden();
+        $this->actingAs($owner)
+            ->get(route('reviews.edit', $review))
+            ->assertOk();
+
+        $this->actingAs($otherUser)
+            ->get(route('reviews.edit', $review))
+            ->assertForbidden();
     }
 
-    // 所有者のみがレビューを更新できる
     public function test_only_owner_can_update_review(): void
     {
         $owner = User::factory()->create();
         $review = Review::factory()->for($owner)->create(['rating' => 3]);
         $otherUser = User::factory()->create();
 
-        $this->actingAs($owner)->put(route('reviews.update', $review), ['rating' => 4, 'comment' => 'Updated'])
+        $this->actingAs($owner)
+            ->put(route('reviews.update', $review), [
+                'rating' => 4,
+                'comment' => 'Updated comment',
+            ])
             ->assertRedirect(route('books.show', $review->book));
-        $this->assertDatabaseHas('reviews', ['id' => $review->id, 'rating' => 4]);
 
-        $this->actingAs($otherUser)->put(route('reviews.update', $review), ['rating' => 2])->assertForbidden();
+        $this->assertDatabaseHas('reviews', [
+            'id' => $review->id,
+            'rating' => 4,
+            'comment' => 'Updated comment',
+        ]);
+
+        $this->actingAs($otherUser)
+            ->put(route('reviews.update', $review), [
+                'rating' => 2,
+                'comment' => 'Not allowed',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('reviews', [
+            'id' => $review->id,
+            'rating' => 4,
+            'comment' => 'Updated comment',
+        ]);
     }
 
-    // 所有者のみがレビューを削除できる
     public function test_only_owner_can_delete_review(): void
     {
         $owner = User::factory()->create();
         $review = Review::factory()->for($owner)->create();
         $otherUser = User::factory()->create();
 
-        $this->actingAs($otherUser)->delete(route('reviews.destroy', $review))->assertForbidden();
+        $this->actingAs($otherUser)
+            ->delete(route('reviews.destroy', $review))
+            ->assertForbidden();
+
         $this->assertDatabaseHas('reviews', ['id' => $review->id]);
 
-        $this->actingAs($owner)->delete(route('reviews.destroy', $review))
+        $this->actingAs($owner)
+            ->delete(route('reviews.destroy', $review))
             ->assertRedirect(route('books.show', $review->book));
+
         $this->assertDatabaseMissing('reviews', ['id' => $review->id]);
     }
 }
 ```
 
-### その他のFeatureテスト
+### FavoriteTest (お気に入り機能)
 
-同様に、お気に入り、レビューいいね、ランキング、ジャンル管理のテストも作成します。これらのテストは、各機能が仕様通りに動作することを保証するために不可欠です。
+`tests/Feature/FavoriteTest.php`
 
-- **FavoriteTest**: お気に入りの追加・解除（toggle）、一覧表示、未認証ユーザーのアクセス制限をテストします。
-- **ReviewLikeTest**: レビューへのいいねの追加・解除（toggle）、未認証ユーザーのアクセス制限をテストします。
-- **RankingTest**: ランキングページが表示され、書籍がレビューの平均評価順に正しく並んでいることをテストします。
-- **GenreTest**: ジャンルのCRUD操作、バリデーション、そして「書籍が紐付いているジャンルは削除できない」という特殊なビジネスロジックをテストします。
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class FavoriteTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_add_favorite(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+        $from = route('books.show', $book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+    }
+
+    public function test_user_can_remove_favorite(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+        $user->favoriteBooks()->attach($book->id);
+        $from = route('books.show', $book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+    }
+
+    public function test_favorite_toggle_works_correctly(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+        $from = route('books.show', $book);
+
+        // Add to favorites
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+
+        // Remove from favorites
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+    }
+
+    public function test_favorite_index_page_can_be_rendered(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Favorite Book']);
+        $user->favoriteBooks()->attach($book->id);
+
+        $this->actingAs($user)
+            ->get(route('favorites.index'))
+            ->assertOk()
+            ->assertSee('Favorite Book');
+    }
+
+    public function test_guest_cannot_toggle_favorite(): void
+    {
+        $book = Book::factory()->create();
+
+        $this->post(route('favorites.toggle', $book))
+            ->assertRedirect(route('login'));
+    }
+}
+```
+
+### ReviewLikeTest (レビューいいね機能)
+
+`tests/Feature/ReviewLikeTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ReviewLikeTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_like_review(): void
+    {
+        $user = User::factory()->create();
+        $review = Review::factory()->create();
+        $from = route('books.show', $review->book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+    }
+
+    public function test_user_can_unlike_review(): void
+    {
+        $user = User::factory()->create();
+        $review = Review::factory()->create();
+        $user->likedReviews()->attach($review->id);
+        $from = route('books.show', $review->book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+    }
+
+    public function test_like_toggle_works_correctly(): void
+    {
+        $user = User::factory()->create();
+        $review = Review::factory()->create();
+        $from = route('books.show', $review->book);
+
+        // Like a review
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+
+        // Unlike a review
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+    }
+
+    public function test_guest_cannot_like_review(): void
+    {
+        $review = Review::factory()->create();
+
+        $this->post(route('reviews.like', $review))
+            ->assertRedirect(route('login'));
+    }
+}
+```
+
+### RankingTest (ランキング機能)
+
+`tests/Feature/RankingTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Review;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RankingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_ranking_page_can_be_rendered(): void
+    {
+        $book = Book::factory()->create(['title' => 'Ranked Book']);
+        Review::factory()->for($book)->count(2)->create(['rating' => 5]);
+
+        $this->get(route('ranking.index'))
+            ->assertOk()
+            ->assertSee('Ranked Book');
+    }
+
+    public function test_ranking_is_ordered_by_average_rating(): void
+    {
+        $topBook = Book::factory()->create(['title' => 'Top Book']);
+        Review::factory()->for($topBook)->count(2)->create(['rating' => 5]);
+
+        $middleBook = Book::factory()->create(['title' => 'Middle Book']);
+        Review::factory()->for($middleBook)->count(2)->create([
+            'rating' => 3,
+        ]);
+
+        $lowBook = Book::factory()->create(['title' => 'Low Book']);
+        Review::factory()->for($lowBook)->count(2)->create([
+            'rating' => 1,
+        ]);
+
+        $this->get(route('ranking.index'))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Top Book',
+                'Middle Book',
+                'Low Book',
+            ]);
+    }
+}
+```
+
+### GenreTest (ジャンル管理機能)
+
+`tests/Feature/GenreTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class GenreTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_genre_index_page_can_be_rendered(): void
+    {
+        $user = User::factory()->create();
+        Genre::factory()->count(3)->create();
+
+        $this->actingAs($user)
+            ->get(route('genres.index'))
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_create_genre(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('genres.store'), [
+                'name' => 'Science Fiction',
+            ])
+            ->assertRedirect(route('genres.index'));
+
+        $this->assertDatabaseHas('genres', ['name' => 'Science Fiction']);
+    }
+
+    public function test_genre_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        Genre::factory()->create(['name' => 'Fantasy']);
+
+        $this->actingAs($user)
+            ->post(route('genres.store'), ['name' => 'Fantasy'])
+            ->assertSessionHasErrors(['name']);
+    }
+
+    public function test_authenticated_user_can_view_create_form(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('genres.create'))
+            ->assertOk();
+    }
+
+    public function test_genre_show_page_displays_books(): void
+    {
+        $genre = Genre::factory()->create(['name' => 'Mystery']);
+        $book = Book::factory()->create(['title' => 'Mystery Book']);
+        $book->genres()->attach($genre);
+
+        $this->get(route('genres.show', $genre))
+            ->assertOk()
+            ->assertSee('Mystery Book');
+    }
+
+    public function test_authenticated_user_can_update_genre(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'History']);
+
+        $this->actingAs($user)
+            ->put(route('genres.update', $genre), ['name' => 'World History'])
+            ->assertRedirect(route('genres.index'));
+
+        $this->assertDatabaseHas('genres', [
+            'id' => $genre->id,
+            'name' => 'World History',
+        ]);
+    }
+
+    public function test_authenticated_user_can_view_edit_form(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Poetry']);
+
+        $this->actingAs($user)
+            ->get(route('genres.edit', $genre))
+            ->assertOk();
+    }
+
+    public function test_genre_with_books_cannot_be_deleted(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Adventure']);
+        $book = Book::factory()->create();
+        $book->genres()->attach($genre);
+
+        $this->actingAs($user)
+            ->delete(route('genres.destroy', $genre))
+            ->assertRedirect(route('genres.index'))
+            ->assertSessionHas('error', 'このジャンルには書籍が紐付いているため削除できません。');
+
+        $this->assertDatabaseHas('genres', ['id' => $genre->id]);
+    }
+
+    public function test_genre_without_books_can_be_deleted(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Short Stories']);
+
+        $this->actingAs($user)
+            ->delete(route('genres.destroy', $genre))
+            ->assertRedirect(route('genres.index'))
+            ->assertSessionHas('success', 'ジャンルを削除しました。');
+
+        $this->assertDatabaseMissing('genres', ['id' => $genre->id]);
+    }
+}
+```
+
+### RedirectIfAuthenticatedTest (認証リダイレクト)
+
+`tests/Feature/RedirectIfAuthenticatedTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Http\Middleware\RedirectIfAuthenticated;
+use App\Models\User;
+use App\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Tests\TestCase;
+
+class RedirectIfAuthenticatedTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_user_is_redirected_to_home(): void
+    {
+        $middleware = new RedirectIfAuthenticated();
+        $request = Request::create('/login', 'GET');
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+
+        $response = $middleware->handle($request, fn () => response('next'));
+
+        $this->assertEquals(url(RouteServiceProvider::HOME), $response->headers->get('Location'));
+
+        Auth::logout();
+    }
+
+    public function test_guest_can_access_route(): void
+    {
+        $middleware = new RedirectIfAuthenticated();
+        $request = Request::create('/login', 'GET');
+
+        $response = $middleware->handle($request, fn () => response('allowed'));
+
+        $this->assertEquals('allowed', $response->getContent());
+    }
+}
+```
 
 ---
 
