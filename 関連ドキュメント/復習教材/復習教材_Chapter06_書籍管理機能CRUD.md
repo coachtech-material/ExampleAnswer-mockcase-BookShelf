@@ -1,4 +1,4 @@
-# Chapter 5: 書籍管理機能 (CRUD)
+# Chapter 6: 書籍管理機能 (CRUD)
 
 このChapterでは、アプリケーションの中核となる書籍管理機能（CRUD: Create, Read, Update, Delete）を実装します。認証済みのユーザーが、自身で書籍を登録・編集・削除できる一連の機能を、Laravelの作法に則って構築します。
 
