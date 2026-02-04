@@ -6,6 +6,7 @@
 
 - **Eloquentでの集計**: `withAvg` や `withCount` を使い、関連するデータの平均値や件数を取得する方法を学びます。
 - **並び替え**: 集計した結果（平均評価）に基づいて、データを降順に並び替える方法を学びます。
+- **型定義の活用**: コントローラーのメソッドに戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
     
 ---
 
@@ -33,10 +34,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Book;
+use Illuminate\View\View;
 
 class RankingController extends Controller
 {
-    public function index()
+    public function index(): View
     {
         // レビューが存在する書籍に絞り込み、評価の高い順に10件取得
         $rankedBooks = Book::whereHas('reviews')
@@ -55,10 +57,12 @@ class RankingController extends Controller
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `whereHas('reviews')` | レビューが少なくとも1件以上存在する書籍のみに絞り込みます。 | レビューがない（平均評価が計算できない）書籍をランキングから除外するために使用します。 |
-| `withCount('reviews as review_count')` | 各書籍に関連付けられたレビューの数を `review_count` という名前で取得します。 | `$book->review_count` で件数にアクセスできるようになります。 |
-| `withAvg('reviews as average_rating', 'rating')` | `reviews` テーブルの `rating` カラムの平均値を計算し、`average_rating` という名前で取得します。 | 内部的にサブクエリが発行されます。`groupBy` を明示的に書く必要がなく、可読性の高い記述が可能です。 |
-| `orderByDesc('average_rating')` | 集計した平均評価が高い順に並び替えます。 | `DESC` は降順（大きい順）を意味します。 |
+| `public function index(): View` | ランキングページを表示するためのメソッド。 | `Route::get("/ranking", ...)`に対応します。 |
+| **`: View`** | **戻り値の型定義**。このメソッドが`View`オブジェクト（HTMLページ）を返すことを明示します。 | これにより、メソッドの役割が「ページを表示する」ことであると明確になります。 |
+| `whereHas(\'reviews\')` | レビューが少なくとも1件以上存在する書籍のみに絞り込みます。 | レビューがない（平均評価が計算できない）書籍をランキングから除外するために使用します。 |
+| `withCount(\'reviews as review_count\')` | 各書籍に関連付けられたレビューの数を `review_count` という名前で取得します。 | `$book->review_count` で件数にアクセスできるようになります。 |
+| `withAvg(\'reviews as average_rating\', \'rating\')` | `reviews` テーブルの `rating` カラムの平均値を計算し、`average_rating` という名前で取得します。 | 内部的にサブクエリが発行されます。`groupBy` を明示的に書く必要がなく、可読性の高い記述が可能です。 |
+| `orderByDesc(\'average_rating\')` | 集計した平均評価が高い順に並び替えます。 | `DESC` は降順（大きい順）を意味します。 |
 | `take(10)` | 取得する件数を最大10件に制限します。 | SQLの `LIMIT 10` に相当します。 |
 
 
