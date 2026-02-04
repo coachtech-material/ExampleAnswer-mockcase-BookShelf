@@ -6,6 +6,7 @@
 
 - **パターンの再利用**: お気に入り機能と同じ設計パターンを、レビューいいね機能に適用します。
 - **学習の定着**: 同じパターンを繰り返し実装することで、理解を深めます。
+- **型定義の活用**: コントローラーのメソッドに戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
 
 ---
 
@@ -40,12 +41,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Review;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 
 class ReviewLikeController extends Controller
 {
     // Bladeの要求に合わせて toggle メソッドに変更
-    public function toggle(Review $review)
+    public function toggle(Review $review): RedirectResponse
     {
         // ユーザーがすでにいいねしていれば解除、していなければ登録を自動で行う
         Auth::user()->likedReviews()->toggle($review->id);
@@ -59,7 +61,8 @@ class ReviewLikeController extends Controller
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `public function toggle(Review $review)` | `toggle`という名前の公開メソッドを定義。引数で`Review`モデルを受け取る。 | `(Review $review)`は「ルートモデルバインディング」。URLの`{review}`の部分に対応するIDを持つ`Review`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| `public function toggle(Review $review): RedirectResponse` | `toggle`という名前の公開メソッドを定義。引数で`Review`モデルを受け取る。 | `(Review $review)`は「ルートモデルバインディング」。URLの`{review}`の部分に対応するIDを持つ`Review`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| **`: RedirectResponse`** | **戻り値の型定義**。このメソッドがリダイレクトレスポンスを返すことを明示します。 | これにより、メソッドの役割が「処理を行い、どこかへリダイレクトする」ことであると一目でわかります。意図しない値が返されるのを防ぎ、コードの堅牢性を高めます。 |
 | `Auth::user()` | ログインしているユーザーの`User`モデルインスタンスを取得する。 | `Auth`ファサードを経由して、セッション情報から認証済みユーザーを取得している。 |
 | `->likedReviews()` | `User`モデルに定義した`likedReviews`リレーション（`belongsToMany`）を取得する。 | これにより、`review_likes`中間テーブルを操作するためのクエリビルダが返される。 |
 | `->toggle($review->id)` | `belongsToMany`リレーションの`toggle`メソッドを実行。 | 中間テーブルに`($user->id, $review->id)`の組み合わせが存在すれば削除し、存在しなければ追加する、という処理を自動で行ってくれる。 |
