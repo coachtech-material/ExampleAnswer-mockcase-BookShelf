@@ -190,6 +190,12 @@ class ReviewFactory extends Factory
 
 最初に、アプリケーションの心臓部であるモデルのリレーションシップが正しく定義されているかを確認するUnitテストを作成します。
 
+以下のコマンドで、`User`モデルのUnitテストを作成します。
+
+```bash
+sail artisan make:test UserModelTest --unit
+```
+
 ### UserModelTest
 
 `tests/Unit/UserModelTest.php`
@@ -249,6 +255,12 @@ class UserModelTest extends TestCase
     - `$this->assertTrue($user->books->contains($ownedBook))`: `$user->books`（ユーザーが所有する書籍のコレクション）に、先ほど作成した`$ownedBook`が含まれていることを確認します。`contains()`は、コレクション内に指定したモデルインスタンスが存在するかを判定するメソッドです。
     - 他の`assertTrue`も同様に、各リレーションのコレクションに、準備段階で作成・紐付けしたモデルが含まれていることを一つずつ検証しています。
 
+以下のコマンドで、`Book`モデルのUnitテストを作成します。
+
+```bash
+sail artisan make:test BookModelTest --unit
+```
+
 ### BookModelTest
 
 `tests/Unit/BookModelTest.php`
@@ -301,6 +313,12 @@ class BookModelTest extends TestCase
 - **Assert (検証)**
     - `$this->assertTrue($book->user->is($user))`: `$book->user`（1対多の逆リレーション）で取得したユーザーが、最初に作成した`$user`と同一のインスタンスであることを`is()`メソッドで確認します。`is()`は、2つのモデルが同じIDとテーブルを持つかを比較します。
     - 他の`contains()`は`UserModelTest`と同様に、コレクション内に期待するモデルが含まれているかを確認しています。
+
+以下のコマンドで、`Review`モデルのUnitテストを作成します。
+
+```bash
+sail artisan make:test ReviewModelTest --unit
+```
 
 ### ReviewModelTest
 
@@ -415,6 +433,12 @@ class AuthServiceProvider extends ServiceProvider
         //
     }
 }
+```
+
+以下のコマンドで、書籍管理機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test BookTest
 ```
 
 ### BookTest (書籍管理機能)
@@ -642,6 +666,12 @@ class BookTest extends TestCase
 
 - **`validBookData`**: テスト用の有効な書籍データを生成するプライベートなヘルパーメソッドです。これにより、テストコードの重複を減らし、可読性を高めています。
 
+以下のコマンドで、レビュー機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test ReviewTest
+```
+
 ### ReviewTest (レビュー機能)
 
 `tests/Feature/ReviewTest.php`
@@ -788,6 +818,12 @@ class ReviewTest extends TestCase
 
 - **`test_only_owner_can_...`**: 3つのテスト（`edit`, `update`, `delete`）は、いずれも認可のテストです。レビューの所有者（`$owner`）と他人（`$otherUser`）を作成し、所有者は操作に成功し（`assertOk`）、他人は拒否される（`assertForbidden`）ことを確認します。削除テストでは、`assertDatabaseMissing`を使って、レコードが実際にデータベースから消えたことも検証しています。
 
+以下のコマンドで、お気に入り機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test FavoriteTest
+```
+
 ### FavoriteTest (お気に入り機能)
 
 `tests/Feature/FavoriteTest.php`
@@ -909,6 +945,12 @@ class FavoriteTest extends TestCase
 
 - **`test_favorite_index_page_can_be_rendered`**: お気に入り一覧ページが正常に表示され、お気に入りした書籍のタイトルが表示されていることを確認します。
 
+以下のコマンドで、レビューいいね機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test ReviewLikeTest
+```
+
 ### ReviewLikeTest (レビューいいね機能)
 
 `tests/Feature/ReviewLikeTest.php`
@@ -1008,6 +1050,12 @@ class ReviewLikeTest extends TestCase
 
 - このテストファイルの各メソッドは、`FavoriteTest`の対応するメソッドと全く同じロジックです。対象が`Book`から`Review`に、中間テーブルが`favorites`から`review_likes`に変わっているだけです。この類似性に気づくことが重要です。
 
+以下のコマンドで、ランキング機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test RankingTest
+```
+
 ### RankingTest (ランキング機能)
 
 `tests/Feature/RankingTest.php`
@@ -1072,6 +1120,12 @@ class RankingTest extends TestCase
 - **`test_ranking_is_ordered_by_average_rating`**: ランキングの並び順が正しいかをテストします。
     - **Arrange**: 評価が5、3、1となる3冊の書籍（`$topBook`, `$middleBook`, `$lowBook`）を意図的に作成します。
     - **Assert**: `$this->get(route('ranking.index'))`でランキングページを取得し、`assertSeeInOrder([...])`を使って、レスポンスのHTML内に指定した文字列がこの順番通りに出現することを確認します。
+
+以下のコマンドで、ジャンル管理機能のFeatureテストを作成します。
+
+```bash
+sail artisan make:test GenreTest
+```
 
 ### GenreTest (ジャンル管理機能)
 
@@ -1218,6 +1272,12 @@ class GenreTest extends TestCase
     - **Arrange**: 書籍が紐付いていないジャンルを作成します。
     - **Act**: 削除リクエストを送信します。
     - **Assert**: `assertSessionHas('success', ...)`で成功メッセージを確認し、`assertDatabaseMissing`でジャンルがDBから削除されたことを確認します。
+
+以下のコマンドで、認証リダイレクトのFeatureテストを作成します。
+
+```bash
+sail artisan make:test RedirectIfAuthenticatedTest
+```
 
 ### RedirectIfAuthenticatedTest (認証リダイレクト)
 
