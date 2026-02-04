@@ -7,6 +7,7 @@
 - **リレーションを活用した絞り込み**: ジャンルから関連する書籍を取得する方法を学びます。
 - **Eagerロード**: N+1問題を防ぐための`with()`メソッドの使い方を復習します。
 - **ページネーション**: 大量のデータを分割して表示する方法を学びます。
+- **型定義の活用**: コントローラーのメソッドに戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
 
 ---
 
@@ -55,13 +56,14 @@ Genre (ジャンル) ※各書籍に紐づくジャンル情報
 namespace App\Http\Controllers;
 
 use App\Models\Genre;
+use Illuminate\View\View;
 // 他のuse宣言はChapter 12で追加します
 
 class GenreController extends Controller
 {
     // Chapter 12で他のメソッドを追加します
 
-    public function show(Genre $genre)
+    public function show(Genre $genre): View
     {
         $books = $genre->books()->with('genres')->paginate(10);
         return view('genres.show', compact('genre', 'books'));
@@ -74,7 +76,8 @@ class GenreController extends Controller
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
 | `use App\Models\Genre;` | `Genre`モデルをインポート。 | コントローラー内で`Genre`クラスを使用するために必要。 |
-| `public function show(Genre $genre)` | `show`という名前の公開メソッドを定義。引数で`Genre`モデルを受け取る。 | `(Genre $genre)`は「ルートモデルバインディング」。URLの`{genre}`の部分に対応するIDを持つ`Genre`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| `use Illuminate\View\View;` | `View`クラスをインポート。 | メソッドの戻り値として`View`型を明示するために必要。 |
+| `public function show(Genre $genre): View` | `show`という名前の公開メソッドを定義。引数で`Genre`モデルを受け取り、戻り値として`View`オブジェクトを返す。 | `(Genre $genre)`は「ルートモデルバインディング」。URLの`{genre}`の部分に対応するIDを持つ`Genre`モデルのインスタンスが自動的にDI（依存性注入）される。<br>**: View** は、このメソッドがHTMLページを返すことを明示します。これにより、メソッドの役割が一目でわかり、意図しない型の値が返されるのを防ぎます。 |
 | `$genre->books()` | `Genre`モデルに定義した`books`リレーション（`belongsToMany`）を取得する。 | これにより、そのジャンルに属する書籍を取得するためのクエリビルダが返される。 |
 | `->with('genres')` | 書籍に紐づくジャンル情報をEagerロードする。 | N+1問題を防ぐため。各書籍のジャンルを表示する際に、追加のクエリが発生しない。 |
 | `->paginate(10)` | 10件ずつページネーションして取得する。 | 大量の書籍があっても、適切な件数で分割表示できる。 |
