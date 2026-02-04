@@ -7,6 +7,7 @@
 - **多対多リレーションの操作**: `belongsToMany`リレーションで定義した中間テーブル（`favorites`）を操作する方法を学びます。
 - **`toggle`メソッド**: 1つのアクションで登録と解除を切り替える効率的な実装方法を学びます。
 - **リレーションを利用したデータ取得**: ログインユーザーに紐づくお気に入り書籍一覧を取得する方法を学びます。
+- **型定義の活用**: コントローラーのメソッドに戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
 
 ---
 
@@ -20,6 +21,7 @@
 | **2. モデルリレーション** | Userモデルからお気に入りのBookモデルを、Bookモデルからお気に入りにしているUserモデルを取得できるようにしたい。→ `User`モデルと`Book`モデルに`belongsToMany`リレーションを定義する。（Chapter 3で実装済み） |
 | **3. コントローラーの責務** | お気に入り登録と解除は、UI上は1つのボタンで行われることが多い。「登録/解除」という状態を切り替える（トグルする）操作が求められる。→ `store`（登録）と`destroy`（削除）の2つのメソッドを用意するのではなく、**`toggle`という1つのメソッドで両方の処理を扱う**のが効率的でスマートだ。 |
 | **4. `toggle`メソッドの実装** | Laravelの`belongsToMany`リレーションには、中間テーブルのレコードを自動で付け外ししてくれる`toggle()`という便利なメソッドが存在する。これを使わない手はない。→ `Auth::user()->favoriteBooks()->toggle($book->id);` の一行で、登録・解除のロジックが完結する。 |
+| **5. 型定義** | 各メソッドが何を返すのかを明確にしたい。→ **戻り値に型定義**を追加して、コードの意図を明確にし、予期せぬエラーを防ごう。 |
 
 ---
 
@@ -35,15 +37,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Book;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class FavoriteController extends Controller
 {
     /**
      * 書籍をお気に入り登録・解除する
      */
-    public function toggle(Book $book)
+    public function toggle(Book $book): RedirectResponse
     {
         // ログインしているユーザーのお気に入り書籍リレーションに対して、toggleメソッドを実行
         // toggleメソッドは、中間テーブルに指定したIDが存在すれば削除し、存在しなければ追加する
@@ -56,7 +59,7 @@ class FavoriteController extends Controller
     /**
      * ログインユーザーのお気に入り書籍一覧を表示する
      */
-    public function index()
+    public function index(): View
     {
         // ログインしているユーザーのお気に入り書籍をページネーションで取得
         $books = Auth::user()->favoriteBooks()->paginate(10);
@@ -71,7 +74,8 @@ class FavoriteController extends Controller
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `public function toggle(Book $book)` | `toggle`という名前の公開メソッドを定義。引数で`Book`モデルを受け取る。 | `(Book $book)`は「ルートモデルバインディング」というLaravelの機能。URLの`{book}`の部分に対応するIDを持つ`Book`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| `public function toggle(Book $book): RedirectResponse` | `toggle`という名前の公開メソッドを定義。引数で`Book`モデルを受け取る。 | `(Book $book)`は「ルートモデルバインディング」というLaravelの機能。URLの`{book}`の部分に対応するIDを持つ`Book`モデルのインスタンスが自動的にDI（依存性注入）される。 |
+| **`: RedirectResponse`** | **戻り値の型定義**。このメソッドがリダイレクトレスポンスを返すことを明示します。 | これにより、メソッドの役割が「処理を行い、どこかへリダイレクトする」ことであると一目でわかります。意図しない値（`View`など）が返されるのを防ぎ、コードの堅牢性を高めます。 |
 | `Auth::user()` | ログインしているユーザーの`User`モデルインスタンスを取得する。 | `Auth`ファサード（Laravelの便利な機能への入り口）を経由して、セッション情報から認証済みユーザーを取得している。 |
 | `->favoriteBooks()` | `User`モデルに定義した`favoriteBooks`リレーション（`belongsToMany`）を取得する。 | これにより、`favorites`中間テーブルを操作するためのクエリビルダが返される。 |
 | `->toggle($book->id)` | `belongsToMany`リレーションの`toggle`メソッドを実行。`$book->id`を中間テーブルに追加、または削除する。 | `toggle`は「切り替える」という意味。中間テーブルに`($user->id, $book->id)`の組み合わせが存在すれば削除し、存在しなければ追加する、という処理を自動で行ってくれる非常に便利なメソッド。 |
@@ -81,7 +85,8 @@ class FavoriteController extends Controller
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `public function index()` | お気に入り一覧ページを表示するためのメソッド。 | `Route::get("/favorites", ...)`に対応する。 |
+| `public function index(): View` | お気に入り一覧ページを表示するためのメソッド。 | `Route::get("/favorites", ...)`に対応する。 |
+| **`: View`** | **戻り値の型定義**。このメソッドが`View`オブジェクト（HTMLページ）を返すことを明示します。 | これにより、メソッドの役割が「ページを表示する」ことであると明確になります。 |
 | `$books = Auth::user()->favoriteBooks()->paginate(10);` | ログインユーザーがお気に入りに登録した書籍を10件ずつ取得する。 | `favoriteBooks()`で中間テーブルを経由して`books`テーブルからデータを取得し、`paginate(10)`でページネーションを適用している。 |
 | `return view("favorites.index", compact("books"));` | `resources/views/favorites/index.blade.php`ビューを返す。その際に`$books`変数をビューに渡す。 | `compact("books")`はPHPの関数で、`["books" => $books]`という連想配列を作成するのと同じ意味。ビュー側では`$books`という変数名でデータにアクセスできる。 |
 
