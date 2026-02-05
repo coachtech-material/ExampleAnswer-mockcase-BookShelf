@@ -59,22 +59,38 @@ class BookController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
-        $keyword = $request->input('keyword');
-        $genreId = $request->input('genre');
+        $keyword = $request->input("keyword");
+        $genreId = $request->input("genre");
+        $sort = $request->input("sort", "newest");
 
-        $query = Book::with('genres');
+        $query = Book::with("genres");
 
         if ($keyword) {
-            $query->where(function ($q) use ($keyword): void {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
+            $query->where(function ($q) use ($keyword) {
+                return $q->where("title", "like", "%{$keyword}%")
+                         ->orWhere("author", "like", "%{$keyword}%");
             });
         }
 
         if ($genreId) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
-                $q->where('genres.id', $genreId);
+            $query->whereHas("genres", function ($q) use ($genreId) {
+                return $q->where("genres.id", $genreId);
             });
+        }
+
+        switch ($sort) {
+            case "oldest":
+                $query->orderBy("created_at", "asc");
+                break;
+            case "rating":
+                $query->withAvg("reviews", "rating")->orderByDesc("reviews_avg_rating");
+                break;
+            case "title":
+                $query->orderBy("title", "asc");
+                break;
+            default:
+                $query->orderBy("created_at", "desc");
+                break;
         }
 
         $books = $query->get();
