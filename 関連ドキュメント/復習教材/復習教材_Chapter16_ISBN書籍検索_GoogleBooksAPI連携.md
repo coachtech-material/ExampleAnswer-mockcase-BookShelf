@@ -109,11 +109,11 @@ class BookController extends Controller
             $volumeInfo = $data['items'][0]['volumeInfo'];
 
             return response()->json([
-                'title' => $volumeInfo['title'] ?? '',
-                'author' => isset($volumeInfo['authors']) ? implode(', ', $volumeInfo['authors']) : '',
-                'published_date' => $volumeInfo['publishedDate'] ?? '',
-                'description' => $volumeInfo['description'] ?? '',
-                'image_url' => $volumeInfo['imageLinks']['thumbnail'] ?? '',
+                'title' => data_get($volumeInfo, 'title', ''),
+                'author' => implode(', ', data_get($volumeInfo, 'authors', [])),
+                'published_date' => data_get($volumeInfo, 'publishedDate', ''),
+                'description' => data_get($volumeInfo, 'description', ''),
+                'image_url' => data_get($volumeInfo, 'imageLinks.thumbnail', ''),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'API通信エラーが発生しました。'], 500);
