@@ -1,35 +1,36 @@
 # Chapter 17: マイ読書レポート機能の実装 (Collectionメソッド活用)
 
-## 1. はじめに
+## 🎯 このセクションで学ぶこと
 
-これまでの機能開発では、主にデータベース（Eloquent）のクエリを駆使してデータを取得・加工してきました。しかし、複雑な集計や統計処理を行おうとすると、クエリだけでは限界があったり、コードが複雑になったりすることがあります。
+- 複雑なデータ集計におけるLaravel Collectionの活用法
+- `map`, `groupBy`, `filter`, `sortByDesc`などの主要なCollectionメソッドの実践的な使い方
+- EloquentリレーションをEager Loadingしてパフォーマンスを最適化する手法
+- 複数の統計データを効率的に生成し、ビューに渡すコントローラーの設計パターン
+- Collectionのメソッドチェーンによる、宣言的で可読性の高いコードの書き方
 
-そこで登場するのが、Laravelの**Collection（コレクション）**です。Collectionは、配列やデータベースの結果セットを操作するための非常に強力で便利なクラスです。SQLの`GROUP BY`や集計関数に似た操作を、PHPのコード上で、より柔軟かつ宣言的に行うことができます。
+---
 
-このChapterでは、ユーザー自身の読書活動を可視化する「マイ読書レポート」機能を実装しながら、Collectionメソッドの威力を体感します。
+## 🧠 先輩エンジニアの思考プロセス
 
-## 2. 要件の確認
+### なぜCollectionを使うのか？
 
-| 機能 | 詳細仕様 |
-|:---|:---|
-| **読書サマリー** | 総レビュー数、平均評価、読んだ本の冊数などを表示する。 |
-| **評価分布** | 5段階評価（1〜5）が、それぞれ何件投稿されたかをグラフなどで可視化する。 |
-| **ジャンル別統計** | どのジャンルの本を何冊読み、その平均評価はどうだったか、などをランキング形式で表示する。 |
-| **読書継続日数** | レビューを投稿した日にちを元に、最長の連続投稿日数（読書継続日数）を計算して表示する。 |
+> 実装も終盤に差し掛かり、ユーザー体験をもう一段階引き上げるための「付加価値機能」を考えるフェーズだね。ユーザー自身の活動履歴を可視化する「ダッシュボード」や「レポート」機能は、その代表格だ。今回の「マイ読書レポート」もその一つ。
+> 
+> このような機能で必要になるのは、**DBから取得したデータを、表示のために様々な形に加工・集計する処理**。例えば、「評価ごとのレビュー件数」や「ジャンル別の平均評価ランキング」などだね。これを全部SQLクエリでやろうとすると、クエリがどんどん複雑になって、可読性もメンテナンス性も著しく低下してしまう。
+> 
+> そこで登場するのが**Laravel Collection**。Eloquentで`get()`した結果は、ただの配列じゃなくて、この便利なCollectionオブジェクトになっている。こいつは、配列操作のための強力なメソッドを山ほど持っているんだ。`map`や`filter`はもちろん、`groupBy`や`reduce`といった高度なメソッドまで揃っている。SQLで複雑な`GROUP BY`やサブクエリを書く代わりに、PHPのコード上で、より柔軟かつ直感的にデータを扱えるようになる。DBから大まかなデータを取得したら、あとの加工はCollectionに任せる。この役割分担が、綺麗でメンテナンスしやすいコードの秘訣なんだ。
 
-## 3. How to: この実装にたどり着くための調べ方
+### 実装の進め方
 
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **配列を柔軟に操作したい** | `laravel collection methods` | Collectionの公式ドキュメントが見つかる。`map`, `filter`, `groupBy`, `reduce`など、JavaScriptの配列操作でおなじみのメソッドが揃っていることを知る。 |
-| **特定の日付以降のデータを取得したい** | `laravel eloquent where date` | `whereDate`や`whereMonth`, `whereYear`といった、日付の特定の部分と比較するための便利なメソッドが見つかる。 |
-| **リレーション先のデータを含めて取得したい** | `laravel eager loading` | N+1問題を解決するための`with()`メソッド（Eager Loading）が見つかる。パフォーマンスチューニングの基本として必須の知識。 |
-| **データを特定のキーでグループ化したい** | `laravel collection groupby` | `groupBy`メソッドのドキュメントが見つかる。コールバック関数を渡すことで、`created_at`の日付部分（`Y-m`）など、柔軟なキーでグループ化できることがわかる。 |
-| **コレクションの各要素を合計したい** | `laravel collection reduce` / `laravel collection sum` | `sum`メソッドは単純な合計に、`reduce`メソッドはより複雑な畳み込み計算に使えることがわかる。今回の「総読了ページ数」のように、初期値を持ちながらループ処理をする場合に`reduce`が最適だと判断できる。 |
+> 1.  **まずはゴール（画面）を確認する**: 今回は先にBladeファイルが提供されている。最終的にどんなデータが必要なのかを把握するために、まずはこのBladeファイルをじっくり読む。`$stats['summary']['total_reviews']` のような記述から、コントローラーが渡すべきデータ構造（配列のキーや階層）を逆算して、設計図を描くんだ。
+> 2.  **土台を作る**: レポート表示用のルート (`routes/web.php`) とコントローラー (`ReportController`) を作成する。これはもう慣れた作業だね。
+> 3.  **心臓部（データ集計ロジック）を実装する**: `ReportController`に、統計データを生成するロジックを実装する。ここが今回のメインディッシュ。Bladeが要求するデータ構造を頭に置きながら、必要なメソッドを一つずつ作っていく。このとき、いきなり`index`メソッドに全部書くのではなく、`generateSummary`や`generateRatingDistribution`のように、**機能ごとにプライベートメソッドに分割する**のが定石。コードの見通しが良くなるし、後から修正するのも楽になるからね。
+> 4.  **Collectionメソッドを使いこなす**: 各プライベートメソッドの中で、やりたいことを実現できるCollectionメソッドを探す。「評価ごとにグループ分けしたい」なら`groupBy`、「高評価の書籍だけ欲しい」なら`filter`、「ランキング順に並べたい」なら`sortByDesc`、といった具合に、メソッドチェーンを組み立てていく。まるでパズルを解くような感覚で、宣言的にデータを処理できるのがCollectionの面白いところだ。
+> 5.  **ビューにデータを渡して完成**: 最後に、完成した`$stats`配列を`view()`ヘルパーでビューに渡せば完成。Blade側はすでにあるから、ブラウザでアクセスすれば綺麗なレポートが表示されるはずだ。
 
-## 4. 実装
+---
 
-### 4.1. ルートとコントローラーの準備
+## 1. ルートとコントローラーの準備
 
 まず、レポート表示用のルートとコントローラーを作成します。
 
@@ -37,322 +38,371 @@
 sail artisan make:controller ReportController
 ```
 
-`routes/web.php`にルートを追加します。
+次に、`routes/web.php`に認証が必要なルートとして、レポートページのルートを追加します。
 
 ```php
 // routes/web.php
+
+// ... 既存のuse文に追記
 use App\Http\Controllers\ReportController;
 
 // ...
+
 Route::middleware('auth')->group(function () {
-    // ...
+    // ... 既存のルート
+
+    // マイ読書レポート
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 });
 ```
 
-### 4.2. ReportControllerの実装
+## 2. ReportControllerの実装
 
-`ReportController`に、統計データを生成し、提供されているビューに渡すロジックを実装します。ここがCollectionメソッド活用の本番です。
+`ReportController`に、統計データを生成し、提供されている`reports.index.blade.php`に渡すロジックを実装します。ここがCollectionメソッド活用の本番です。
+
+既存の`app/Http/Controllers/ReportController.php`を以下の内容で上書きしてください。
 
 ```php
-// app/Http/Controllers/ReportController.php
-
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
 use App\Models\Review;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\
+Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
     /**
-     * マイ読書レポートを表示
+     * マイ読書レポートを表示します。
+     *
+     * @return \Illuminate\View\View
      */
     public function index(): View
     {
         $user = Auth::user();
 
-        // ユーザーのレビューを全て取得（リレーション含む）
+        // ユーザーのレビューを全て取得（パフォーマンスのためリレーションをEager Load）
         $reviews = Review::with(['book.genres'])
             ->where('user_id', $user->id)
             ->get();
 
-        // お気に入り書籍を取得
-        $favoriteBooks = $user->favoriteBooks()->with('genres')->get();
-
         // 統計データを生成
-        $stats = $this->generateStats($reviews, $favoriteBooks);
+        $stats = $this->generateStats($reviews);
 
+        // ビューに統計データを渡して表示
         return view('reports.index', compact('stats'));
     }
 
     /**
-     * 統計データを生成
+     * レビューデータから統計情報を生成します。
      *
-     * @param Collection<int, Review> $reviews
-     * @param Collection<int, Book> $favoriteBooks
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Review>  $reviews
      * @return array<string, mixed>
      */
-    private function generateStats(Collection $reviews, Collection $favoriteBooks): array
+    private function generateStats(Collection $reviews): array
     {
         return [
             'summary' => $this->generateSummary($reviews),
             'rating_distribution' => $this->generateRatingDistribution($reviews),
-            'genre_stats' => $this->generateGenreStats($reviews),
-            'favorite_genres' => $this->generateFavoriteGenres($favoriteBooks),
             'top_rated_books' => $this->getTopRatedBooks($reviews),
-            'reading_streak' => $this->calculateReadingStreak($reviews),
+            'genre_ratings' => $this->generateGenreRatings($reviews),
         ];
     }
 
     /**
-     * 基本統計サマリーを生成
-     * 使用: count(), avg(), max(), min(), pluck(), unique()
+     * 基本統計サマリーを生成します。
+     * 使用するCollectionメソッド: count(), pluck(), unique(), avg()
      *
-     * @param Collection<int, Review> $reviews
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Review>  $reviews
      * @return array<string, int|float>
      */
     private function generateSummary(Collection $reviews): array
     {
         return [
             'total_reviews' => $reviews->count(),
+            'books_read' => $reviews->pluck('book_id')->unique()->count(),
             'average_rating' => round($reviews->avg('rating') ?? 0, 1),
-            'highest_rating' => $reviews->max('rating') ?? 0,
-            'lowest_rating' => $reviews->min('rating') ?? 0,
-            'total_books_reviewed' => $reviews->pluck('book_id')->unique()->count(),
         ];
     }
 
     /**
-     * 評価分布を生成
-     * 使用: groupBy(), map(), count(), mapWithKeys()
+     * 評価の分布を生成します。
+     * 使用するCollectionメソッド: groupBy(), map(), get(), range(), mapWithKeys()
      *
-     * @param Collection<int, Review> $reviews
-     * @return Collection<int, int>
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Review>  $reviews
+     * @return array<int, int>
      */
-    private function generateRatingDistribution(Collection $reviews): Collection
+    private function generateRatingDistribution(Collection $reviews): array
     {
-        // 1〜5の評価ごとにグループ化し、件数をカウント
+        // 評価（1〜5）ごとにレビューをグループ化し、それぞれの件数をカウント
         $distribution = $reviews
             ->groupBy('rating')
             ->map(fn (Collection $group): int => $group->count());
 
-        // 1〜5の全ての評価を含むように補完
+        // 評価が存在しない星も0件として結果に含めるために、1〜5の範囲で結果を補完
         return collect(range(1, 5))
-            ->mapWithKeys(fn (int $rating): array => [$rating => $distribution->get($rating, 0)]);
+            ->mapWithKeys(fn (int $rating): array => [$rating - 1 => $distribution->get($rating, 0)])
+            ->toArray();
     }
 
     /**
-     * ジャンル別統計を生成
-     * 使用: flatMap(), groupBy(), map(), sortByDesc(), take(), values()
+     * 高評価の書籍トップ5を取得します。
+     * 使用するCollectionメソッド: filter(), sortByDesc(), take(), map(), values()
      *
-     * @param Collection<int, Review> $reviews
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function generateGenreStats(Collection $reviews): Collection
-    {
-        return $reviews
-            // 各レビューから書籍のジャンルを展開（flatMap）
-            ->flatMap(fn (Review $review): Collection => $review->book->genres->map(
-                fn ($genre): array => [
-                    'genre_name' => $genre->name,
-                    'rating' => $review->rating,
-                ]
-            ))
-            // ジャンル名でグループ化
-            ->groupBy('genre_name')
-            // 各ジャンルの統計を計算
-            ->map(function (Collection $genreReviews, string $genreName): array {
-                $ratings = $genreReviews->pluck('rating');
-
-                return [
-                    'name' => $genreName,
-                    'count' => $genreReviews->count(),
-                    'average_rating' => round($ratings->avg(), 1),
-                    'total_rating' => $ratings->sum(),
-                ];
-            })
-            // レビュー数で降順ソート
-            ->sortByDesc('count')
-            // 上位10件を取得
-            ->take(10)
-            ->values();
-    }
-
-    /**
-     * お気に入りジャンルを分析
-     * 使用: flatMap(), countBy(), sortDesc(), take()
-     *
-     * @param Collection<int, Book> $favoriteBooks
-     * @return Collection<string, int>
-     */
-    private function generateFavoriteGenres(Collection $favoriteBooks): Collection
-    {
-        return $favoriteBooks
-            // 各書籍からジャンル名を展開
-            ->flatMap(fn (Book $book): Collection => $book->genres->pluck('name'))
-            // ジャンル名ごとにカウント
-            ->countBy()
-            // 降順ソート
-            ->sortDesc()
-            // 上位5件を取得
-            ->take(5);
-    }
-
-    /**
-     * 高評価書籍を取得
-     * 使用: filter(), sortByDesc(), take(), map(), values()
-     *
-     * @param Collection<int, Review> $reviews
-     * @return Collection<int, array<string, mixed>>
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Review>  $reviews
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
     private function getTopRatedBooks(Collection $reviews): Collection
     {
         return $reviews
-            // 評価4以上をフィルタ
+            // 評価4以上のレビューのみをフィルタリング
             ->filter(fn (Review $review): bool => $review->rating >= 4)
-            // 評価で降順ソート
+            // 評価が高い順にソート
             ->sortByDesc('rating')
             // 上位5件を取得
             ->take(5)
-            // 必要な情報のみ抽出
+            // ビューで必要な情報だけを抽出して新しいコレクションを作成
             ->map(fn (Review $review): array => [
+                'id' => $review->book->id,
                 'title' => $review->book->title,
                 'author' => $review->book->author,
                 'rating' => $review->rating,
-                'reviewed_at' => $review->created_at->format('Y-m-d'),
             ])
-            ->values();
+            ->values(); // キーを0から始まる連番にリセット
     }
 
     /**
-     * 読書継続日数を計算
-     * 使用: map(), unique(), sort(), values(), reduce()
+     * ジャンル別の評価傾向トップ5を生成します。
+     * 使用するCollectionメソッド: flatMap(), map(), groupBy(), map(), round(), avg(), sortByDesc(), take(), values()
      *
-     * @param Collection<int, Review> $reviews
-     * @return array<string, int>
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Review>  $reviews
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function calculateReadingStreak(Collection $reviews): array
+    private function generateGenreRatings(Collection $reviews): Collection
     {
-        // レビュー日をユニークな日付リストに変換
-        $reviewDates = $reviews
-            ->map(fn (Review $review): string => $review->created_at->format('Y-m-d'))
-            ->unique()
-            ->sort()
-            ->values();
-
-        if ($reviewDates->isEmpty()) {
-            return ['current_streak' => 0, 'longest_streak' => 0];
-        }
-
-        // 連続日数を計算（reduce使用）
-        $streakData = $reviewDates->reduce(
-            function (array $carry, string $date): array {
-                $currentDate = Carbon::parse($date);
-
-                if ($carry['last_date'] === null) {
-                    $carry['current'] = 1;
-                    $carry['longest'] = 1;
-                } else {
-                    $lastDate = Carbon::parse($carry['last_date']);
-                    $diffDays = $lastDate->diffInDays($currentDate);
-
-                    if ($diffDays === 1) {
-                        $carry['current']++;
-                        $carry['longest'] = max($carry['longest'], $carry['current']);
-                    } elseif ($diffDays > 1) {
-                        $carry['current'] = 1;
-                    }
-                }
-
-                $carry['last_date'] = $date;
-
-                return $carry;
-            },
-            ['current' => 0, 'longest' => 0, 'last_date' => null]
-        );
-
-        return [
-            'current_streak' => $streakData['current'],
-            'longest_streak' => $streakData['longest'],
-        ];
+        return $reviews
+            // 各レビューが持つ書籍の全ジャンルを展開し、フラットなコレクションを作成
+            ->flatMap(fn (Review $review): Collection => $review->book->genres->map(
+                fn ($genre) => [
+                    'id' => $genre->id,
+                    'name' => $genre->name,
+                    'rating' => $review->rating,
+                ]
+            ))
+            // ジャンル名でグループ化
+            ->groupBy('name')
+            // 各ジャンルの統計情報（レビュー数、平均評価）を計算
+            ->map(function (Collection $genreReviews, string $genreName): array {
+                return [
+                    'id' => $genreReviews->first()['id'],
+                    'name' => $genreName,
+                    'count' => $genreReviews->count(),
+                    'average_rating' => round($genreReviews->avg('rating'), 1),
+                ];
+            })
+            // 平均評価が高い順にソート
+            ->sortByDesc('average_rating')
+            // 上位5件を取得
+            ->take(5)
+            ->values(); // キーを0から始まる連番にリセット
     }
 }
 ```
 
-### 4.3. ビューの実装
+### 📖 詳細解説: ReportController
 
-`resources/views/reports/index.blade.php`を作成し、コントローラーから渡された`$stats`変数の内容を表示します。（ビューの具体的なコードは、Tailwind CSSなどを用いて自由にデザインしてください）
+> **💡 先輩エンジニアの視点**
+> このコントローラーは、まさに「Collection使いこなし塾」だね。`index`メソッド自体は、データを取得してプライベートメソッドに渡し、結果をビューに返すだけ、と非常にシンプル。実際の複雑な処理は、意味のある単位で分割されたプライベートメソッド群が担当している。この「**関心の分離**」が、コードを綺麗に保つための基本原則だよ。
+> 
+> 特に注目してほしいのは、`flatMap`や`groupBy`、`map`、`reduce`といったメソッドが、`foreach`ループの代わりに見事な仕事をしている点。例えば`generateGenreRatings`を見てみよう。レビューのコレクションから、そのレビューが持つ書籍の、さらにその書籍が持つジャンルを全て取り出して、ジャンル名でグループ化し、それぞれの平均点を計算して、ランキング付けする...。これを`foreach`で書いたら、ネストが深くて複雑なコードになってしまうだろう。でも、Collectionのメソッドチェーンを使えば、まるで英語の文章を読むように「何をしたいか」が宣言的に記述できる。これがCollectionの真価なんだ。
+
+**コードリーディング**
+
+- **`index()`**: このメソッドがエントリーポイントです。
+    1.  `Auth::user()`で現在ログインしているユーザーを取得します。
+    2.  `Review::with(['book.genres'])`で、ユーザーの全レビューを取得します。このとき`with()`を使って`book`と`book`に紐づく`genres`リレーションを**Eager Loading（先行読み込み）**しています。これにより、後続の処理でレビューごとにDBへクエリが発行される**N+1問題**を防ぎ、パフォーマンスを大幅に向上させます。
+    3.  取得したレビューのコレクションを`generateStats()`メソッドに渡し、統計データを生成します。
+    4.  `compact('stats')`を使って、`$stats`変数をビューに渡します。
+
+- **`generateStats()`**: 複数の統計生成メソッドを呼び出し、結果を一つの配列にまとめる役割を担います。Bladeファイルが必要とするキー（`summary`, `rating_distribution`など）に対応した配列を返します。
+
+- **`generateSummary()`**: 基本的な統計情報を計算します。
+    - `total_reviews`: `count()`でレビューの総数を取得します。
+    - `books_read`: `pluck('book_id')`で`book_id`だけのコレクションを作成し、`unique()`で重複を除外してから`count()`することで、レビューしたユニークな書籍の冊数を数えます。
+    - `average_rating`: `avg('rating')`で`rating`カラムの平均値を計算し、`round()`で小数点以下1桁に丸めています。
+
+- **`generateRatingDistribution()`**: 評価（星1〜5）の分布を計算します。
+    - `groupBy('rating')`で評価の値ごとにレビューをグループ化します。
+    - `map()`で各グループの要素数（レビュー数）を数えます。
+    - このままではレビューがない評価（例：星1のレビューが0件）のデータが欠落してしまうため、`collect(range(1, 5))`で1から5までのコレクションを作成し、`mapWithKeys()`を使って、各評価に対応する件数が存在しない場合は`0`で補完しています。最後に`toArray()`でただの配列に変換してビューに渡します。
+
+- **`getTopRatedBooks()`**: 高評価書籍のランキングを生成します。
+    - `filter()`で評価が4以上のレビューに絞り込みます。
+    - `sortByDesc('rating')`で評価の高い順に並べ替えます。
+    - `take(5)`で上位5件を取得します。
+    - `map()`で、ビューで表示するために必要な書籍の`id`, `title`, `author`, `rating`だけを抽出した新しいコレクションを生成します。
+    - `values()`で、コレクションのキーをリセットし、`0`, `1`, `2`...という連番に振り直します。これにより、Blade側でインデックスを使った処理（例：1位、2位のメダル表示）が容易になります。
+
+- **`generateGenreRatings()`**: ジャンルごとの評価傾向を計算します。
+    - `flatMap()`がここでのキーポイントです。`map()`と似ていますが、`flatMap()`は多次元のコレクションを一次元のフラットなコレクションに展開します。ここでは、各レビューが持つ書籍の、さらにその書籍が持つ複数のジャンルを全て取り出し、`['id' => ..., 'name' => ..., 'rating' => ...]`という形式の配列のフラットなコレクションを生成します。
+    - その後、`groupBy('name')`でジャンル名ごとにグループ化し、`map()`で各ジャンルのレビュー数（`count`）と平均評価（`average_rating`）を計算します。
+    - 最後に`sortByDesc('average_rating')`で平均評価の高い順にソートし、`take(5)`で上位5件を取得して返します。
+
+---
+
+## 3. ビューの実装
+
+コントローラーから渡された`$stats`変数を表示するために、`resources/views/reports/index.blade.php`を以下の内容で作成または上書きします。このコードは、提供されたBladeファイルそのものです。
 
 ```html
-<!-- resources/views/reports/index.blade.php の例 -->
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('マイ読書レポート') }}
+        </h2>
+    </x-slot>
 
-@extends('layouts.app')
-
-@section('content')
-    <div class="container mx-auto">
-        <h1 class="text-2xl font-bold mb-4">マイ読書レポート</h1>
-
-        <!-- 読書サマリー -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div class="p-4 bg-white rounded shadow text-center">
-                <div class="text-3xl font-bold">{{ $stats['summary']['total_reviews'] }}</div>
-                <div class="text-gray-600">総レビュー数</div>
-            </div>
-            <div class="p-4 bg-white rounded shadow text-center">
-                <div class="text-3xl font-bold">{{ $stats['summary']['average_rating'] }}</div>
-                <div class="text-gray-600">平均評価</div>
-            </div>
-            <!-- 他のサマリー項目... -->
-        </div>
-
-        <!-- 評価分布 -->
-        <div class="p-4 bg-white rounded shadow mb-8">
-            <h2 class="text-xl font-bold mb-2">評価の分布</h2>
-            @foreach ($stats['rating_distribution'] as $rating => $count)
-                <div class="flex items-center">
-                    <div class="w-12">{{ $rating }} ★</div>
-                    <div class="w-full bg-gray-200 rounded h-6">
-                        <div class="bg-blue-500 h-6 rounded" style="width: {{ $stats['summary']['total_reviews'] > 0 ? ($count / $stats['summary']['total_reviews']) * 100 : 0 }}%;"></div>
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <!-- 基本サマリー -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">基本統計</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="border rounded-lg p-6 text-center">
+                            <div class="text-4xl font-bold text-blue-600 mb-2">{{ $stats['summary']['total_reviews'] }}</div>
+                            <div class="text-sm text-gray-600">総レビュー数</div>
+                        </div>
+                        <div class="border rounded-lg p-6 text-center">
+                            <div class="text-4xl font-bold text-green-600 mb-2">{{ $stats['summary']['books_read'] }}</div>
+                            <div class="text-sm text-gray-600">読了冊数</div>
+                        </div>
+                        <div class="border rounded-lg p-6 text-center">
+                            <div class="text-4xl font-bold text-yellow-500 mb-2">
+                                @if ($stats['summary']['average_rating'] > 0)
+                                    {{ number_format($stats['summary']['average_rating'], 1) }}
+                                @else
+                                    -
+                                @endif
+                            </div>
+                            <div class="text-sm text-gray-600">平均評価</div>
+                        </div>
                     </div>
-                    <div class="w-12 text-right">{{ $count }}件</div>
                 </div>
-            @endforeach
-        </div>
+            </div>
 
-        <!-- ジャンル別統計 -->
-        <!-- ... -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- 評価分布 -->
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">評価分布</h3>
+                        <div class="space-y-3">
+                            @foreach ($stats['rating_distribution'] as $index => $count)
+                                @php
+                                    $rating = $index + 1;
+                                    $maxCount = max($stats['rating_distribution']) ?: 1;
+                                    $percentage = ($count / $maxCount) * 100;
+                                @endphp
+                                <div class="flex items-center">
+                                    <div class="w-16 text-sm text-gray-700">
+                                        <span class="text-yellow-500">{{ str_repeat('★', $rating) }}</span>
+                                    </div>
+                                    <div class="flex-1 mx-3">
+                                        <div class="bg-gray-200 rounded-full h-5 overflow-hidden">
+                                            <div class="bg-yellow-400 h-5 rounded-full transition-all duration-300" style="width: {{ $percentage }}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="w-12 text-sm text-gray-600 text-right font-medium">{{ $count }}件</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高評価書籍TOP5 -->
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">高評価書籍 TOP5</h3>
+                        @if (count($stats['top_rated_books']) > 0)
+                            <div class="space-y-3">
+                                @foreach ($stats['top_rated_books'] as $index => $book)
+                                    @php
+                                        $rankColors = [
+                                            0 => 'bg-yellow-400 text-white',
+                                            1 => 'bg-gray-400 text-white',
+                                            2 => 'bg-amber-600 text-white',
+                                        ];
+                                        $rankColor = $rankColors[$index] ?? 'bg-gray-200 text-gray-600';
+                                    @endphp
+                                    <a href="{{ route('books.show', $book['id']) }}" class="flex items-center p-3 border rounded-lg hover:shadow-md transition">
+                                        <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full {{ $rankColor }} font-bold text-sm">
+                                            {{ $index + 1 }}
+                                        </div>
+                                        <div class="flex-grow min-w-0 ml-3">
+                                            <div class="font-medium text-gray-900 truncate">{{ $book['title'] }}</div>
+                                            <div class="text-sm text-gray-500">{{ $book['author'] }}</div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-3 text-yellow-500 text-sm">
+                                            {{ str_repeat('★', $book['rating']) }}{{ str_repeat('☆', 5 - $book['rating']) }}
+                                        </div>
+                                    </a>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="text-gray-500 text-center py-8">4星以上の書籍がありません</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- ジャンル別評価傾向 -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">ジャンル別評価傾向 TOP5</h3>
+                    <p class="text-sm text-gray-500 mb-4">どのジャンルを高く評価する傾向があるかを表示</p>
+                    @if (count($stats['genre_ratings']) > 0)
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            @foreach ($stats['genre_ratings'] as $index => $genre)
+                                @php
+                                    $rankColors = [
+                                        0 => 'bg-yellow-400 text-white',
+                                        1 => 'bg-gray-400 text-white',
+                                        2 => 'bg-amber-600 text-white',
+                                    ];
+                                    $rankColor = $rankColors[$index] ?? 'bg-gray-200 text-gray-600';
+                                @endphp
+                                <a href="{{ route('genres.show', $genre['id']) }}" class="flex items-center p-4 border rounded-lg hover:shadow-md transition">
+                                    <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full {{ $rankColor }} font-bold text-sm">
+                                        {{ $index + 1 }}
+                                    </div>
+                                    <div class="flex-grow ml-3">
+                                        <div class="font-medium text-gray-900">{{ $genre['name'] }}</div>
+                                        <div class="text-sm text-gray-500">{{ $genre['count'] }}件のレビュー</div>
+                                    </div>
+                                    <div class="flex-shrink-0 ml-3 text-right">
+                                        <div class="text-lg font-bold text-yellow-500">{{ number_format($genre['average_rating'], 1) }}</div>
+                                        <div class="text-xs text-gray-400">平均評価</div>
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-gray-500 text-center py-8">ジャンルが設定された書籍のレビューがありません</p>
+                    @endif
+                </div>
+            </div>
+        </div>
     </div>
-@endsection
+</x-app-layout>
 ```
 
-## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
+これで、`/reports`にアクセスすると、ログインユーザー自身の読書アクティビティに基づいた美しいレポートが表示されるようになります。
 
-### 思考1：まずDBから必要なデータを大まかに取得する
+---
 
-> 「統計処理をする前に、元になるデータをまず取得する。このとき、後で使うことが分かっているリレーション（`book.genres`など）は`with()`でEager Loadingしておくのが鉄則。DBへのクエリは最小限に抑えたいからね。`get()`でCollectionとしてデータを取得したら、ここから先はPHP（Collection）の世界。DBへの負荷はもうかからない。」
+## ✨ まとめ
 
-### 思考2：処理を意味のある単位でプライベートメソッドに分割する
-
-> 「`index`メソッドに全ての統計処理ロジックを書くと、巨大で可読性の低いメソッドになってしまう。`generateSummary`、`generateRatingDistribution`のように、計算したい統計ごとにプライベートメソッドに分割するのが良い設計だ。各メソッドが何を計算しているか明確になるし、テストもしやすくなる。」
-
-### 思考3：やりたいことをCollectionメソッドで表現できないか考える
-
-> 「『評価ごとの件数を数えたい』→ `groupBy('rating')`して`map()`で`count()`すれば良さそうだな。『ジャンルごとの平均評価を出したい』→ `flatMap()`で全レビューのジャンルを展開して、`groupBy('genre_name')`して、`map()`で`avg()`を計算すればいけるな。というように、`foreach`でループを回す前に、**やりたいことを実現できるCollectionメソッドがないか？**と考える癖をつけることが大事。Collectionメソッドを組み合わせることで、コードは驚くほど宣言的で簡潔になる。」
-
-### 思考4：複雑なロジックは`reduce`でエレガントに
-
-> 「『読書継続日数』の計算は少し複雑だ。前の日付を記憶しながら、現在の日付と比較してカウンターを増やすかリセットするかを判断する必要がある。こういう『前の値（状態）を引き継ぎながら畳み込み計算をする』処理は、`reduce`メソッドの独壇場。初期値（`$carry`）とコールバック関数を渡すだけで、複雑なループ処理をエレガントに記述できる。`reduce`を使いこなせると、書けるコードの幅が格段に広がるよ。」
-
-### 思考5：PHPDocで型情報を補う
-
-> 「Collectionの中身が何なのか（`Review`のコレクションなのか、`Book`のコレクションなのか）は、コードを読む上で非常に重要な情報。`@param Collection<int, Review> $reviews`のようにPHPDoc（アノテーション）で型情報をしっかり記述しておくことで、IDEの補完も効くようになるし、他の開発者もコードを理解しやすくなる。これもプロとしての気遣いだね。」
-
-## 6. まとめ
-
-このChapterでは、Laravel Collectionが提供する多彩なメソッド（`map`, `filter`, `groupBy`, `reduce`など）を駆使して、複雑な統計データを効率的かつ宣言的に生成する方法を学びました。データベースから取得した後のデータ加工は、Collectionを使いこなせるかどうかでコードの品質が大きく変わります。ぜひ、公式ドキュメントを読み込み、様々なメソッドを試してみてください。
+このChapterでは、Laravel Collectionが提供する多彩なメソッドを駆使して、複雑な統計データを効率的かつ宣言的に生成する方法を学びました。データベースから取得した後のデータ加工は、Collectionを使いこなせるかどうかでコードの品質が大きく変わります。`foreach`で複雑なループを書く前に、「これを実現できるCollectionメソッドはないか？」と一歩立ち止まって考える癖をつけることが、より良いLaravelデベロッパーへの近道です。ぜひ、公式ドキュメントを片手に、様々なメソッドを試してみてください。
