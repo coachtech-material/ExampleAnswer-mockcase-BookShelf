@@ -111,7 +111,7 @@ class BookController extends Controller
                     $book->title,
                     $book->author,
                     $book->isbn ?? '',
-                    $book->published_date?->format('Y-m-d') ?? '',
+                    $book->published_date ?? '',
                     $book->genres->pluck('name')->implode(', '),
                     $book->created_at->format('Y-m-d H:i:s'),
                 ]);
