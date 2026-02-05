@@ -64,6 +64,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ReviewLikeController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 
@@ -88,6 +89,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     // CSVエクスポート機能
     Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
+    // マイ読書レポート機能
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     // レビューいいね機能
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
