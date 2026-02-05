@@ -87,7 +87,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     // レビューいいね機能
-    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('review.likes.toggle');
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
 
 // --- 3. 汎用的な公開ルート (最後) ---

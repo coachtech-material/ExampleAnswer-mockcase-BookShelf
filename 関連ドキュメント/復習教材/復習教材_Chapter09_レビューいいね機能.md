@@ -69,6 +69,15 @@ class ReviewLikeController extends Controller
 | `return back();` | ユーザーを直前のページ（いいねボタンを押したページ）にリダイレクトさせる。 | `back()`ヘルパー関数は、セッションに保存されている直前のURLにリダイレクトする便利な機能。 |
 
 > **📝 ルート定義について**
-> レビューいいね機能のルート定義も、Chapter 6で既に`toggle`メソッドを使用する形で定義済みです。そのため、`routes/web.php`を修正する必要はありません。
+> レビューいいね機能のルート定義は、Chapter 6で既に定義済みですが、Bladeファイル（`books/show.blade.php`）で使用されている`route('reviews.like')`という名前に合わせる必要があります。`routes/web.php`を開き、該当するルートの名前を修正してください。
+> 
+> ```php
+> // routes/web.php
+> 
+> // ...
+> // レビューいいね機能
+> Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like'); // 'review.likes.toggle' から 'reviews.like' に変更
+> // ...
+> ```
 
 これで、レビューいいね機能の実装は完了です。次のChapterでは、ランキング機能を実装していきます。
