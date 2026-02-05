@@ -89,13 +89,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     // CSVエクスポート機能
     Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
-    // ISBN検索機能
-    Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
+
     // マイ読書レポート機能
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     // レビューいいね機能
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
+
+// ISBN検索機能
+Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
 
 // --- 3. 汎用的な公開ルート (最後) ---
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
