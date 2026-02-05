@@ -86,6 +86,8 @@ Route::middleware('auth')->group(function () {
     // お気に入り機能
     Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    // CSVエクスポート機能
+    Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
     // レビューいいね機能
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
