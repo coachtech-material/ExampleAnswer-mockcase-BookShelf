@@ -122,94 +122,17 @@ class BookController extends Controller
 }
 ```
 
-### 4.4. ビューとJavaScriptの実装
+### 4.4. 提供されているBladeファイルの確認
 
-提供されている書籍登録・編集画面（`resources/views/books/create.blade.php`と`edit.blade.php`）のISBN検索機能が動作するように、JavaScriptとコントローラーを連携させます。以下は`create.blade.php`のコード例です。
+このプロジェクトでは、書籍登録・編集画面のBladeファイル（`resources/views/books/create.blade.php`と`edit.blade.php`）が事前に提供されています。提供されているBladeファイルには、既にISBN検索機能のUIとJavaScriptが実装されており、コントローラーの実装により機能するようになります。
 
-```html
-<!-- resources/views/books/create.blade.php -->
+**提供されているBladeファイルのポイント:**
 
-@extends('layouts.app')
-
-@section('content')
-    <div class="container mx-auto">
-        <h1 class="text-2xl font-bold mb-4">書籍登録</h1>
-
-        <!-- ISBN検索フォーム -->
-        <div class="mb-4 p-4 bg-gray-100 rounded">
-            <label for="isbn-search" class="block font-bold mb-2">ISBNで書籍情報を自動入力</label>
-            <div class="flex">
-                <input type="text" id="isbn-search" placeholder="13桁のISBNを入力" class="border rounded-l px-2 py-1 w-full">
-                <button id="isbn-search-button" class="bg-blue-500 text-white px-4 py-1 rounded-r">検索</button>
-            </div>
-            <p id="isbn-search-error" class="text-red-500 text-sm mt-1"></p>
-        </div>
-
-        <form action="{{ route('books.store') }}" method="POST">
-            @csrf
-            @include('books._form', ['book' => null])
-        </form>
-    </div>
-
-@push('scripts')
-<script>
-    document.getElementById('fetch-btn').addEventListener('click', async function() {
-            const isbn = document.getElementById('isbn-search').value.trim();
-            const errorEl = document.getElementById('fetch-error');
-            const successEl = document.getElementById('fetch-success');
-
-            errorEl.classList.add('hidden');
-            successEl.classList.add('hidden');
-
-            if (isbn.length !== 13) {
-                errorEl.textContent = 'ISBNは13桁で入力してください。';
-                errorEl.classList.remove('hidden');
-                return;
-            }
-
-            this.disabled = true;
-            this.textContent = '検索中...';
-
-            try {
-                const response = await fetch(`/books/isbn/${isbn}`, {
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                });
-                const data = await response.json();
-
-                if (data.error) {
-                    errorEl.textContent = data.error;
-                    errorEl.classList.remove('hidden');
-                } else {
-                    document.getElementById('title').value = data.title || '';
-                    document.getElementById('author').value = data.author || '';
-                    document.getElementById('isbn').value = isbn;
-                    document.getElementById('description').value = data.description || '';
-                    document.getElementById('image_url').value = data.image_url || '';
-
-                    if (data.published_date) {
-                        const date = new Date(data.published_date);
-                        if (!isNaN(date)) {
-                            document.getElementById('published_date').value = date.toISOString().split('T')[0];
-                        }
-                    }
-
-                    successEl.textContent = '書籍情報を取得しました。';
-                    successEl.classList.remove('hidden');
-                }
-            } catch (e) {
-                errorEl.textContent = '通信エラーが発生しました。';
-                errorEl.classList.remove('hidden');
-            } finally {
-                this.disabled = false;
-                this.textContent = '検索';
-            }
-        });
-</script>
-@endpush
-@endsection
-```
+- **ISBN検索フォーム**: ISBN入力欄と検索ボタンが配置されています。
+- **JavaScriptによる非同期通信**: `fetch` APIを使用して`/books/isbn/{isbn}`エンドポイントにGETリクエストを送信します。
+- **フォームへの自動入力**: APIから取得した書籍情報（タイトル、著者、出版日、説明、書影URL）を、対応するフォームフィールドに自動でセットします。
+- **エラーハンドリング**: 書籍が見つからない場合や通信エラーが発生した場合に、ユーザーに適切なエラーメッセージを表示します。
+- **ローディング状態の表示**: 検索中はボタンを無効化し、「検索中...」と表示することで、ユーザーに処理中であることを伝えます。
 
 ## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
 

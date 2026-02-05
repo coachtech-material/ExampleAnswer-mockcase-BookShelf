@@ -122,44 +122,15 @@ class BookController extends Controller
 
 > 「検索結果が複数ページにわたる場合、2ページ目に移動したときに検索条件が消えてしまったらユーザーはがっかりする。`paginate(10)`の後ろに`withQueryString()`を繋げるだけで、Laravelが自動的にURLのクエリパラメータ（`?keyword=...&genre=...`）をページネーションのリンクに引き継いでくれる。これは本当に便利だから絶対に覚えておこう。」
 
-## 6. ビューの実装
+## 6. 提供されているBladeファイルの確認
 
-コントローラーの改修に合わせて、提供されているビューファイル（`resources/views/books/index.blade.php`）の検索フォームが機能するようにします。
+このプロジェクトでは、書籍一覧画面のBladeファイル（`resources/views/books/index.blade.php`）が事前に提供されています。コントローラーの改修により、提供されているビューの検索フォームが正しく機能するようになります。
 
-```html
-<!-- resources/views/books/index.blade.php の一部 -->
+### 提供されているBladeファイルのポイント
 
-<div class="mb-4">
-    <form action="{{ route('books.index') }}" method="GET" class="flex items-center space-x-2">
-        <input type="text" name="keyword" placeholder="書籍名または著者名" value="{{ request('keyword') }}" class="border rounded px-2 py-1">
-        <select name="genre" class="border rounded px-2 py-1">
-            <option value="">すべてのジャンル</option>
-            @foreach ($genres as $genre)
-                <option value="{{ $genre->id }}" {{ request('genre') == $genre->id ? 'selected' : '' }}>
-                    {{ $genre->name }}
-                </option>
-            @endforeach
-        </select>
-        <select name="sort" class="border rounded px-2 py-1">
-            <option value="latest" {{ request('sort') == 'latest' ? 'selected' : '' }}>登録日の新しい順</option>
-            <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>登録日の古い順</option>
-            <option value="title" {{ request('sort') == 'title' ? 'selected' : '' }}>タイトル順</option>
-            <option value="rating" {{ request('sort') == 'rating' ? 'selected' : '' }}>評価の高い順</option>
-        </select>
-        <button type="submit" class="bg-blue-500 text-white px-4 py-1 rounded">検索</button>
-    </form>
-</div>
+提供されている`books/index.blade.php`には、以下の要素が含まれています。
 
-<!-- 書籍一覧表示... -->
-
-<div class="mt-4">
-    {{ $books->links() }}
-</div>
-```
-
-### 実装のポイント
-
-- **フォームの`action`と`method`**: `GET`メソッドで`books.index`ルートにリクエストを送信します。検索条件はURLのクエリパラメータとして渡されます。
+- **検索フォーム**: `GET`メソッドで`books.index`ルートにリクエストを送信します。検索条件はURLのクエリパラメータとして渡されます。
 - **入力値の復元**: `request('keyword')`や`request('genre') == $genre->id ? 'selected' : ''`のようにして、検索実行後もユーザーが入力・選択した条件がフォームに残るようにしています。これにより、ユーザーは自分がどの条件で検索したかを常に把握できます。
 - **ページネーションリンク**: `{{ $books->links() }}`でページネーションリンクを表示します。コントローラーで`withQueryString()`を使っているので、このリンクには自動で検索条件が付与されます。
 

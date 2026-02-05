@@ -125,21 +125,14 @@ class BookController extends Controller
 }
 ```
 
-### 4.3. ビューの実装
+### 4.3. 提供されているBladeファイルの確認
 
-提供されている書籍一覧画面（`resources/views/books/index.blade.php`）のCSVダウンロードボタンが機能するように、コントローラーからのルートにクエリパラメータを引き継ぎます。
+このプロジェクトでは、書籍一覧画面のBladeファイル（`resources/views/books/index.blade.php`）が事前に提供されています。提供されているBladeファイルには、既にCSVダウンロードボタンが実装されており、コントローラーの実装により機能するようになります。
 
-```html
-<!-- resources/views/books/index.blade.php の一部 -->
+**提供されているBladeファイルのポイント:**
 
-<div class="flex justify-between items-center mb-4">
-    <h1 class="text-2xl font-bold">書籍一覧</h1>
-    <div>
-        <a href="{{ route('books.create') }}" class="bg-green-500 text-white px-4 py-2 rounded">新規登録</a>
-        <a href="{{ route('books.export', request()->query()) }}" class="bg-gray-500 text-white px-4 py-2 rounded">CSVエクスポート</a>
-    </div>
-</div>
-```
+- CSVダウンロードボタンは`{{ route('books.export') }}?{{ http_build_query(request()->query()) }}`のように、現在の検索条件をクエリパラメータとして引き継いでいます。
+- これにより、ユーザーが検索結果を絞り込んだ状態でCSVエクスポートを実行すると、その検索条件が反映されたCSVファイルがダウンロードされます。
 
 ## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
 
