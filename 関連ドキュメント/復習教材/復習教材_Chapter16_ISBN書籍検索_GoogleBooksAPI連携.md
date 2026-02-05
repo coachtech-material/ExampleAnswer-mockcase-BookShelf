@@ -153,34 +153,59 @@ class BookController extends Controller
 
 @push('scripts')
 <script>
-    document.getElementById('isbn-search-button').addEventListener('click', async () => {
-        const isbn = document.getElementById('isbn-search').value;
-        const errorElement = document.getElementById('isbn-search-error');
-        errorElement.textContent = '';
+    document.getElementById('fetch-btn').addEventListener('click', async function() {
+            const isbn = document.getElementById('isbn-search').value.trim();
+            const errorEl = document.getElementById('fetch-error');
+            const successEl = document.getElementById('fetch-success');
 
-        if (!isbn) {
-            errorElement.textContent = 'ISBNを入力してください。';
-            return;
-        }
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
 
-        try {
-            const response = await fetch(`/books/isbn/${isbn}`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'エラーが発生しました。');
+            if (isbn.length !== 13) {
+                errorEl.textContent = 'ISBNは13桁で入力してください。';
+                errorEl.classList.remove('hidden');
+                return;
             }
 
-            document.querySelector('[name="title"]').value = data.title || '';
-            document.querySelector('[name="author"]').value = data.author || '';
-            document.querySelector('[name="published_date"]').value = data.published_date || '';
-            document.querySelector('[name="description"]').value = data.description || '';
-            document.querySelector('[name="image_url"]').value = data.image_url || '';
+            this.disabled = true;
+            this.textContent = '検索中...';
 
-        } catch (error) {
-            errorElement.textContent = error.message;
-        }
-    });
+            try {
+                const response = await fetch(`/books/isbn/${isbn}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    errorEl.textContent = data.error;
+                    errorEl.classList.remove('hidden');
+                } else {
+                    document.getElementById('title').value = data.title || '';
+                    document.getElementById('author').value = data.author || '';
+                    document.getElementById('isbn').value = isbn;
+                    document.getElementById('description').value = data.description || '';
+                    document.getElementById('image_url').value = data.image_url || '';
+
+                    if (data.published_date) {
+                        const date = new Date(data.published_date);
+                        if (!isNaN(date)) {
+                            document.getElementById('published_date').value = date.toISOString().split('T')[0];
+                        }
+                    }
+
+                    successEl.textContent = '書籍情報を取得しました。';
+                    successEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errorEl.textContent = '通信エラーが発生しました。';
+                errorEl.classList.remove('hidden');
+            } finally {
+                this.disabled = false;
+                this.textContent = '検索';
+            }
+        });
 </script>
 @endpush
 @endsection
