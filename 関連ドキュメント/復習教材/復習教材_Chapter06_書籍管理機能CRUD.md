@@ -147,6 +147,9 @@ class StoreBookRequest extends FormRequest
             'title' => 'required|string|max:255',
             'author' => 'required|string|max:255',
             'description' => 'required|string',
+            'isbn' => 'required|string|digits:13|unique:books,isbn',
+            'published_date' => 'nullable|date',
+            'image_url' => 'nullable|url',
             'genres' => 'required|array',
             'genres.*' => 'exists:genres,id',
         ];
@@ -176,6 +179,9 @@ class UpdateBookRequest extends FormRequest
             'title' => 'required|string|max:255',
             'author' => 'required|string|max:255',
             'description' => 'required|string',
+            'isbn' => 'required|string|digits:13|unique:books,isbn,' . $this->route('book')->id,
+            'published_date' => 'nullable|date',
+            'image_url' => 'nullable|url',
             'genres' => 'required|array',
             'genres.*' => 'exists:genres,id',
         ];
@@ -189,6 +195,10 @@ class UpdateBookRequest extends FormRequest
 |:---|:---|:---|
 | `public function authorize(): bool` | このリクエストを送信する権限があるかどうかを判定します。`: bool`は戻り値が真偽値であることを示します。ここでは一旦`true`を返し、誰でもリクエストを送信できるようにしておきます。権限の制御は後ほどポリシーで行います。 |
 | `public function rules(): array` | バリデーションルールを配列形式で返します。`: array`は戻り値が配列であることを示します。 |
+| `'isbn' => 'required|string|digits:13|unique:books,isbn'` | ISBNは必須で、文字列かつ13桁の数字であり、`books`テーブルの`isbn`カラムで一意でなければならないことを示します。`digits:13`は正確に13桁の数字であることを検証します。 |
+| `'isbn' => '...|unique:books,isbn,' . $this->route('book')->id` | `UpdateBookRequest`では、更新時に自分自身のISBNを除外するため、`unique`ルールの第3引数に現在の書籍IDを指定します。これにより、自分自身のISBNと重複してもエラーになりません。 |
+| `'published_date' => 'nullable|date'` | 出版日は任意（`nullable`）で、入力された場合は有効な日付形式でなければならないことを示します。 |
+| `'image_url' => 'nullable|url'` | 画像URLは任意（`nullable`）で、入力された場合は有効なURL形式でなければならないことを示します。 |
 | `'genres' => 'required|array'` | `genres`という名前の入力が必須であり、かつ配列でなければならないことを示します。 |
 | `'genres.*' => 'exists:genres,id'` | `genres`配列の**各要素**（`*`はワイルドカード）が、`genres`テーブルの`id`カラムに実際に存在するかどうかをチェックします。これにより、存在しないジャンルIDが送信されるのを防ぎます。 |
 
