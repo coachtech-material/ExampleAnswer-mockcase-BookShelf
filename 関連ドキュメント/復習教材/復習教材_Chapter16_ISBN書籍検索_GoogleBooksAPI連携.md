@@ -61,7 +61,7 @@ APIリクエストを処理するためのエンドポイントを`routes/web.ph
 // ...
 Route::middleware('auth')->group(function () {
     // ...
-    Route::get('/books/fetch', [BookController::class, 'fetch'])->name('books.fetch');
+    Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
     // ...
 });
 ```
@@ -84,9 +84,8 @@ class BookController extends Controller
     /**
      * ISBN検索（Google Books API）（応用機能）
      */
-    public function fetch(Request $request): JsonResponse
+      public function searchByIsbn(string $isbn): JsonResponse
     {
-        $isbn = $request->input('isbn');
 
         if (!$isbn || strlen($isbn) !== 13) {
             return response()->json(['error' => 'ISBNは13桁で入力してください。'], 400);
@@ -165,7 +164,7 @@ class BookController extends Controller
         }
 
         try {
-            const response = await fetch(`{{ route('books.fetch') }}?isbn=${isbn}`);
+            const response = await fetch(`/books/isbn/${isbn}`);
             const data = await response.json();
 
             if (!response.ok) {
