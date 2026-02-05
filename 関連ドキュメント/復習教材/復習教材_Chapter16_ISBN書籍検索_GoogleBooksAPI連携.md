@@ -102,8 +102,8 @@ class BookController extends Controller
             $response = Http::get($url);
             $data = $response->json();
 
-            if (!isset($data['items'][0])) {
-                return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
+            if (empty($data["items"])) {
+                return response()->json(["error" => "書籍が見つかりませんでした。"], 404);
             }
 
             $volumeInfo = $data['items'][0]['volumeInfo'];
