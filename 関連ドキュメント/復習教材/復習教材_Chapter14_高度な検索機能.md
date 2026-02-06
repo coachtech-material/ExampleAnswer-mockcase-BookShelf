@@ -15,20 +15,37 @@
 | **並び替え** | 「登録日の新しい順」「登録日の古い順」「タイトル順」「評価の高い順」で結果を並び替えられる。 |
 | **状態の維持** | 検索条件や並び順を維持したまま、ページネーションが機能する。 |
 
-## 3. How to: この実装にたどり着くための調べ方
+## 3. 先輩エンジニアの思考プロセス：実装の設計
 
-これらの要件から、どうやって具体的なメソッドにたどり着くのか？先輩エンジニアが新人の頃にやっていた思考プロセスはこんな感じです。
+これから`BookController`の`index`メソッドを改修していきますが、その前に、どのような考え方で実装を進めていくのか、設計段階の思考プロセスを覗いてみましょう。これは、単にコードを書き写すのではなく、「なぜこのコードになるのか」を理解するための重要なステップです。
 
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **タイトルか著者で検索したい** | `laravel query builder where or` | `where`句のパラメータとしてクロージャを渡すことで、`AND (A OR B)`という条件を作れることがわかる。`orWhere`を単純に繋げると`AND A OR B`になってしまう問題点にも気づける。 |
-| **関連テーブルの条件で絞り込みたい** | `laravel eloquent relation where` / `laravel リレーション 絞り込み` | Eloquentの「リレーションの存在クエリ」のセクションに`whereHas`というまさにやりたいこと通りのメソッドが見つかる。 |
-| **評価の高い順で並び替えたい** | `laravel order by relation count` / `laravel リレーション 集計 並び替え` | `withCount`や`withAvg`といったメソッドでリレーション先の集計結果をSELECT句に追加し、そのエイリアス（`reviews_avg_rating`）で`orderBy`できることがわかる。 |
-| **検索条件をページャーに引き継ぎたい** | `laravel pagination query parameter` / `laravel ページネーション 検索条件 維持` | ページネーションのドキュメントに`withQueryString()`という便利なメソッドが紹介されているのを発見する。 |
+### 思考1：どうやって複数の検索条件を組み合わせるか？
+
+> 「まず考えるべきは、ユーザーが入力する検索条件（キーワード、ジャンル、並び順）は、常に全てが指定されるわけではない、ということ。キーワードだけで検索することもあれば、ジャンルと並び順だけを指定することもある。つまり、**条件に応じてクエリを動的に組み立てる**必要があるな。」
+> 
+> 「これは、ベースとなる`Book::query()`に対して、`if`文で条件分岐させながら`where`句や`orderBy`句を繋げていく（メソッドチェーンしていく）のが良さそうだ。この『段階的にクエリを構築する』アプローチは、複雑な検索機能を作る上での基本パターンになる。」
+
+### 思考2：「タイトル or 著者」の検索はどう実現する？
+
+> 「キーワード検索は『タイトルまたは著者』での部分一致。SQLで言えば `WHERE (title LIKE '%keyword%' OR author LIKE '%keyword%')` という形にしたい。Laravelのクエリビルダでこれを実現するには、`where()`メソッドにクロージャ（無名関数）を渡すテクニックが使える。`$query->where(function($q) { ... })` のように書くことで、`()`で囲まれた論理グループを作れるんだ。これをしないと、他の`where`句との組み合わせで意図しないSQLになってしまう可能性があるから注意が必要だ。」
+
+### 思考3：関連テーブル（ジャンル）での絞り込みは？
+
+> 「ジャンルでの絞り込みは、`books`テーブルに直接ジャンル名があるわけではなく、中間テーブルを介して`genres`テーブルとリレーションしている。こういう**リレーション先のテーブルの条件で絞り込みたい**場合は、`whereHas()`メソッドがまさにうってつけ。`whereHas('genres', function($q) { ... })`と書けば、『指定した条件に合致する`genres`リレーションを持つ`Book`』を簡単に絞り込める。」
+
+### 思考4：評価の高い順ってどうやって並び替える？
+
+> 「『評価の高い順』での並び替えは少し工夫が必要だ。各書籍の平均評価を計算し、その結果でソートしないといけない。これもリレーションの集計機能が使える。`withAvg('reviews', 'rating')`を使うと、`reviews`リレーションの`rating`カラムの平均値を`reviews_avg_rating`という名前で取得できる。あとは、このエイリアスカラムで`orderByDesc()`すればいい。他の並び替え条件（新着順、タイトル順など）は`switch`文でシンプルに分岐させよう。」
+
+### 思考5：検索条件を維持したままページ移動させたい
+
+> 「最後に忘れてはいけないのが、ユーザー体験。検索結果の2ページ目に移動したときに、検索条件がリセットされて全件表示に戻ってしまったら最悪だ。Laravelのページネーションには、`withQueryString()`という便利なメソッドがある。これを`paginate()`の後ろに付けるだけで、URLのクエリパラメータ（`?keyword=...`など）を自動でページネーションリンクに引き継いでくれる。これは絶対に使うべき機能だね。」
+
+このような思考プロセスを経て、これから見ていく具体的な実装コードが出来上がっていきます。一つ一つのコードが、どの思考に基づいて書かれているのかを意識しながら読み進めてみてください。
 
 ## 4. 実装：BookControllerの改修
 
-それでは、`app/Http/Controllers/BookController.php`の`index`メソッドを以下のように修正します。
+それでは、上記の思考プロセスを元に、`app/Http/Controllers/BookController.php`の`index`メソッドを以下のように修正します。
 
 ```php
 // app/Http/Controllers/BookController.php
@@ -55,33 +72,33 @@ class BookController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Book::with('genres');
+        $query = Book::with(\'genres\');
 
         // キーワード検索（応用機能）
-        if ($keyword = $request->input('keyword')) {
+        if ($keyword = $request->input(\'keyword\')) {
             $query->where(function ($q) use ($keyword): void {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
+                $q->where(\'title\', \'like\', "%{$keyword}%")
+                  ->orWhere(\'author\', \'like\', "%{$keyword}%");
             });
         }
 
         // ジャンル絞り込み（応用機能）
-        if ($genreId = $request->input('genre')) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
-                $q->where('genres.id', $genreId);
+        if ($genreId = $request->input(\'genre\')) {
+            $query->whereHas(\'genres\', function ($q) use ($genreId): void {
+                $q->where(\'genres.id\', $genreId);
             });
         }
 
         // 並び順（応用機能）
-        switch ($request->input('sort')) {
-            case 'oldest':
+        switch ($request->input(\'sort\')) {
+            case \'oldest\':
                 $query->oldest();
                 break;
-            case 'title':
-                $query->orderBy('title');
+            case \'title\':
+                $query->orderBy(\'title\');
                 break;
-            case 'rating':
-                $query->withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating');
+            case \'rating\':
+                $query->withAvg(\'reviews\', \'rating\')->orderByDesc(\'reviews_avg_rating\');
                 break;
             default:
                 $query->latest();
@@ -89,38 +106,25 @@ class BookController extends Controller
         }
 
         $books = $query->paginate(10)->withQueryString();
-        $genres = Genre::orderBy('name')->get();
+        $genres = Genre::orderBy(\'name\')->get();
 
-        return view('books.index', compact('books', 'genres'));
+        return view(\'books.index\', compact(\'books\', \'genres\'));
     }
 
     // ... 他のメソッドは省略 ...
 }
 ```
 
-## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
+## 5. How to: この実装にたどり着くための調べ方
 
-なぜこのような実装になっているのか、先輩エンジニアの視点で振り返ってみましょう。
+もし自力でこの実装にたどり着くとしたら、どのようなキーワードで調べれば良いでしょうか？先輩エンジニアが新人の頃にやっていた思考プロセスはこんな感じです。
 
-### 思考1：クエリビルダを段階的に組み立てる
-
-> 「検索条件はユーザーの操作によって増えたり減ったりする。`if`文を使って、リクエストに特定のパラメータ（`keyword`や`genre`）が存在する場合にのみ、クエリビルダに`where`句を追加していくのが定石だね。こうすることで、条件がない場合は全件検索、条件がある場合はその条件で絞り込まれた検索、というように柔軟に対応できる。」
-
-### 思考2：複雑な`WHERE`句はクロージャでまとめる
-
-> 「キーワード検索では、『タイトル OR 著者』で検索したい。`orWhere`を使うんだけど、他の`where`句と混ざると意図しない結果になることがある（`WHERE A AND B OR C`と`WHERE A AND (B OR C)`の違い）。これを避けるために、`where(function($q) { ... })`のようにクロージャ（無名関数）で囲むのが安全策。これで`AND (title LIKE ? OR author LIKE ?)`というSQLが生成されるんだ。」
-
-### 思考3：リレーション先のテーブルで絞り込むなら`whereHas`
-
-> 「ジャンルでの絞り込みは、`books`テーブルではなく、リレーション先の`genres`テーブルのIDで絞り込む必要がある。こういう時は`whereHas`が便利。`whereHas`の第一引数にリレーション名、第二引数にそのリレーション先のテーブルに対する絞り込み条件を書くクロージャを渡す。これで『特定ジャンルに属する書籍』を効率的に取得できる。」
-
-### 思考4：並び替えは`switch`文でシンプルに
-
-> 「並び替えの条件もユーザーの選択によって変わる。`switch`文を使うと、`sort`パラメータの値に応じて処理をきれいに分岐できる。`default`ケースでデフォルトの並び順（今回は`latest()`）を指定しておくのが親切だね。評価順（`rating`）の場合は、`withAvg`で平均評価を計算し、その結果（`reviews_avg_rating`）で`orderByDesc`する必要がある点に注意しよう。」
-
-### 思考5：ページネーションと検索条件の維持は`withQueryString()`にお任せ
-
-> 「検索結果が複数ページにわたる場合、2ページ目に移動したときに検索条件が消えてしまったらユーザーはがっかりする。`paginate(10)`の後ろに`withQueryString()`を繋げるだけで、Laravelが自動的にURLのクエリパラメータ（`?keyword=...&genre=...`）をページネーションのリンクに引き継いでくれる。これは本当に便利だから絶対に覚えておこう。」
+| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
+|:---|:---|:---|
+| **タイトルか著者で検索したい** | `laravel query builder where or` | `where`句のパラメータとしてクロージャを渡すことで、`AND (A OR B)`という条件を作れることがわかる。`orWhere`を単純に繋げると`AND A OR B`になってしまう問題点にも気づける。 |
+| **関連テーブルの条件で絞り込みたい** | `laravel eloquent relation where` / `laravel リレーション 絞り込み` | Eloquentの「リレーションの存在クエリ」のセクションに`whereHas`というまさにやりたいこと通りのメソッドが見つかる。 |
+| **評価の高い順で並び替えたい** | `laravel order by relation count` / `laravel リレーション 集計 並び替え` | `withCount`や`withAvg`といったメソッドでリレーション先の集計結果をSELECT句に追加し、そのエイリアス（`reviews_avg_rating`）で`orderBy`できることがわかる。 |
+| **検索条件をページャーに引き継ぎたい** | `laravel pagination query parameter` / `laravel ページネーション 検索条件 維持` | ページネーションのドキュメントに`withQueryString()`という便利なメソッドが紹介されているのを発見する。 |
 
 ## 6. 提供されているBladeファイルの確認
 
