@@ -104,7 +104,7 @@ Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show')
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
 // --- 認証関連ルート ---
-require __DIR__.'/auth.php';
+// require __DIR__.'/auth.php';
 ```
 
 > **✅ 動作確認**
