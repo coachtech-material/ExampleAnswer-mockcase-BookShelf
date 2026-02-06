@@ -27,15 +27,15 @@
 
 ### 思考2：「タイトル or 著者」の検索はどう実現する？
 
-> 「キーワード検索は『タイトルまたは著者』での部分一致。SQLで言えば `WHERE (title LIKE \'%keyword%\') OR author LIKE \'%keyword%\')` という形にしたい。Laravelのクエリビルダでこれを実現するには、`where()`メソッドにクロージャ（無名関数）を渡すテクニックが使える。`$query->where(function($q) { ... })` のように書くことで、`()`で囲まれた論理グループを作れるんだ。これをしないと、他の`where`句との組み合わせで意図しないSQLになってしまう可能性があるから注意が必要だ。」
+> 「キーワード検索は『タイトルまたは著者』での部分一致。SQLで言えば `WHERE (title LIKE '%keyword%') OR author LIKE '%keyword%')` という形にしたい。Laravelのクエリビルダでこれを実現するには、`where()`メソッドにクロージャ（無名関数）を渡すテクニックが使える。`$query->where(function($q) { ... })` のように書くことで、`()`で囲まれた論理グループを作れるんだ。これをしないと、他の`where`句との組み合わせで意図しないSQLになってしまう可能性があるから注意が必要だ。」
 
 ### 思考3：関連テーブル（ジャンル）での絞り込みは？
 
-> 「ジャンルでの絞り込みは、`books`テーブルに直接ジャンル名があるわけではなく、中間テーブルを介して`genres`テーブルとリレーションしている。こういう**リレーション先のテーブルの条件で絞り込みたい**場合は、`whereHas()`メソッドがまさにうってつけ。`whereHas(\'genres\', function($q) { ... })`と書けば、『指定した条件に合致する`genres`リレーションを持つ`Book`』を簡単に絞り込める。」
+> 「ジャンルでの絞り込みは、`books`テーブルに直接ジャンル名があるわけではなく、中間テーブルを介して`genres`テーブルとリレーションしている。こういう**リレーション先のテーブルの条件で絞り込みたい**場合は、`whereHas()`メソッドがまさにうってつけ。`whereHas('genres', function($q) { ... })`と書けば、『指定した条件に合致する`genres`リレーションを持つ`Book`』を簡単に絞り込める。」
 
 ### 思考4：評価の高い順ってどうやって並び替える？
 
-> 「『評価の高い順』での並び替えは少し工夫が必要だ。各書籍の平均評価を計算し、その結果でソートしないといけない。これもリレーションの集計機能が使える。`withAvg(\'reviews\', \'rating\')`を使うと、`reviews`リレーションの`rating`カラムの平均値を`reviews_avg_rating`という名前で取得できる。あとは、このエイリアスカラムで`orderByDesc()`すればいい。他の並び替え条件（新着順、タイトル順など）は`switch`文でシンプルに分岐させよう。」
+> 「『評価の高い順』での並び替えは少し工夫が必要だ。各書籍の平均評価を計算し、その結果でソートしないといけない。これもリレーションの集計機能が使える。`withAvg('reviews', 'rating')`を使うと、`reviews`リレーションの`rating`カラムの平均値を`reviews_avg_rating`という名前で取得できる。あとは、このエイリアスカラムで`orderByDesc()`すればいい。他の並び替え条件（新着順、タイトル順など）は`switch`文でシンプルに分岐させよう。」
 
 ### 思考5：検索条件を維持したままページ移動させたい
 
@@ -72,33 +72,33 @@ class BookController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Book::with(\'genres\');
+        $query = Book::with('genres');
 
         // キーワード検索（応用機能）
-        if ($keyword = $request->input(\'keyword\')) {
+        if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword): void {
-                $q->where(\'title\', \'like\', "%{$keyword}%")
-                  ->orWhere(\'author\', \'like\', "%{$keyword}%");
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('author', 'like', "%{$keyword}%");
             });
         }
 
         // ジャンル絞り込み（応用機能）
-        if ($genreId = $request->input(\'genre\')) {
-            $query->whereHas(\'genres\', function ($q) use ($genreId): void {
-                $q->where(\'genres.id\', $genreId);
+        if ($genreId = $request->input('genre')) {
+            $query->whereHas('genres', function ($q) use ($genreId): void {
+                $q->where('genres.id', $genreId);
             });
         }
 
         // 並び順（応用機能）
-        switch ($request->input(\'sort\')) {
-            case \'oldest\':
+        switch ($request->input('sort')) {
+            case 'oldest':
                 $query->oldest();
                 break;
-            case \'title\':
-                $query->orderBy(\'title\');
+            case 'title':
+                $query->orderBy('title');
                 break;
-            case \'rating\':
-                $query->withAvg(\'reviews\', \'rating\')->orderByDesc(\'reviews_avg_rating\');
+            case 'rating':
+                $query->withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating');
                 break;
             default:
                 $query->latest();
@@ -106,9 +106,9 @@ class BookController extends Controller
         }
 
         $books = $query->paginate(10)->withQueryString();
-        $genres = Genre::orderBy(\'name\')->get();
+        $genres = Genre::orderBy('name')->get();
 
-        return view(\'books.index\', compact(\'books\', \'genres\'));
+        return view('books.index', compact('books', 'genres'));
     }
 
     // ... 他のメソッドは省略 ...
