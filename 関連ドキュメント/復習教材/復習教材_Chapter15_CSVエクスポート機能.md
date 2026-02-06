@@ -28,7 +28,7 @@ Webアプリケーション開発では、画面に表示されているデー�
 
 ### 思考3：大量データを扱う場合の注意点は？
 
-> 「実務では数万、数十万件のデータを扱う可能性がある。その場合、`$query->get()`で全件を一度に取得すると、メモリを大量に消費して最悪サーバーがダウンする。この問題は、DBからデータを少しずつ（例えば1000件ずつ）取得する`chunk()`メソッドと、レスポンスを少しずつ送信する`StreamedResponse`を組み合わせることで解決できる。今回は学習のため`get()`を使うけど、大量データを扱う機能では`chunk()`の利用を必ず検討すべきだ。」
+> 「実務では数万、数十万件のデータを扱う可能性がある。その場合、`$query->get()`で全件を一度に取得すると、メモリを大量に消費して最悪サーバーがダウンする。この問題は、DBからデータを少しずつ（例えば1000件ずつ）取得する`chunk()`メソッドと、レスポンスを少しずつ送信する`StreamedResponse`を組み合わせることで解決できる。今回は模範解答に合わせて`get()`を使うけど、大量データを扱う機能では`chunk()`の利用を必ず検討すべきだ。」
 
 ### 思考4：CSV特有の問題（文字化け）はどうする？
 
@@ -36,7 +36,7 @@ Webアプリケーション開発では、画面に表示されているデー�
 
 ## 4. 実装
 
-それでは、上記の思考プロセスを元に、CSVエクスポート機能を実装していきましょう。
+それでは、上記の思考プロセスを元に、CSVエクスポート機能を実装していきましょう。コード全体を掲載した後に、各ブロックの詳細な解説を追記します。
 
 ### 4.1. ルートの定義
 
@@ -55,7 +55,7 @@ Route::middleware('auth')->group(function () {
 
 ### 4.2. BookControllerの実装
 
-次に、`BookController`に`exportCsv`メソッドを追加します。コード全体を掲載した後に、各ブロックの詳細な解説を追記します。
+次に、`BookController`に`exportCsv`メソッドを追加します。
 
 ```php
 // app/Http/Controllers/BookController.php
@@ -72,96 +72,147 @@ class BookController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
-        // 1. 検索条件の取得
-        $query = Book::query(); // クエリビルダの初期化
-        $this->applySearchFilters($query, $request->all()); // 検索条件の適用
+        $keyword = $request->input("keyword");
+        $genreId = $request->input("genre");
+        $sort = $request->input("sort", "newest");
 
-        // 2. レスポンスヘッダの設定
+        $query = Book::with("genres");
+
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                return $q->where("title", "like", "%{$keyword}%")
+                         ->orWhere("author", "like", "%{$keyword}%");
+            });
+        }
+
+        if ($genreId) {
+            $query->whereHas("genres", function ($q) use ($genreId) {
+                return $q->where("genres.id", $genreId);
+            });
+        }
+
+        switch ($sort) {
+            case "oldest":
+                $query->orderBy("created_at", "asc");
+                break;
+            case "rating":
+                $query->withAvg("reviews", "rating")->orderByDesc("reviews_avg_rating");
+                break;
+            case "title":
+                $query->orderBy("title", "asc");
+                break;
+            default:
+                $query->orderBy("created_at", "desc");
+                break;
+        }
+
+        $books = $query->get();
+
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="books_' . date('Ymd_His') . '.csv"',
         ];
 
-        // 3. StreamedResponseの生成
-        return response()->stream(function () use ($query): void {
-            // 4. CSVファイルへの書き込み処理
+        return response()->stream(function () use ($books): void {
             $handle = fopen('php://output', 'w');
-
-            // BOMの書き込み（文字化け対策）
             fwrite($handle, "\xEF\xBB\xBF");
-
-            // ヘッダ行の書き込み
             fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
 
-            // データ行の書き込み（chunkを利用したメモリ対策版）
-            $query->with('genres')->chunk(1000, function ($books) use ($handle): void {
-                foreach ($books as $book) {
-                    fputcsv($handle, [
-                        $book->id,
-                        $book->title,
-                        $book->author,
-                        $book->isbn ?? '',
-                        $book->published_date ?? '',
-                        $book->genres->pluck('name')->implode(', '),
-                        $book->created_at->format('Y-m-d H:i:s'),
-                    ]);
-                }
-            });
+            foreach ($books as $book) {
+                fputcsv($handle, [
+                    $book->id,
+                    $book->title,
+                    $book->author,
+                    $book->isbn ?? '',
+                    $book->published_date ?? '',
+                    $book->genres->pluck('name')->implode(', '),
+                    $book->created_at->format('Y-m-d H:i:s'),
+                ]);
+            }
 
             fclose($handle);
         }, 200, $headers);
     }
 
-    /**
-     * 検索条件をクエリに適用する（indexとexportCsvで共通化）
-     */
-    private function applySearchFilters($query, array $params): void
-    {
-        if (isset($params['keyword'])) {
-            $query->where(function ($q) use ($params) {
-                $q->where('title', 'like', "%{$params['keyword']}%")
-                  ->orWhere('author', 'like', "%{$params['keyword']}%");
-            });
-        }
-
-        if (isset($params['genre'])) {
-            $query->whereHas('genres', function ($q) use ($params) {
-                $q->where('genres.id', $params['genre']);
-            });
-        }
-
-        $sort = $params['sort'] ?? 'latest';
-        switch ($sort) {
-            case 'oldest':
-                $query->oldest();
-                break;
-            case 'title':
-                $query->orderBy('title');
-                break;
-            case 'rating':
-                $query->withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating');
-                break;
-            default:
-                $query->latest();
-                break;
-        }
-    }
+    // ... 他のメソッド ...
 }
 ```
 
 ### 4.3. コードの詳細解説
 
-#### 1. 検索条件の取得と適用
+ここからは、上記のコードをブロックごとに分解し、何をしているのかを詳しく見ていきましょう。
+
+#### 1. 検索条件の取得
 
 ```php
-$query = Book::query();
-$this->applySearchFilters($query, $request->all());
+$keyword = $request->input("keyword");
+$genreId = $request->input("genre");
+$sort = $request->input("sort", "newest");
+
+$query = Book::with("genres");
 ```
 
-- **DRY原則の実践**: `index`メソッドと`exportCsv`メソッドで重複していた検索ロジックを、新しく作成した`applySearchFilters`プライベートメソッドに共通化しました。これにより、コードの再利用性が高まり、修正が容易になります。
-- **`$request->all()`**: リクエストの全クエリパラメータ（`keyword`, `genre`, `sort`）を配列として取得し、共通メソッドに渡しています。
+- **`$request->input("keyword")`**: リクエストから`keyword`パラメータを取得します。ユーザーが検索フォームに入力したキーワードが入っています。
+- **`$request->input("sort", "newest")`**: `sort`パラメータを取得します。第二引数の`"newest"`はデフォルト値で、パラメータが指定されていない場合に使用されます。
+- **`Book::with("genres")`**: 書籍データを取得する際に、関連するジャンル情報も一緒に取得するよう指示しています（Eager Loading）。
 
-#### 2. レスポンスヘッダの設定
+#### 2. キーワード検索
+
+```php
+if ($keyword) {
+    $query->where(function ($q) use ($keyword) {
+        return $q->where("title", "like", "%{$keyword}%")
+                 ->orWhere("author", "like", "%{$keyword}%");
+    });
+}
+```
+
+- **`if ($keyword)`**: キーワードが入力されている場合のみ、この検索条件を適用します。
+- **クロージャによるグループ化**: `where(function ($q) { ... })`の形式でクロージャを渡すことで、SQLの`WHERE (title LIKE ... OR author LIKE ...)`というグループ化された条件を作成しています。これはChapter 14で学んだテクニックと同じです。
+
+#### 3. ジャンル絞り込み
+
+```php
+if ($genreId) {
+    $query->whereHas("genres", function ($q) use ($genreId) {
+        return $q->where("genres.id", $genreId);
+    });
+}
+```
+
+- **`whereHas`**: リレーション先のテーブル（`genres`）の条件で絞り込むためのメソッドです。「指定したジャンルIDを持つ書籍のみ」を取得します。
+
+#### 4. 並び替え
+
+```php
+switch ($sort) {
+    case "oldest":
+        $query->orderBy("created_at", "asc");
+        break;
+    case "rating":
+        $query->withAvg("reviews", "rating")->orderByDesc("reviews_avg_rating");
+        break;
+    case "title":
+        $query->orderBy("title", "asc");
+        break;
+    default:
+        $query->orderBy("created_at", "desc");
+        break;
+}
+```
+
+- **`switch`文による分岐**: ユーザーが選択した並び順に応じて、クエリに`orderBy`を追加しています。
+- **`withAvg("reviews", "rating")`**: 評価の高い順で並び替える場合、`reviews`リレーションの`rating`カラムの平均値を計算し、`reviews_avg_rating`という名前で取得します。
+
+#### 5. データの取得
+
+```php
+$books = $query->get();
+```
+
+- **`get()`**: 組み立てたクエリを実行し、結果を取得します。この時点で、検索条件に合致するすべての書籍データがメモリに読み込まれます。
+
+#### 6. レスポンスヘッダの設定
 
 ```php
 $headers = [
@@ -175,10 +226,10 @@ $headers = [
     - `attachment`: ファイルとしてダウンロードさせるための指定です。
     - `filename=...`: ダウンロード時のファイル名を指定しています。`date('Ymd_His')`を使って、ダウンロードした日時がファイル名に含まれるようにしています。
 
-#### 3. StreamedResponseの生成
+#### 7. StreamedResponseの生成
 
 ```php
-return response()->stream(function () use ($query): void {
+return response()->stream(function () use ($books): void {
     // ... 書き込み処理 ...
 }, 200, $headers);
 ```
@@ -187,38 +238,43 @@ return response()->stream(function () use ($query): void {
 - `200`: HTTPステータスコード「OK」です。
 - `$headers`: 先ほど設定したレスポンスヘッダです。
 
-#### 4. CSVファイルへの書き込み処理
+#### 8. CSVファイルへの書き込み処理
 
 ```php
 $handle = fopen('php://output', 'w');
-// ...
 fwrite($handle, "\xEF\xBB\xBF");
-// ...
-fputcsv($handle, [...]);
-// ...
-$query->with('genres')->chunk(1000, function ($books) use ($handle): void {
-    // ...
-});
-// ...
+fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
+
+foreach ($books as $book) {
+    fputcsv($handle, [
+        $book->id,
+        $book->title,
+        $book->author,
+        $book->isbn ?? '',
+        $book->published_date ?? '',
+        $book->genres->pluck('name')->implode(', '),
+        $book->created_at->format('Y-m-d H:i:s'),
+    ]);
+}
+
 fclose($handle);
 ```
 
 - **`fopen('php://output', 'w')`**: `php://output`は書き込み可能なストリームで、プログラムの出力バッファに直接アクセスします。つまり、「画面に出力するのと同じ要領でファイルに書き込む」というイメージです。これを`$handle`（ファイルポインタ）に格納します。
 - **`fwrite($handle, "\xEF\xBB\xBF");`**: **BOM（バイトオーダーマーク）**をファイルの先頭に書き込みます。これはExcelでCSVを開いた際の文字化けを防ぐためのおまじないです。
-- **`fputcsv($handle, [...])`**: 配列をCSV形式の1行としてファイルに書き込みます。ここではヘッダ行を書き込んでいます。
-- **`$query->with('genres')->chunk(1000, ...)`**: ここが大量データ対策の核心部です。`get()`で全件取得する代わりに、`chunk(1000, ...)`を使うことで、データベースから1000件ずつデータを取得し、その都度クロージャ内の処理を実行します。これにより、メモリ消費を一定に保つことができます。
-- **`foreach ($books as $book)`**: `chunk`で取得した1000件のデータを1件ずつループ処理し、`fputcsv`でデータ行を書き込んでいきます。
+- **`fputcsv($handle, [...])`**: 配列をCSV形式の1行としてファイルに書き込みます。最初の呼び出しでヘッダ行を書き込んでいます。
+- **`foreach ($books as $book)`**: 取得した書籍データを1件ずつループ処理し、`fputcsv`でデータ行を書き込んでいきます。
+- **`$book->genres->pluck('name')->implode(', ')`**: 書籍に紐づくジャンル名を取得し、カンマ区切りの文字列に変換しています。
 - **`fclose($handle)`**: ファイルポインタを閉じます。
 
-### 4.4. Bladeファイルの修正
+### 4.4. 提供されているBladeファイルの確認
 
-`resources/views/books/index.blade.php`にあるCSVダウンロードボタンのリンクを、現在の検索条件を引き継ぐように修正します。
+このプロジェクトでは、書籍一覧画面のBladeファイル（`resources/views/books/index.blade.php`）が事前に提供されています。提供されているBladeファイルには、既にCSVダウンロードボタンが実装されており、コントローラーの実装により機能するようになります。
 
-```html
-<a href="{{ route('books.export', request()->query()) }}" class="btn btn-secondary">CSVエクスポート</a>
-```
+**提供されているBladeファイルのポイント:**
 
-- **`route('books.export', request()->query())`**: `route()`ヘルパの第二引数に`request()->query()`を渡すことで、現在のURLのクエリパラメータ（`?keyword=...&sort=...`など）を全てエクスポート用のURLに引き継いでいます。
+- CSVダウンロードボタンは`{{ route('books.export') }}?{{ http_build_query(request()->query()) }}`のように、現在の検索条件をクエリパラメータとして引き継いでいます。
+- これにより、ユーザーが検索結果を絞り込んだ状態でCSVエクスポートを実行すると、その検索条件が反映されたCSVファイルがダウンロードされます。
 
 ## 5. How to: この実装にたどり着くための調べ方
 
@@ -279,10 +335,4 @@ Laravel CSV Excel 文字化け
 
 ## 6. まとめ
 
-このChapterでは、CSVエクスポート機能の実装方法を学びました。特に、実務で重要となる以下の3つのポイントを重点的に扱いました。
-
-1.  **DRY原則**: `applySearchFilters`メソッドによる検索ロジックの共通化
-2.  **パフォーマンス**: `StreamedResponse`と`chunk`メソッドを組み合わせた、大量データ処理におけるメモリ対策
-3.  **互換性**: BOMの付与によるExcelでの文字化け対策
-
-常にパフォーマンスと再利用性を意識することは、プロのエンジニアとして非常に大切なスキルです。
+このChapterでは、CSVエクスポート機能の実装方法を学びました。今回は模範解答に合わせて`get()`でデータを取得しましたが、実務における大量データ処理の重要性と、その解決策である`StreamedResponse`と`chunk()`の組み合わせについても理解を深めました。常にパフォーマンスを意識することは、プロのエンジニアとして非常に大切なスキルです。
