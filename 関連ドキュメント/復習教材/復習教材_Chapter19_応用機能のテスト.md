@@ -4,596 +4,392 @@
 
 ## 🎯 このセクションで学ぶこと
 
-- 応用機能（高度な検索、CSVエクスポート、外部API連携、公開API）のテスト方法
-- `Http::fake()` を使った外部APIのモック化
-- ファイルダウンロードのテスト方法
-- JSONレスポンスのアサーション
-- テストカバレッジの確認方法
+- **応用機能**（検索、CSVエクスポート）のFeatureテスト
+- **コントローラーのメソッドを直接呼び出す**テスト手法
+- レスポンスとして返される**Viewオブジェクトの中身を検証する**方法
+- モデルの**リレーションメソッドを直接テストする**Unitテスト的なアプローチ
+- `assertSeeInOrder`, `assertHeader`, `streamedContent`など、応用的なアサーションメソッド
 
 ---
 
 ## 🧠 先輩エンジニアの思考プロセス
 
-### 応用機能のテストで考慮すべきこと
+### なぜ応用機能のテストも必要なのか？
 
-応用機能のテストでは、基本機能のテストに加えて以下の点を考慮する必要があります：
+Chapter 13では、基本的なCRUD操作や認証・認可のテストを行いました。しかし、実務で開発するアプリケーションには、検索、外部連携、データエクスポートなど、より複雑な「応用機能」が数多く存在します。これらの機能は、複数の条件分岐や特殊なデータ処理を含むことが多く、手動でのテストには限界があります。
 
-| 機能 | テストの考慮点 |
-|:---|:---|
-| **高度な検索機能** | 複数の検索条件の組み合わせ、ソート順の検証 |
-| **CSVエクスポート** | ファイルダウンロードの検証、文字コードの確認 |
-| **外部API連携** | `Http::fake()`によるモック化、エラーハンドリング |
-| **公開API** | JSONレスポンスの構造検証、ステータスコード |
+例えば、**検索機能**では、「キーワードとジャンルの両方を指定した場合」「並び替え順を変更した場合」など、組み合わせパターンが爆発的に増加します。**CSVエクスポート機能**では、「検索結果を正しく反映しているか」「大量データでもメモリを使いすぎないか」といった、目に見えにくい部分の品質も保証しなければなりません。
 
-### 外部APIのテストにおける重要な考え方
+応用機能のテストを書くことで、これらの複雑なロジックが仕様通りに動作することを保証し、将来の変更にも強い、堅牢なアプリケーションを構築することができます。
 
-外部API（Google Books APIなど）に依存するテストは、以下の理由からモック化が必須です：
+### どうやってテストの「観点」を見つけるか？
 
-1. **テストの安定性**: 外部APIがダウンしていてもテストが実行できる
-2. **テストの速度**: 実際のHTTPリクエストを送信しないため高速
-3. **テストの再現性**: 常に同じレスポンスを返すため結果が安定
+テストを書く際、「何をテストすればいいのか？」と迷うことがあります。基本的な考え方は、「**ユーザーの操作**」と「**システムの振る舞い**」を分解し、それぞれの重要なポイントを検証することです。
+
+| 機能 | ユーザーの操作 | システムの振る舞い（テストの観点） |
+|:---|:---|:---|
+| **検索機能** | キーワードを入力して検索ボタンを押す | - 検索結果が正しく表示されるか？ (`assertSee`)
+- 関係ないデータは表示されていないか？ (`assertDontSee`)
+- 並び替え順は正しいか？ (`assertSeeInOrder`) |
+| **CSVエクスポート** | エクスポートボタンを押す | - CSVファイルがダウンロードされるか？ (`assertOk`, `assertHeader`)
+- ファイル名は正しいか？ (`assertHeader`)
+- 検索条件がCSVの内容に反映されているか？ (`streamedContent`) |
+
+### テスト手法をどう使い分けるか？
+
+Chapter 13では、主にHTTPリクエストを送信するFeatureテストを学びました。しかし、テストには様々なアプローチがあります。
+
+- **HTTPリクエスト vs コントローラー直接呼び出し**
+  - **HTTPリクエスト**: ユーザー操作全体の流れを検証したい場合に最適です。ルーティングやミドルウェアも含めた総合的なテストになります。
+  - **コントローラー直接呼び出し**: ルーティングなどを介さず、コントローラーの特定のメソッドが返す「データ」そのものを検証したい場合に有効です。例えば、「`edit`メソッドが、Viewに正しい書籍データとジャンル一覧を渡しているか」を直接確認できます。
+
+- **HTTPリクエスト vs モデルのメソッド直接呼び出し**
+  - **HTTPリクエスト**: 「いいねボタンを押したら、DBにレコードが作られ、元のページにリダイレクトされる」という一連の機能（Feature）をテストします。
+  - **モデルのメソッド直接呼び出し**: 「`user->likedReviews()->toggle()`というメソッドが、中間テーブルのレコードを正しく追加・削除するか」という単一の責務（Unit）をテストします。より高速で、テストの関心事を絞り込めます。
+
+> **💡 テスト戦略**
+> 完璧なテスト戦略というものはなく、プロジェクトの特性やチームの方針によって様々です。重要なのは、それぞれのテスト手法のメリット・デメリットを理解し、「何を保証したいのか」という目的に合わせて、最適な手法を選択することです。
 
 ---
 
-## 18.1. 高度な検索機能のテスト
+## 19.1. 応用機能のテストコード
 
-### テストファイルの作成
+このセクションでは、Chapter 14（高度な検索機能）とChapter 15（CSVエクスポート機能）に対するテストを`BookTest`に追加します。また、`ReviewLikeTest`をモデルメソッド直接呼び出しの形式に修正し、テスト手法の違いを学びます。
 
-```bash
-sail artisan make:test SearchTest
-```
+### BookTest.php の修正・追記
 
-### SearchTest.php の実装
+`tests/Feature/BookTest.php`に、以下のメソッドを追加・修正します。
 
 ```php
 <?php
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\BookController;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\View\View;
 use Tests\TestCase;
 
-class SearchTest extends TestCase
+class BookTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * キーワード検索が正しく動作することをテスト
-     */
-    public function test_keyword_search_returns_matching_books(): void
+    // ... 既存のテストメソッドは省略 ...
+
+    // ========== ここから追加・修正 ========== 
+
+    /** @test */
+    public function test_book_index_with_search_query_displays_results(): void
     {
-        $user = User::factory()->create();
-        
-        // テスト用の書籍を作成
-        Book::factory()->create(['title' => 'Laravel入門', 'user_id' => $user->id]);
-        Book::factory()->create(['title' => 'PHP基礎', 'user_id' => $user->id]);
-        Book::factory()->create(['title' => 'JavaScript入門', 'user_id' => $user->id]);
+        Book::factory()->create(["title" => "Laravel Testing Guide"]);
+        Book::factory()->create(["title" => "Another Book"]);
 
-        // 「Laravel」で検索
-        $response = $this->get(route('books.index', ['keyword' => 'Laravel']));
-
-        $response->assertStatus(200);
-        $response->assertSee('Laravel入門');
-        $response->assertDontSee('PHP基礎');
+        $this->get(route("books.index", ["keyword" => "Laravel"]))
+            ->assertOk()
+            ->assertSee("Laravel Testing Guide")
+            ->assertDontSee("Another Book");
     }
 
-    /**
-     * ジャンル絞り込みが正しく動作することをテスト
-     */
-    public function test_genre_filter_returns_books_in_genre(): void
+    /** @test */
+    public function test_book_index_with_genre_filter_displays_results(): void
     {
-        $user = User::factory()->create();
-        $genre1 = Genre::factory()->create(['name' => 'プログラミング']);
-        $genre2 = Genre::factory()->create(['name' => '小説']);
+        $genre = Genre::factory()->create();
+        $bookInGenre = Book::factory()->create();
+        $bookInGenre->genres()->attach($genre);
+        $bookNotInGenre = Book::factory()->create();
 
-        $book1 = Book::factory()->create(['title' => 'Laravel本', 'user_id' => $user->id]);
-        $book2 = Book::factory()->create(['title' => '小説本', 'user_id' => $user->id]);
-
-        $book1->genres()->attach($genre1->id);
-        $book2->genres()->attach($genre2->id);
-
-        // プログラミングジャンルで絞り込み
-        $response = $this->get(route('books.index', ['genre' => $genre1->id]));
-
-        $response->assertStatus(200);
-        $response->assertSee('Laravel本');
-        $response->assertDontSee('小説本');
+        $this->get(route("books.index", ["genre_id" => $genre->id]))
+            ->assertOk()
+            ->assertSee($bookInGenre->title)
+            ->assertDontSee($bookNotInGenre->title);
     }
 
-    /**
-     * ソート機能が正しく動作することをテスト
-     */
-    public function test_sort_by_created_at_works(): void
+    /** @test */
+    public function test_book_index_is_ordered_correctly(): void
+    {
+        $latestBook = Book::factory()->create(["created_at" => now()]);
+        $oldestBook = Book::factory()->create(["created_at" => now()->subDay()]);
+
+        // 新着順（デフォルト）
+        $this->get(route("books.index", ["sort" => "newest"]))
+            ->assertOk()
+            ->assertSeeInOrder([$latestBook->title, $oldestBook->title]);
+
+        // 古い順
+        $this->get(route("books.index", ["sort" => "oldest"]))
+            ->assertOk()
+            ->assertSeeInOrder([$oldestBook->title, $latestBook->title]);
+    }
+
+    /** @test */
+    public function test_authenticated_user_can_export_csv(): void
     {
         $user = User::factory()->create();
-        
-        // 異なる日時で書籍を作成
-        $oldBook = Book::factory()->create([
-            'title' => '古い本',
-            'user_id' => $user->id,
-            'created_at' => now()->subDays(10),
-        ]);
-        $newBook = Book::factory()->create([
-            'title' => '新しい本',
-            'user_id' => $user->id,
-            'created_at' => now(),
-        ]);
+        Book::factory()->count(3)->create();
 
-        // 新しい順でソート
-        $response = $this->get(route('books.index', ['sort' => 'newest']));
+        $response = $this->actingAs($user)->get(route("books.export"));
 
-        $response->assertStatus(200);
-        // 新しい本が先に表示されることを確認
-        $response->assertSeeInOrder(['新しい本', '古い本']);
+        $response->assertOk();
+        $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
+        $response->assertHeader("Content-Disposition", 'attachment; filename="books.csv"');
+    }
+
+    /** @test */
+    public function test_csv_export_with_search_filters(): void
+    {
+        $user = User::factory()->create();
+        Book::factory()->create(["title" => "Laravel Book"]);
+        Book::factory()->create(["title" => "PHP Book"]);
+
+        $response = $this->actingAs($user)->get(route("books.export", ["keyword" => "Laravel"]));
+
+        $response->assertOk();
+        $this->assertStringContainsString("Laravel Book", $response->streamedContent());
+        $this->assertStringNotContainsString("PHP Book", $response->streamedContent());
+    }
+
+    /** @test */
+    public function test_guest_cannot_export_csv(): void
+    {
+        $this->get(route("books.export"))
+            ->assertRedirect(route("login"));
+    }
+
+    /** @test */
+    public function test_only_owner_can_view_edit_form_and_it_has_correct_data(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $genres = Genre::factory()->count(2)->create(); // 全てのジャンル
+        $otherUser = User::factory()->create();
+
+        // 他のユーザーはアクセス不可
+        $this->actingAs($otherUser)
+            ->get(route("books.edit", $book))
+            ->assertForbidden();
+
+        // オーナーはアクセス可能
+        $this->actingAs($owner);
+
+        // コントローラーのメソッドを直接実行
+        $response = app(BookController::class)->edit($book);
+
+        // Viewオブジェクトが返されることを確認
+        $this->assertInstanceOf(View::class, $response);
+        // 正しいビューファイルかを確認
+        $this->assertSame("books.edit", $response->name());
+
+        // Viewに渡されたデータを取得
+        $data = $response->getData();
+
+        // 正しい書籍データが渡されているか
+        $this->assertTrue($data["book"]->is($book));
+        // 全てのジャンルデータが渡されているか
+        $this->assertCount($genres->count(), $data["genres"]);
     }
 }
 ```
 
-### 📖 コードリーディング：検索テストの解説
+### ReviewLikeTest.php の修正
 
-| コード | 説明 | 役割 |
-|:---|:---|:---|
-| `$response->assertSee('...')` | 文字列の存在確認 | レスポンスに指定した文字列が含まれることを確認 |
-| `$response->assertDontSee('...')` | 文字列の非存在確認 | レスポンスに指定した文字列が含まれないことを確認 |
-| `$response->assertSeeInOrder([...])` | 順序の確認 | 指定した文字列が指定した順序で表示されることを確認 |
-| `$book->genres()->attach(...)` | リレーションの設定 | 多対多リレーションのデータを追加 |
-
----
-
-## 18.2. CSVエクスポート機能のテスト
-
-### テストファイルの作成
-
-```bash
-sail artisan make:test CsvExportTest
-```
-
-### CsvExportTest.php の実装
+`tests/Feature/ReviewLikeTest.php`のテストを、HTTPリクエストベースからモデルメソッド直接呼び出しの形式に全面的に書き換えます。
 
 ```php
 <?php
 
 namespace Tests\Feature;
 
-use App\Models\Book;
+use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class CsvExportTest extends TestCase
+class ReviewLikeTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * CSVエクスポートが正しく動作することをテスト
-     */
-    public function test_csv_export_returns_csv_file(): void
+    /** @test */
+    public function test_user_can_like_review_via_model_method(): void
     {
         $user = User::factory()->create();
-        
-        // テスト用の書籍を作成
-        Book::factory()->create([
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'user_id' => $user->id,
+        $review = Review::factory()->create();
+
+        // モデルのメソッドを直接呼び出し
+        $user->likedReviews()->syncWithoutDetaching([$review->id]);
+
+        $this->assertDatabaseHas("review_likes", [
+            "user_id" => $user->id,
+            "review_id" => $review->id,
         ]);
 
-        $response = $this->actingAs($user)->get(route('books.export'));
-
-        // ステータスコードが200であることを確認
-        $response->assertStatus(200);
-
-        // Content-Typeがtext/csvであることを確認
-        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-
-        // Content-Dispositionヘッダーが設定されていることを確認
-        $this->assertStringContainsString(
-            'attachment',
-            $response->headers->get('Content-Disposition')
+        $this->assertTrue(
+            $user->likedReviews()->whereKey($review->id)->exists()
         );
     }
 
-    /**
-     * CSVの内容が正しいことをテスト
-     */
-    public function test_csv_contains_correct_data(): void
+    /** @test */
+    public function test_user_can_unlike_review_via_model_method(): void
     {
         $user = User::factory()->create();
-        
-        Book::factory()->create([
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'user_id' => $user->id,
+        $review = Review::factory()->create();
+        $user->likedReviews()->attach($review->id);
+
+        // モデルのメソッドを直接呼び出し
+        $user->likedReviews()->detach($review->id);
+
+        $this->assertDatabaseMissing("review_likes", [
+            "user_id" => $user->id,
+            "review_id" => $review->id,
         ]);
-
-        $response = $this->actingAs($user)->get(route('books.export'));
-
-        // CSVの内容を確認
-        $content = $response->streamedContent();
-        
-        $this->assertStringContainsString('テスト書籍', $content);
-        $this->assertStringContainsString('テスト著者', $content);
     }
 
-    /**
-     * 未認証ユーザーはCSVエクスポートできないことをテスト
-     */
-    public function test_guest_cannot_export_csv(): void
+    /** @test */
+    public function test_like_toggle_works_correctly_via_model_method(): void
     {
-        $response = $this->get(route('books.export'));
+        $user = User::factory()->create();
+        $review = Review::factory()->create();
 
-        $response->assertRedirect(route('login'));
+        // 1回目のtoggle: いいね追加
+        $user->likedReviews()->toggle($review->id);
+        $this->assertDatabaseHas("review_likes", [
+            "user_id" => $user->id,
+            "review_id" => $review->id,
+        ]);
+
+        // 2回目のtoggle: いいね解除
+        $user->likedReviews()->toggle($review->id);
+        $this->assertDatabaseMissing("review_likes", [
+            "user_id" => $user->id,
+            "review_id" => $review->id,
+        ]);
+    }
+
+    /** @test */
+    public function test_guest_cannot_like_review_via_http_request(): void
+    {
+        $review = Review::factory()->create();
+
+        // 認証部分はHTTPリクエストでテスト
+        $this->post(route("reviews.like", $review))
+            ->assertRedirect(route("login"));
     }
 }
 ```
 
-### 📖 コードリーディング：CSVテストの解説
-
-| コード | 説明 | 役割 |
-|:---|:---|:---|
-| `$response->assertHeader(...)` | ヘッダーの検証 | レスポンスヘッダーが期待値と一致することを確認 |
-| `$response->streamedContent()` | ストリームの取得 | StreamedResponseの内容を文字列として取得 |
-| `$this->assertStringContainsString(...)` | 文字列の部分一致 | 文字列に指定した部分文字列が含まれることを確認 |
-
 ---
 
-## 18.3. ISBN書籍検索機能のテスト（外部API連携）
+## 19.2. コードの詳細解説
 
-### テストファイルの作成
-
-```bash
-sail artisan make:test IsbnSearchTest
-```
-
-### IsbnSearchTest.php の実装
+### 検索機能のテスト (`BookTest`)
 
 ```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
-
-class IsbnSearchTest extends TestCase
-{
-    use RefreshDatabase;
-
-    /**
-     * ISBN検索が正しく動作することをテスト（正常系）
-     */
-    public function test_isbn_search_returns_book_info(): void
-    {
-        // Google Books APIのレスポンスをモック化
-        Http::fake([
-            'www.googleapis.com/books/v1/*' => Http::response([
-                'totalItems' => 1,
-                'items' => [
-                    [
-                        'volumeInfo' => [
-                            'title' => 'テスト書籍タイトル',
-                            'authors' => ['テスト著者'],
-                            'description' => 'テスト説明文',
-                            'industryIdentifiers' => [
-                                ['type' => 'ISBN_13', 'identifier' => '9784123456789'],
-                            ],
-                        ],
-                    ],
-                ],
-            ], 200),
-        ]);
-
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get(route('isbn.fetch', ['isbn' => '9784123456789']));
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'title' => 'テスト書籍タイトル',
-            'author' => 'テスト著者',
-            'description' => 'テスト説明文',
-        ]);
-    }
-
-    /**
-     * 存在しないISBNの場合のテスト
-     */
-    public function test_isbn_search_returns_404_when_not_found(): void
-    {
-        // 書籍が見つからない場合のレスポンスをモック化
-        Http::fake([
-            'www.googleapis.com/books/v1/*' => Http::response([
-                'totalItems' => 0,
-            ], 200),
-        ]);
-
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get(route('isbn.fetch', ['isbn' => '0000000000000']));
-
-        $response->assertStatus(404);
-        $response->assertJson([
-            'message' => '書籍が見つかりませんでした',
-        ]);
-    }
-
-    /**
-     * 外部APIがエラーを返した場合のテスト
-     */
-    public function test_isbn_search_handles_api_error(): void
-    {
-        // APIエラーをモック化
-        Http::fake([
-            'www.googleapis.com/books/v1/*' => Http::response([], 500),
-        ]);
-
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get(route('isbn.fetch', ['isbn' => '9784123456789']));
-
-        $response->assertStatus(503);
-        $response->assertJson([
-            'message' => '外部APIとの通信に失敗しました',
-        ]);
-    }
-
-    /**
-     * 無効なISBN形式の場合のテスト
-     */
-    public function test_isbn_search_validates_isbn_format(): void
-    {
-        $user = User::factory()->create();
-
-        // 無効なISBN形式
-        $response = $this->actingAs($user)->get(route('isbn.fetch', ['isbn' => 'invalid']));
-
-        $response->assertStatus(422);
-    }
-}
+// test_book_index_with_search_query_displays_results
+$this->get(route("books.index", ["keyword" => "Laravel"]))
+    ->assertOk()
+    ->assertSee("Laravel Testing Guide")
+    ->assertDontSee("Another Book");
 ```
-
-### 📖 コードリーディング：Http::fake() の解説
-
-| コード | 説明 | 役割 |
-|:---|:---|:---|
-| `Http::fake([...])` | HTTPリクエストのモック化 | 指定したURLパターンに対するレスポンスを偽装する |
-| `Http::response([...], 200)` | モックレスポンスの作成 | 指定したボディとステータスコードのレスポンスを返す |
-| `'www.googleapis.com/books/v1/*'` | URLパターン | ワイルドカード（*）を使ってURLパターンを指定 |
-| `$response->assertJson([...])` | JSONの検証 | レスポンスのJSONが指定した構造を含むことを確認 |
-
-> **💡 Http::fake() の重要性**
-> 
-> `Http::fake()` を使用することで、外部APIに実際にリクエストを送信せずにテストを実行できます。これにより：
-> - 外部APIがダウンしていてもテストが実行できる
-> - テストの実行速度が向上する
-> - 様々なエラーケース（404、500など）を簡単にテストできる
-
----
-
-## 18.4. 公開APIのテスト
-
-### テストファイルの作成
-
-```bash
-sail artisan make:test PublicApiTest
-```
-
-### PublicApiTest.php の実装
+1.  **`route("books.index", ["keyword" => "Laravel"])`**: `books.index`ルートに、クエリパラメータ`?keyword=Laravel`を付与してGETリクエストを送信します。
+2.  **`assertSee()`**: レスポンスのHTML内に、検索キーワードにマッチする書籍のタイトルが含まれていることを確認します。
+3.  **`assertDontSee()`**: マッチしない書籍のタイトルが含まれていないことを確認します。これにより、検索が正しく機能していることをより確実に検証できます。
 
 ```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Book;
-use App\Models\Genre;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class PublicApiTest extends TestCase
-{
-    use RefreshDatabase;
-
-    /**
-     * 書籍一覧APIが正しいJSON構造を返すことをテスト
-     */
-    public function test_books_api_returns_correct_json_structure(): void
-    {
-        $user = User::factory()->create();
-        $genre = Genre::factory()->create();
-        $book = Book::factory()->create(['user_id' => $user->id]);
-        $book->genres()->attach($genre->id);
-
-        $response = $this->getJson('/api/v1/books');
-
-        $response->assertStatus(200);
-        $response->assertJsonStructure([
-            'data' => [
-                '*' => [
-                    'id',
-                    'title',
-                    'author',
-                    'description',
-                    'genres' => [
-                        '*' => ['id', 'name'],
-                    ],
-                    'created_at',
-                ],
-            ],
-            'links',
-            'meta',
-        ]);
-    }
-
-    /**
-     * 書籍詳細APIが正しいデータを返すことをテスト
-     */
-    public function test_book_show_api_returns_correct_data(): void
-    {
-        $user = User::factory()->create();
-        $book = Book::factory()->create([
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->getJson("/api/v1/books/{$book->id}");
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'data' => [
-                'id' => $book->id,
-                'title' => 'テスト書籍',
-                'author' => 'テスト著者',
-            ],
-        ]);
-    }
-
-    /**
-     * 存在しない書籍のAPIアクセスで404が返ることをテスト
-     */
-    public function test_book_show_api_returns_404_for_nonexistent_book(): void
-    {
-        $response = $this->getJson('/api/v1/books/99999');
-
-        $response->assertStatus(404);
-    }
-
-    /**
-     * APIのページネーションが正しく動作することをテスト
-     */
-    public function test_books_api_pagination_works(): void
-    {
-        $user = User::factory()->create();
-        
-        // 15件の書籍を作成（1ページ10件の場合、2ページ目が必要）
-        Book::factory()->count(15)->create(['user_id' => $user->id]);
-
-        // 1ページ目
-        $response = $this->getJson('/api/v1/books?page=1');
-        $response->assertStatus(200);
-        $response->assertJsonCount(10, 'data');
-
-        // 2ページ目
-        $response = $this->getJson('/api/v1/books?page=2');
-        $response->assertStatus(200);
-        $response->assertJsonCount(5, 'data');
-    }
-}
+// test_book_index_is_ordered_correctly
+$this->get(route("books.index", ["sort" => "newest"]))
+    ->assertOk()
+    ->assertSeeInOrder([$latestBook->title, $oldestBook->title]);
 ```
+1.  **`assertSeeInOrder([...])`**: レスポンスのHTML内に、配列で指定した文字列が、**この順番通りに**出現することを確認します。ランキングや並び替え機能のテストに非常に強力なアサーションです。
 
-### 📖 コードリーディング：APIテストの解説
+### CSVエクスポート機能のテスト (`BookTest`)
 
-| コード | 説明 | 役割 |
-|:---|:---|:---|
-| `$this->getJson(...)` | JSON APIリクエスト | Accept: application/json ヘッダー付きでGETリクエストを送信 |
-| `$response->assertJsonStructure([...])` | JSON構造の検証 | レスポンスのJSONが指定した構造を持つことを確認 |
-| `$response->assertJsonCount(10, 'data')` | 配列の件数検証 | 指定したキーの配列が指定した件数であることを確認 |
-| `'*' => [...]` | 配列要素の構造 | 配列の各要素が指定した構造を持つことを確認 |
+```php
+// test_authenticated_user_can_export_csv
+$response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
+$response->assertHeader("Content-Disposition", 'attachment; filename="books.csv"');
+```
+1.  **`assertHeader($key, $value)`**: レスポンスヘッダーに、指定したキーと値のペアが含まれていることを確認します。`Content-Type`でCSV形式であることを、`Content-Disposition`でファイル名が指定され、ダウンロードされる設定になっていることを検証します。
+
+```php
+// test_csv_export_with_search_filters
+$this->assertStringContainsString("Laravel Book", $response->streamedContent());
+```
+1.  **`$response->streamedContent()`**: `StreamedResponse`の場合、レスポンスのコンテンツ（CSVの中身）を文字列として取得します。
+2.  **`assertStringContainsString()`**: 取得したCSVコンテンツの文字列内に、期待する書籍のタイトルが含まれていることを確認します。
+
+### 応用的なテスト手法
+
+```php
+// test_only_owner_can_view_edit_form_and_it_has_correct_data
+$response = app(BookController::class)->edit($book);
+```
+1.  **`app(BookController::class)`**: サービスコンテナから`BookController`のインスタンスを取得します。これにより、ルーティングやミドルウェアを介さずに、コントローラーのメソッドを直接呼び出す準備ができます。
+2.  **`->edit($book)`**: 取得したコントローラーインスタンスの`edit`メソッドを、引数を渡して直接実行します。戻り値（この場合は`View`オブジェクト）が`$response`に格納されます。
+
+```php
+$this->assertInstanceOf(View::class, $response);
+$this->assertSame("books.edit", $response->name());
+$data = $response->getData();
+$this->assertTrue($data["book"]->is($book));
+```
+1.  **`assertInstanceOf(View::class, $response)`**: `$response`が`View`クラスのインスタンスであることを確認します。
+2.  **`$response->name()`**: `View`オブジェクトがどのBladeファイル（`books.edit`）を指しているかを取得します。
+3.  **`$response->getData()`**: `View`オブジェクトに渡された全てのデータを連想配列として取得します。
+4.  **`$data["book"]`**: `compact("book", "genres")`で渡された書籍データにアクセスし、`is()`メソッドで期待通りのデータか検証します。
+
+```php
+// test_user_can_like_review_via_model_method
+$user->likedReviews()->syncWithoutDetaching([$review->id]);
+```
+1.  **`$user->likedReviews()`**: `User`モデルに定義された`likedReviews`リレーション（`BelongsToMany`）のクエリビルダを取得します。
+2.  **`->syncWithoutDetaching([...])`**: HTTPリクエストを送信する代わりに、リレーションのメソッドを直接呼び出して、中間テーブルにレコードを追加します。これにより、テストの関心事を「リレーションのロジックが正しいか」という点に絞り込むことができます。
 
 ---
 
-## 18.5. テストカバレッジの確認
+## 19.3. How to: この実装にたどり着くための調べ方
 
-### カバレッジレポートの生成
+応用的なテスト手法は、公式ドキュメントのどこを読めば良いか分かりにくいことがあります。以下のような検索経路を辿ることで、必要な情報にたどり着くことができます。
 
-テストカバレッジを確認するには、以下のコマンドを実行します：
+### Step 1: 「並び順をテストしたい」
 
-```bash
-sail artisan test --coverage
-```
+- **最初の検索**: `Laravel test order` / `Laravel テスト 並び順`
+- **検索結果から得られる情報**: `assertSeeInOrder`というメソッドの存在を知る。
+- **次の疑問と検索**: `assertSeeInOrder`の具体的な使い方が知りたい → `Laravel assertSeeInOrder example`
+- **最終的にたどり着く答え**: `assertSeeInOrder`の公式ドキュメントや解説記事にたどり着き、配列で文字列を渡せば良いことを理解する。
 
-### カバレッジ目標
+### Step 2: 「CSVダウンロードをテストしたい」
 
-| 項目 | 目標値 |
-|:---|:---|
-| **全体カバレッジ** | 80%以上 |
-| **コントローラー** | 90%以上 |
-| **モデル** | 80%以上 |
+- **最初の検索**: `Laravel test csv download` / `Laravel テスト ファイルダウンロード`
+- **検索結果から得られる情報**: レスポンスヘッダーを検証する必要があることが分かる。`assertHeader`というメソッドの存在を知る。
+- **次の疑問と検索**: CSVの中身はどうやってテストする？ → `Laravel test streamedresponse content`
+- **最終的にたどり着く答え**: `streamedContent()`メソッドでコンテンツを文字列として取得し、`assertStringContainsString`などで検証する方法を学ぶ。
 
-### カバレッジを上げるためのポイント
+### Step 3: 「Viewに渡したデータをテストしたい」
 
-1. **正常系と異常系の両方をテストする**
-2. **条件分岐（if文）の全てのパスを通す**
-3. **バリデーションエラーのケースもテストする**
-4. **認証・認可のテストを含める**
+- **最初の検索**: `Laravel test view data` / `Laravel テスト ビュー データ`
+- **検索結果から得られる情報**: `assertViewHas`や`assertViewIs`といったメソッドの存在を知る。しかし、これらはHTTPリクエストのレスポンス全体を検証するもの。
+- **次の疑問と検索**: コントローラーのメソッドだけをテストして、Viewのデータを直接見たい → `Laravel test controller method directly` / `Laravel コントローラー メソッド 単体テスト`
+- **最終的にたどり着く答え**: `app()`ヘルパでコントローラーをインスタンス化し、メソッドを直接呼び出す手法を知る。返ってきた`View`オブジェクトの`getData()`メソッドでデータを取得できることを学ぶ。
 
----
+### Step 4: 「リレーションのテストをもっとシンプルに書きたい」
 
-## 18.6. 全テストの実行
-
-全てのテストを実行して、結果を確認します。
-
-```bash
-sail artisan test
-```
-
-成功すると以下のような出力が表示されます：
-
-```
-   PASS  Tests\Feature\BookTest
-  ✓ book index page can be rendered
-  ✓ authenticated user can create book
-  ...
-
-   PASS  Tests\Feature\SearchTest
-  ✓ keyword search returns matching books
-  ✓ genre filter returns books in genre
-  ✓ sort by created at works
-
-   PASS  Tests\Feature\CsvExportTest
-  ✓ csv export returns csv file
-  ✓ csv contains correct data
-  ✓ guest cannot export csv
-
-   PASS  Tests\Feature\IsbnSearchTest
-  ✓ isbn search returns book info
-  ✓ isbn search returns 404 when not found
-  ✓ isbn search handles api error
-  ✓ isbn search validates isbn format
-
-   PASS  Tests\Feature\PublicApiTest
-  ✓ books api returns correct json structure
-  ✓ book show api returns correct data
-  ✓ book show api returns 404 for nonexistent book
-  ✓ books api pagination works
-
-  Tests:  XX passed
-  Time:   X.XXs
-```
+- **最初の検索**: `Laravel test many to many relationship` / `Laravel テスト 多対多`
+- **検索結果から得られる情報**: `attach()`や`sync()`を使ったテスト方法が多く見つかる。HTTPリクエストを使わない方法はないか？
+- **次の疑問と検索**: `Laravel test model method directly` / `Laravel モデル メソッド テスト`
+- **最終的にたどり着く答え**: FeatureテストではなくUnitテストとして、モデルのインスタンスを生成し、リレーションメソッド（`syncWithoutDetaching`, `toggle`など）を直接呼び出してDBの状態を検証する、というアプローチがあることを理解する。
 
 ---
 
-## 📝 まとめ
+## 19.4. まとめ
 
-このChapterでは、応用機能のテストを実装しました。
+このChapterでは、応用機能に対するテスト手法を学びました。
 
-### 学んだこと
+- **検索機能のテスト**: `assertSeeInOrder`や`assertDontSee`を使い、複雑な条件や並び順を検証しました。
+- **CSVエクスポートのテスト**: `assertHeader`でヘッダーを、`streamedContent()`でレスポンスの中身を検証しました。
+- **コントローラーの直接テスト**: `app()`ヘルパを使い、Viewに渡されるデータを直接検証する手法を学びました。
+- **モデルメソッドの直接テスト**: HTTPリクエストを介さず、リレーションのロジックを直接検証するUnitテスト的なアプローチを学びました。
 
-| 項目 | 内容 |
-|:---|:---|
-| **Http::fake()** | 外部APIへのリクエストをモック化し、テストを安定させる |
-| **assertHeader()** | レスポンスヘッダーを検証する |
-| **assertJson()** | JSONレスポンスの内容を検証する |
-| **assertJsonStructure()** | JSONレスポンスの構造を検証する |
-| **assertJsonCount()** | JSON配列の件数を検証する |
-| **getJson()** | JSON APIにリクエストを送信する |
-| **streamedContent()** | StreamedResponseの内容を取得する |
-
-### テストカバレッジの重要性
-
-テストカバレッジ80%以上を目標とすることで、コードの品質を一定以上に保つことができます。ただし、カバレッジの数値だけでなく、**意味のあるテスト**を書くことが重要です。
-
-### 外部API連携テストのベストプラクティス
-
-1. **必ず`Http::fake()`を使用する**: 外部APIに依存しないテストを書く
-2. **正常系・異常系の両方をテストする**: APIエラー時の挙動も確認する
-3. **レスポンスの構造を検証する**: 期待するデータ形式が返されることを確認する
-
-これで、応用機能編のテストが完了しました。全てのテストが通ることを確認してください。
+テストには様々なアプローチがあり、絶対的な正解はありません。しかし、これらの多様な手法を知っていることで、テストしたい内容に応じて最適な方法を選択できるようになります。これにより、アプリケーションの品質と開発効率をさらに高めることができるでしょう。
