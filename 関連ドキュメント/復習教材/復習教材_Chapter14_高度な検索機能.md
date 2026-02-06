@@ -45,7 +45,7 @@
 
 ## 4. 実装：BookControllerの改修
 
-それでは、上記の思考プロセスを元に、`app/Http/Controllers/BookController.php`の`index`メソッドを以下のように修正します。
+それでは、上記の思考プロセスを元に、`app/Http/Controllers/BookController.php`の`index`メソッドを以下のように修正します。コード全体を掲載した後に、各ブロックの詳細な解説を追記します。
 
 ```php
 // app/Http/Controllers/BookController.php
@@ -114,6 +114,97 @@ class BookController extends Controller
     // ... 他のメソッドは省略 ...
 }
 ```
+
+### コードの詳細解説
+
+ここからは、上記のコードをブロックごとに分解し、何をしているのかを詳しく見ていきましょう。
+
+#### 1. クエリの初期化
+
+```php
+public function index(Request $request): View
+{
+    $query = Book::with('genres');
+```
+
+- **`public function index(Request $request): View`**: `index`メソッドの定義です。引数の`Request $request`は、ユーザーからのHTTPリクエスト（検索キーワードや選択したジャンルなど）を受け取るためのオブジェクトです。`: View`は、このメソッドが最終的に`View`オブジェクト（Bladeテンプレートをレンダリングしたもの）を返すことを示しています（戻り値の型宣言）。
+- **`$query = Book::with('genres');`**: これが検索クエリの土台となります。`Book`モデルに対するクエリビルダを`$query`変数に格納しています。`with('genres')`は**Eager Loading（イーガーローディング）**と呼ばれる機能で、書籍情報を取得する際に、関連するジャンル情報も一緒に取得するように指示しています。これにより、後から書籍ごとにジャンルを取得する（N+1問題）のを防ぎ、パフォーマンスを向上させます。
+
+#### 2. キーワード検索
+
+```php
+// キーワード検索（応用機能）
+if ($keyword = $request->input('keyword')) {
+    $query->where(function ($q) use ($keyword): void {
+        $q->where('title', 'like', "%{$keyword}%")
+          ->orWhere('author', 'like', "%{$keyword}%");
+    });
+}
+```
+
+- **`if ($keyword = $request->input('keyword'))`**: ユーザーがキーワードを入力した場合のみ、このブロックが実行されます。`$request->input('keyword')`でリクエストから`keyword`パラメータを取得し、その値を変数`$keyword`に代入しています。値が存在すれば（空文字列や`null`でなければ）`true`と評価され、`if`文の中の処理が実行されます。
+- **`$query->where(function ($q) use ($keyword): void { ... })`**: ここがキーワード検索の核です。`where`メソッドに**クロージャ（無名関数）**を渡すことで、SQLの`WHERE`句をグループ化（`()`で囲む）できます。これにより、`WHERE (title LIKE ... OR author LIKE ...)`というSQLが生成され、他の検索条件と正しく組み合わせることができます。
+- **`use ($keyword)`**: クロージャの中から外側のスコープにある変数`$keyword`を利用するために必要です。
+- **`$q->where('title', 'like', "%{$keyword}%")`**: 書籍の`title`カラムを`$keyword`で**部分一致検索**します。`like`演算子とワイルドカード`%`を使っています。
+- **`->orWhere('author', 'like', "%{$keyword}%")`**: `orWhere`を使うことで、「または」の条件を追加します。つまり、「タイトル`OR`著者」での検索が実現します。
+
+#### 3. ジャンル絞り込み
+
+```php
+// ジャンル絞り込み（応用機能）
+if ($genreId = $request->input('genre')) {
+    $query->whereHas('genres', function ($q) use ($genreId): void {
+        $q->where('genres.id', $genreId);
+    });
+}
+```
+
+- **`if ($genreId = $request->input('genre'))`**: ユーザーがジャンルを選択した場合のみ、このブロックが実行されます。
+- **`$query->whereHas('genres', ...)`**: **リレーション先のテーブルの条件で絞り込む**ためのメソッドです。`whereHas`は「指定した条件に合致する`genres`リレーションを持つ`Book`のみを結果に含める」というクエリを生成します。
+- **`function ($q) use ($genreId)`**: ここでもクロージャを使い、絞り込みの具体的な条件を定義します。
+- **`$q->where('genres.id', $genreId)`**: `genres`テーブルの`id`カラムが、ユーザーの選択した`$genreId`と一致する、という条件を指定しています。
+
+#### 4. 並び替え
+
+```php
+// 並び順（応用機能）
+switch ($request->input('sort')) {
+    case 'oldest':
+        $query->oldest();
+        break;
+    case 'title':
+        $query->orderBy('title');
+        break;
+    case 'rating':
+        $query->withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating');
+        break;
+    default:
+        $query->latest();
+        break;
+}
+```
+
+- **`switch ($request->input('sort'))`**: ユーザーが選択した並び順（`sort`パラメータ）に応じて処理を分岐します。
+- **`case 'oldest'` / `case 'title'`**: それぞれ登録日の古い順（`created_at`の昇順）、タイトル順（`title`の昇順）で並び替えます。`oldest()`は`orderBy('created_at', 'asc')`のショートカットです。
+- **`case 'rating'`**: 評価の高い順で並び替えます。
+    - **`withAvg('reviews', 'rating')`**: `reviews`リレーションの`rating`カラムの平均値を計算し、`reviews_avg_rating`という名前の追加カラムとして取得します。
+    - **`->orderByDesc('reviews_avg_rating')`**: 計算した平均評価カラムを使って、降順（高い順）に並び替えます。
+- **`default`**: `sort`パラメータが指定されていない場合や、上記`case`のいずれにも一致しない場合のデフォルトの処理です。`latest()`（`created_at`の降順、つまり新しい順）で並び替えます。
+
+#### 5. 結果の取得とビューへの受け渡し
+
+```php
+$books = $query->paginate(10)->withQueryString();
+$genres = Genre::orderBy('name')->get();
+
+return view('books.index', compact('books', 'genres'));
+```
+
+- **`$books = $query->paginate(10)->withQueryString()`**: ここで最終的なSQLが実行されます。
+    - **`paginate(10)`**: それまで組み立ててきたクエリの結果を、1ページあたり10件でページネーションします。
+    - **`withQueryString()`**: ページネーションのリンク（例：「2」「3」...）に、現在のURLのクエリパラメータ（`?keyword=...&genre=...`など）を自動的に引き継ぎます。これにより、検索条件を維持したままページ移動ができます。
+- **`$genres = Genre::orderBy('name')->get()`**: 検索フォームのジャンル選択プルダウンに表示するため、すべてのジャンル情報を取得しています。
+- **`return view('books.index', compact('books', 'genres'))`**: `books.index`ビュー（`resources/views/books/index.blade.php`）をレンダリングして返します。`compact('books', 'genres')`は、`$books`と`$genres`変数をビューに渡すためのPHPの関数で、`['books' => $books, 'genres' => $genres]`と書くのと同じ意味です。
 
 ## 5. How to: この実装にたどり着くための調べ方
 
