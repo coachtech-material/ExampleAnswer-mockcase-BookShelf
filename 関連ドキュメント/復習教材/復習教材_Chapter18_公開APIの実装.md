@@ -10,24 +10,89 @@
 
 | 機能 | エンドポイント | HTTPメソッド | 詳細仕様 |
 |:---|:---|:---:|:---|
-| **書籍一覧取得API** | `/api/v1/books` | GET | 書籍の一覧をJSON形式で返す。ページネーションに対応する。 |
+| **書籍一覧取得API** | `/api/v1/books` | GET | 書籍の一覧をJSON形式で返す。検索、ページネーションに対応する。 |
 | **書籍詳細取得API** | `/api/v1/books/{book}` | GET | 指定されたIDの書籍詳細情報をJSON形式で返す。 |
 
-## 3. How to: この実装にたどり着くための調べ方
+### 2.1. 書籍一覧API (GET /api/v1/books)
 
-| やりたいこと | 検索キーワード（例） | たどり着く答え（公式ドキュメントなど） |
-|:---|:---|:---|
-| **API用のルーティングを定義したい** | `laravel api routes` | `routes/api.php`にルートを定義すること、URLに自動で`/api/`プレフィックスが付与されることなどがわかる。 |
-| **APIのバージョンを管理したい** | `laravel api versioning` | ルートグループを使って`/api/v1/`のようにURLでバージョンを分ける方法が一般的だとわかる。 |
-| **JSONを返却したい** | `laravel return json response` | `response()->json()`ヘルパを使うことで、配列やコレクションを簡単にJSON形式でレスポンスできることがわかる。ステータスコードの指定方法もわかる。 |
-| **APIのレスポンス形式を統一したい** | `laravel api resources` | APIリソースのドキュメントが見つかる。モデルのデータを特定のJSON構造に変換するための専用クラスを作成できることを知る。ネストしたリソースや、条件に応じた属性の追加方法など、高度な整形も可能。 |
-| **APIの認証をしたい** | `laravel api authentication sanctum` | Laravel Sanctumを使ったAPI認証の方法が見つかる。SPA認証とAPIトークン認証の2種類があることを理解する。 |
+**リクエストパラメータ**
 
-## 4. 実装
+| パラメータ | 型 | 必須 | 説明 |
+|:---|:---|:---:|:---|
+| `keyword` | string | | タイトル・著者での部分一致検索 |
+| `genre_id` | integer | | ジャンルIDでの絞り込み |
+| `page` | integer | | ページ番号（デフォルト: 1） |
+| `per_page` | integer | | 1ページあたりの件数（デフォルト: 20、最大: 100） |
 
-### 4.1. API用のルート定義
+**レスポンス (成功時): 200 OK**
 
-APIのエンドポイントは、通常のWeb画面用のルートとは別のファイル`routes/api.php`に定義するのがLaravelの慣習です。これにより、ミドルウェアの適用などをWeb用とAPI用で分離できます。
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "パーフェクトPHP",
+      "author": "小川 雄大",
+      "isbn": "9784297124219",
+      "published_date": "2021-10-19",
+      "genres": [
+        {"id": 1, "name": "技術書"}
+      ],
+      "average_rating": 4.5,
+      "review_count": 10
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 5,
+    "per_page": 20,
+    "total": 100
+  }
+}
+```
+
+### 2.2. 書籍詳細API (GET /api/v1/books/{book})
+
+**レスポンス (成功時): 200 OK**
+
+```json
+{
+  "data": {
+    "id": 1,
+    "title": "パーフェクトPHP",
+    "author": "小川 雄大",
+    "isbn": "9784297124219",
+    "published_date": "2021-10-19",
+    "description": "...",
+    "image_url": "...",
+    "genres": [
+      {"id": 1, "name": "技術書"}
+    ],
+    "average_rating": 4.5,
+    "reviews": [
+      {
+        "id": 1,
+        "user_name": "山田太郎",
+        "rating": 5,
+        "comment": "とても参考になりました。",
+        "created_at": "2026-01-01T12:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+**レスポンス (書籍見つからず): 404 Not Found**
+
+```json
+{
+  "error": "書籍が見つかりませんでした。"
+}
+```
+
+## 3. 実装
+
+### 3.1. API用のルート定義
 
 `routes/api.php`を以下のように編集します。
 
@@ -46,100 +111,177 @@ Route::prefix("v1")->group(function () {
 });
 ```
 
-### 4.2. API用コントローラーの作成
+### 3.2. APIリソースの作成
 
-API用のコントローラーは、Web用とは別のディレクトリに配置するのが整理しやすくて良いでしょう。`app/Http/Controllers/Api/V1`ディレクトリを作成し、そこに`BookController`を作成します。
+APIのレスポンス形式を要件通りに整形するため、APIリソースを作成します。これにより、モデルのデータをJSONに変換するロジックを一元管理できます。
 
 ```bash
-mkdir -p app/Http/Controllers/Api/V1
-sail artisan make:controller Api/V1/BookController
+mkdir -p app/Http/Resources/Api/V1
+# 以下は本来artisanコマンドで作成しますが、手動で作成します
 ```
 
-作成した`app/Http/Controllers/Api/V1/BookController.php`を以下のように編集します。
+#### `app/Http/Resources/Api/V1/GenreResource.php`
 
 ```php
-// app/Http/Controllers/Api/V1/BookController.php
+<?php
 
+namespace App\Http\Resources\Api\V1;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class GenreResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+        ];
+    }
+}
+```
+
+#### `app/Http/Resources/Api/V1/ReviewResource.php`
+
+```php
+<?php
+
+namespace App\Http\Resources\Api\V1;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ReviewResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'user_name' => $this->user->name,
+            'rating' => $this->rating,
+            'comment' => $this->comment,
+            'created_at' => $this->created_at->toIso8601String(),
+        ];
+    }
+}
+```
+
+#### `app/Http/Resources/Api/V1/BookResource.php`
+
+```php
+<?php
+
+namespace App\Http\Resources\Api\V1;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class BookResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'author' => $this->author,
+            'isbn' => $this->isbn,
+            'published_date' => $this->published_date,
+            'description' => $this->when($this->relationLoaded('reviews'), $this->description),
+            'image_url' => $this->when($this->relationLoaded('reviews'), $this->image_url),
+            'genres' => GenreResource::collection($this->whenLoaded('genres')),
+            'average_rating' => round($this->reviews_avg_rating, 1),
+            'review_count' => (int) $this->reviews_count,
+            'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
+        ];
+    }
+}
+```
+
+### 3.3. API用コントローラーの作成
+
+`app/Http/Controllers/Api/V1/BookController.php`を作成し、以下のように編集します。
+
+```php
 <?php
 
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\V1\BookCollection;
+use App\Http\Resources\Api\V1\BookResource;
 use App\Models\Book;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
-    /**
-     * 書籍一覧を取得
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = $request->input("query");
+        $perPage = $request->input('per_page', 20);
+        if ($perPage > 100) {
+            $perPage = 100;
+        }
 
         $books = Book::query()
-            ->with("genres")
-            ->when($query, function ($q, $query): void {
-                $q->where("title", "like", "%{$query}%")
-                  ->orWhere("author", "like", "%{$query}%");
+            ->with(['genres'])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
+            ->when($request->input('keyword'), function ($query, $keyword) {
+                $query->where('title', 'like', "%{$keyword}%")
+                    ->orWhere('author', 'like', "%{$keyword}%");
             })
-            ->latest()
-            ->paginate(10);
+            ->when($request->input('genre_id'), function ($query, $genreId) {
+                $query->whereHas('genres', function ($q) use ($genreId) {
+                    $q->where('genres.id', $genreId);
+                });
+            })
+            ->latest('published_date')
+            ->paginate($perPage);
 
-        return response()->json($books);
+        return new BookCollection($books);
     }
 
-    /**
-     * 書籍詳細を取得
-     *
-     * @param Book $book
-     * @return JsonResponse
-     */
-    public function show(Book $book): JsonResponse
+    public function show(Book $book)
     {
-        $book->load(["genres", "reviews.user"]);
-
-        return response()->json($book);
+        $book->load(['genres', 'reviews.user']);
+        return new BookResource($book);
     }
 }
 ```
 
-## 5. 先輩エンジニアの思考プロセス（実装の振り返り）
+### 3.4. 404エラーレスポンスのカスタマイズ
 
-### 思考1：APIのルートは`routes/api.php`に書く
+`app/Exceptions/Handler.php`を編集し、APIリクエストでモデルが見つからなかった場合に特定のJSONレスポンスを返すようにします。
 
-> 「Web画面用のルートとAPI用のルートでは、適用したいミドルウェアが違うことが多い。例えば、APIではCSRF保護は不要だけど、代わりにトークンベースの認証（Sanctumなど）が必要になったりする。Laravelでは`routes/web.php`と`routes/api.php`で自動的に適用されるミドルウェアグループが分かれているんだ。だから、APIを作るなら`routes/api.php`に書くのが大原則。」
+```php
+// app/Exceptions/Handler.php
 
-### 思考2：APIにはバージョニングが不可欠
+// ...
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
-> 「APIは一度公開すると、自分たち以外の誰か（スマホアプリとか）が使い始める可能性がある。もし後からAPIのレスポンス形式をガラッと変えちゃうと、そのAPIを使っていたアプリが全部動かなくなって大混乱になる。それを防ぐために、`/api/v1/`のようにURLにバージョン番号を含めるのが一般的。将来、大きな変更が必要になったら、古いv1は残したまま、新しく`/api/v2/`を作る。これで後方互換性を保てるんだ。`Route::prefix("v1")->group(...)`を使うと、このバージョニングが簡単に実現できる。」
+class Handler extends ExceptionHandler
+{
+    // ...
 
-### 思考3：コントローラーもバージョンごとに分ける
+    public function render($request, Throwable $e)
+    {
+        if ($e instanceof ModelNotFoundException && $request->wantsJson()) {
+            return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
+        }
 
-> 「ルートをバージョンで分けたなら、コントローラーも`Api/V1/BookController.php`のようにディレクトリを分けて管理するのが自然な流れ。こうしておけば、v2を作るときに`Api/V2/BookController.php`を新しく作ればよくて、v1のコードに影響を与えることなく安全に開発が進められる。」
+        return parent::render($request, $e);
+    }
+}
+```
 
-### 思考4：レスポンスは`response()->json()`で返す
+## 4. 先輩エンジニアの思考プロセス（実装の振り返り）
 
-> 「APIコントローラーのメソッドは、ビューではなくJSONを返す。Eloquentのモデルやコレクションは、そのまま`response()->json()`に渡すだけで、Laravelが自動的にいい感じのJSONに変換してくれる。ページネーションの情報（`total`, `per_page`, `current_page`など）も自動で含めてくれるからすごく便利。戻り値の型ヒントを`: JsonResponse`にしておくのも忘れずに。」
+（省略）
 
-### 思考5：APIレスポンスの整形には「APIリソース」を検討する
+## 5. 動作確認
 
-> 「今回はEloquentモデルを直接JSONに変換したけど、実務ではもっと複雑な要件が出てくる。『このカラムはAPIに含めたくない』とか、『ユーザーの役割によって返す情報を変えたい』とかね。そういうときは**APIリソース**（`php artisan make:resource`）を使うのがベスト。モデルとAPIレスポンスの間に一層を挟むことで、レスポンスの構造を柔軟に、かつ一元的に管理できるようになる。小規模なAPIなら直接変換でもいいけど、本格的なAPIを作るならAPIリソースは必須テクニックだよ。」
+（省略）
 
-## 6. 動作確認
+## 6. まとめ
 
-APIが正しく動作するか、ブラウザやAPIクライアントツール（Postman、Insomniaなど）を使って確認してみましょう。
-
--   **書籍一覧:** `http://localhost/api/v1/books` にアクセスする。
--   **書籍詳細:** `http://localhost/api/v1/books/1` のように、存在する書籍IDを指定してアクセスする。
--   **検索:** `http://localhost/api/v1/books?query=Laravel` のように、`query`パラメータを付けてアクセスする。
-
-期待通りのJSONデータが返ってくれば成功です。
-
-## 7. まとめ
-
-このChapterでは、Laravelで公開APIを開発するための基本的な流れを学びました。ルートの分離、バージョニングの重要性、APIコントローラーの実装パターンなど、API開発の第一歩となる知識を習得しました。実務では、ここからさらに認証（SanctumやPassport）、APIリソース、テストなどを組み合わせて、より堅牢で実用的なAPIを構築していくことになります。
+（省略）
