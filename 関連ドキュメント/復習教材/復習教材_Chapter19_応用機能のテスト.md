@@ -230,7 +230,7 @@ class BookTest extends TestCase
         $bookInGenre->genres()->attach($genre);
         $bookNotInGenre = Book::factory()->create();
 
-        $this->get(route("books.index", ["genre_id" => $genre->id]))
+        $this->get(route("books.index", ["genre" => $genre->id]))
             ->assertOk()
             ->assertSee($bookInGenre->title)
             ->assertDontSee($bookNotInGenre->title);
@@ -263,7 +263,8 @@ class BookTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-        $response->assertHeader("Content-Disposition", 'attachment; filename="books.csv"');
+        $response->assertHeaderContains("Content-Disposition", "attachment; filename=");
+        $response->assertHeaderContains("Content-Disposition", ".csv");
     }
 
     /** @test */
@@ -455,9 +456,11 @@ $this->get(route("books.index", ["sort" => "newest"]))
 ```php
 // test_authenticated_user_can_export_csv
 $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-$response->assertHeader("Content-Disposition", 'attachment; filename="books.csv"');
+$response->assertHeaderContains("Content-Disposition", "attachment; filename=");
+$response->assertHeaderContains("Content-Disposition", ".csv");
 ```
-1.  **`assertHeader($key, $value)`**: レスポンスヘッダーに、指定したキーと値のペアが含まれていることを確認します。`Content-Type`でCSV形式であることを、`Content-Disposition`でファイル名が指定され、ダウンロードされる設定になっていることを検証します。
+1.  **`assertHeader($key, $value)`**: レスポンスヘッダーに、指定したキーと値のペアが**完全一致**で含まれていることを確認します。`Content-Type`のように値が固定のヘッダーに適しています。
+2.  **`assertHeaderContains($key, $value)`**: レスポンスヘッダーの値に、指定した文字列が**部分一致**で含まれていることを確認します。今回のCSVファイル名にはタイムスタンプ（例: `books_20260209_002136.csv`）が含まれるため、完全一致ではなく部分一致で「`attachment; filename=`」と「`.csv`」が含まれていることを検証しています。
 
 ```php
 // test_csv_export_with_search_filters
