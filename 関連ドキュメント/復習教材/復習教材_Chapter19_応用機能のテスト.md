@@ -56,9 +56,9 @@ Chapter 13では、主にHTTPリクエストを送信するFeatureテストを�
 
 このセクションでは、Chapter 14（高度な検索機能）とChapter 15（CSVエクスポート機能）に対するテストを`BookTest`に追加します。また、`ReviewLikeTest`をモデルメソッド直接呼び出しの形式に修正し、テスト手法の違いを学びます。
 
-### BookTest.php の修正・追記
+### BookTest.php の全体像
 
-`tests/Feature/BookTest.php`に、以下のメソッドを追加・修正します。
+Chapter 13で作成した`BookTest.php`に、応用機能のテストを追加した完全なコードは以下のようになります。
 
 ```php
 <?php
@@ -77,9 +77,138 @@ class BookTest extends TestCase
 {
     use RefreshDatabase;
 
-    // ... 既存のテストメソッドは省略 ...
+    // ========== Chapter 13: 基本機能のテスト ========== 
 
-    // ========== ここから追加・修正 ========== 
+    public function test_book_index_page_can_be_rendered(): void
+    {
+        Book::factory()->count(2)->create();
+
+        $this->get(route("books.index"))
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_view_create_form(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route("books.create"))
+            ->assertOk();
+    }
+
+    public function test_guest_cannot_view_create_form(): void
+    {
+        $this->get(route("books.create"))
+            ->assertRedirect(route("login"));
+    }
+
+    public function test_authenticated_user_can_create_book(): void
+    {
+        $user = User::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
+
+        $payload = $this->validBookData([
+            "title" => "My Test Book",
+            "isbn" => "1111111111111",
+            "genres" => $genres->pluck("id")->toArray(),
+        ]);
+
+        $response = $this->actingAs($user)->post(route("books.store"), $payload);
+
+        $book = Book::where("title", "My Test Book")->first();
+        $this->assertNotNull($book);
+
+        $response->assertRedirect(route("books.show", $book));
+
+        $this->assertDatabaseHas("books", [
+            "id" => $book->id,
+            "user_id" => $user->id,
+            "title" => "My Test Book",
+        ]);
+
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas("book_genre", [
+                "book_id" => $book->id,
+                "genre_id" => $genre->id,
+            ]);
+        }
+    }
+
+    public function test_book_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route("books.store"), [
+            "title" => "",
+            "author" => "",
+            "isbn" => "123",
+            "published_date" => "invalid-date",
+            "genres" => [],
+        ]);
+
+        $response->assertSessionHasErrors(["title", "isbn", "genres"]);
+        $this->assertDatabaseCount("books", 0);
+    }
+
+    public function test_book_show_page_can_be_rendered(): void
+    {
+        $book = Book::factory()->create(["title" => "Detail Book"]);
+
+        $this->get(route("books.show", $book))
+            ->assertOk()
+            ->assertSee("Detail Book");
+    }
+
+    public function test_authenticated_user_can_update_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $originalGenre = Genre::factory()->create();
+        $book->genres()->attach($originalGenre);
+        $newGenres = Genre::factory()->count(2)->create();
+
+        $payload = $this->validBookData([
+            "title" => "Updated Title",
+            "isbn" => "9876543210123",
+            "genres" => $newGenres->pluck("id")->toArray(),
+        ]);
+
+        $response = $this->actingAs($user)->put(route("books.update", $book), $payload);
+
+        $response->assertRedirect(route("books.show", $book));
+
+        $this->assertDatabaseHas("books", [
+            "id" => $book->id,
+            "title" => "Updated Title",
+            "isbn" => "9876543210123",
+        ]);
+
+        foreach ($newGenres as $genre) {
+            $this->assertDatabaseHas("book_genre", [
+                "book_id" => $book->id,
+                "genre_id" => $genre->id,
+            ]);
+        }
+
+        $this->assertDatabaseMissing("book_genre", [
+            "book_id" => $book->id,
+            "genre_id" => $originalGenre->id,
+        ]);
+    }
+
+    public function test_authenticated_user_can_delete_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $this->actingAs($user)
+            ->delete(route("books.destroy", $book))
+            ->assertRedirect(route("books.index"));
+
+        $this->assertDatabaseMissing("books", ["id" => $book->id]);
+    }
+
+    // ========== Chapter 19: 応用機能のテスト ========== 
 
     /** @test */
     public function test_book_index_with_search_query_displays_results(): void
@@ -159,36 +288,53 @@ class BookTest extends TestCase
     }
 
     /** @test */
-    public function test_only_owner_can_view_edit_form_and_it_has_correct_data(): void
+    public function test_only_owner_can_view_edit_form(): void
     {
         $owner = User::factory()->create();
-        $book = Book::factory()->for($owner)->create();
-        $genres = Genre::factory()->count(2)->create(); // 全てのジャンル
+        $book = Book::factory()
+            ->for($owner)
+            ->create(["published_date" => "2024-01-01"]);
         $otherUser = User::factory()->create();
 
-        // 他のユーザーはアクセス不可
+        $this->assertTrue($owner->can("update", $book));
+
         $this->actingAs($otherUser)
             ->get(route("books.edit", $book))
             ->assertForbidden();
+    }
 
-        // オーナーはアクセス可能
+    /** @test */
+    public function test_owner_receives_edit_view_with_genres(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create(["published_date" => "2024-01-01"]);
+        $genres = Genre::factory()->count(2)->create();
+
         $this->actingAs($owner);
 
-        // コントローラーのメソッドを直接実行
         $response = app(BookController::class)->edit($book);
 
-        // Viewオブジェクトが返されることを確認
         $this->assertInstanceOf(View::class, $response);
-        // 正しいビューファイルかを確認
         $this->assertSame("books.edit", $response->name());
 
-        // Viewに渡されたデータを取得
         $data = $response->getData();
-
-        // 正しい書籍データが渡されているか
-        $this->assertTrue($data["book"]->is($book));
-        // 全てのジャンルデータが渡されているか
+        $this->assertSame($book->id, $data["book"]->id);
         $this->assertCount($genres->count(), $data["genres"]);
+    }
+
+    private function validBookData(array $overrides = []): array
+    {
+        $genres = $overrides["genres"] ?? Genre::factory()->count(2)->create()->pluck("id")->toArray();
+
+        return array_merge([
+            "title" => "Sample Book",
+            "author" => "Sample Author",
+            "isbn" => "1234567890123",
+            "published_date" => "2024-01-01",
+            "description" => "Sample description",
+            "image_url" => "https://example.com/image.jpg",
+            "genres" => $genres,
+        ], $overrides);
     }
 }
 ```
@@ -323,7 +469,7 @@ $this->assertStringContainsString("Laravel Book", $response->streamedContent());
 ### 応用的なテスト手法
 
 ```php
-// test_only_owner_can_view_edit_form_and_it_has_correct_data
+// test_owner_receives_edit_view_with_genres
 $response = app(BookController::class)->edit($book);
 ```
 1.  **`app(BookController::class)`**: サービスコンテナから`BookController`のインスタンスを取得します。これにより、ルーティングやミドルウェアを介さずに、コントローラーのメソッドを直接呼び出す準備ができます。
@@ -335,7 +481,7 @@ $this->assertSame("books.edit", $response->name());
 $data = $response->getData();
 $this->assertTrue($data["book"]->is($book));
 ```
-1.  **`assertInstanceOf(View::class, $response)`**: `$response`が`View`クラスのインスタンスであることを確認します。
+1.  **`assertInstanceOf(View::class, $response)`**: 戻り値が`View`クラスのインスタンスであることを確認します。
 2.  **`$response->name()`**: `View`オブジェクトがどのBladeファイル（`books.edit`）を指しているかを取得します。
 3.  **`$response->getData()`**: `View`オブジェクトに渡された全てのデータを連想配列として取得します。
 4.  **`$data["book"]`**: `compact("book", "genres")`で渡された書籍データにアクセスし、`is()`メソッドで期待通りのデータか検証します。
