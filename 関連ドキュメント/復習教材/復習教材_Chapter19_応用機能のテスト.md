@@ -263,8 +263,14 @@ class BookTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-        $response->assertHeaderContains("Content-Disposition", "attachment; filename=");
-        $response->assertHeaderContains("Content-Disposition", ".csv");
+        $this->assertStringContainsString(
+            "attachment; filename=",
+            $response->headers->get("Content-Disposition")
+        );
+        $this->assertStringContainsString(
+            ".csv",
+            $response->headers->get("Content-Disposition")
+        );
     }
 
     /** @test */
@@ -456,11 +462,13 @@ $this->get(route("books.index", ["sort" => "newest"]))
 ```php
 // test_authenticated_user_can_export_csv
 $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-$response->assertHeaderContains("Content-Disposition", "attachment; filename=");
-$response->assertHeaderContains("Content-Disposition", ".csv");
+$this->assertStringContainsString(
+    "attachment; filename=",
+    $response->headers->get("Content-Disposition")
+);
 ```
-1.  **`assertHeader($key, $value)`**: レスポンスヘッダーに、指定したキーと値のペアが**完全一致**で含まれていることを確認します。`Content-Type`のように値が固定のヘッダーに適しています。
-2.  **`assertHeaderContains($key, $value)`**: レスポンスヘッダーの値に、指定した文字列が**部分一致**で含まれていることを確認します。今回のCSVファイル名にはタイムスタンプ（例: `books_20260209_002136.csv`）が含まれるため、完全一致ではなく部分一致で「`attachment; filename=`」と「`.csv`」が含まれていることを検証しています。
+1.  **`$response->headers->get("Content-Disposition")`**: `StreamedResponse`オブジェクトから直接ヘッダーの値を取得します。`assertHeaderContains`が使えないため、この方法で値を取得します。
+2.  **`$this->assertStringContainsString($needle, $haystack)`**: 取得したヘッダーの値（`$haystack`）に、期待する文字列（`$needle`）が含まれているかを検証します。ファイル名にタイムスタンプが含まれるため、部分一致で検証しています。
 
 ```php
 // test_csv_export_with_search_filters
