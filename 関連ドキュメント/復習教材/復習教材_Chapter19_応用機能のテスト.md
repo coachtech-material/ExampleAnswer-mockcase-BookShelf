@@ -528,6 +528,14 @@ class BookTest extends TestCase
 
 読書レポート機能のテストを`tests/Feature/ReportTest.php`として新規に作成します。
 
+まず、以下のArtisanコマンドでテストファイルを作成してください。
+
+```bash
+sail artisan make:test ReportTest
+```
+
+このコマンドを実行すると、`tests/Feature/ReportTest.php`が自動生成されます。生成されたファイルの内容を、以下のコードに置き換えてください。
+
 ```php
 <?php
 
