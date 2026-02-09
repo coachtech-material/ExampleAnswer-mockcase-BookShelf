@@ -498,63 +498,199 @@ class ReportTest extends TestCase
 
 ---
 
-## 19.2. コードの詳細解説
+## 19.2. テストコードの詳細解説と実装のポイント
 
-### 並び替えのテスト (`BookTest`)
+### はじめに：良いテストコードを書くための「AAA」パターン
 
-```php
-// test_book_index_can_sort_by_title
-$response = $this->get(route("books.index", ["sort" => "title"]));
-$titles = collect($response->viewData("books")->items())->pluck("title")->all();
-$this->assertSame([$bookA->title, $bookZ->title], $titles);
-```
-1.  **`$response->viewData("books")`**: `assertSeeInOrder`ではHTML全体の出現順しか確認できません。より厳密に、コントローラーからViewに渡された`books`（ページネーションオブジェクト）の**データそのもの**の並び順を検証するために、`viewData`メソッドを使います。
-2.  **`->items()`**: ページネーションオブジェクトから、そのページに含まれるレコードの配列を取得します。
-3.  **`collect(...)->pluck("title")->all()`**: 取得したレコード配列をコレクションに変換し、`pluck`でタイトルのみを抜き出し、最終的にPHPの配列に変換します。
-4.  **`$this->assertSame([...], $titles)`**: 2つの配列が**型と順序を含めて**完全に同一であることを検証します。これにより、タイトル順（A→Z）に正しくソートされていることを保証します。
+テストコードは、ただ動けば良いというものではありません。他の開発者が読んでも「何を検証したいのか」がすぐに理解でき、将来的に仕様変更があってもメンテナンスしやすいコードであることが理想です。そのための普遍的なデザインパターンとして**「AAA（Arrange, Act, Assert）」**があります。
 
-```php
-// test_export_csv_can_sort_by_oldest
-$content = $response->streamedContent();
-$this->assertTrue(strpos($content, $oldestBook->title) < strpos($content, $newestBook->title));
-```
-1.  **`strpos($haystack, $needle)`**: 文字列`$haystack`（CSVコンテンツ全体）の中から、文字列`$needle`（書籍タイトル）が最初に出現する位置（インデックス）を返します。
-2.  **`<`**: 古い書籍のタイトルが出現する位置が、新しい書籍のタイトルが出現する位置よりも**小さい**（＝先に出現する）ことを検証します。これにより、CSVの内容が古い順にソートされていることを確認できます。
+- **Arrange（準備）**: テストに必要な前提条件（データや状態）を準備します。`factory`を使ってユーザーや書籍データを作成する部分がこれにあたります。
+- **Act（実行）**: テスト対象のコード（機能）を実行します。`$this->get(...)`や`$this->post(...)`で特定のルートにHTTPリクエストを送信する部分です。
+- **Assert（検証）**: 実行結果が期待通りであったかを検証（アサート）します。`assertOk()`や`assertSee()`などのアサーションメソッドを呼び出す部分です。
 
-### ISBN検索のテスト (`BookTest`)
+この3つのステップを意識してテストコードを記述することで、テストの目的が明確になり、構造的で理解しやすいコードになります。この後の解説も、このAAAパターンを念頭に置いて読んでみてください。
+
+### 1. 検索・並び替え機能のテスト (`BookTest`)
+
+このテストグループの目的は、ユーザーが指定した様々な条件（キーワード、ジャンル、並び順）に応じて、**正しいデータが、正しい順序で**表示されることを保証することです。
+
+#### `test_book_index_with_search_query_displays_results`
 
 ```php
-// test_search_by_isbn_returns_book_information
-config(["services.google.books_api_key" => "fake-key"]);
-Http::fake(function ($request) use ($isbn) {
-    $this->assertStringContainsString("isbn:{$isbn}", $request->url());
-    $this->assertStringContainsString("fake-key", $request->url());
-    return Http::response([...], 200);
-});
-```
-1.  **`config([...])`**: テスト実行中に、コンフィグ値（この場合はAPIキー）を一時的に設定します。
-2.  **`Http::fake(...)`**: LaravelのHTTPクライアントに、「実際にはリクエストを送信せず、このクロージャ（無名関数）を実行せよ」と指示します。
-3.  **`$this->assertStringContainsString(...)`**: クロージャ内で、送信されるはずだったリクエストのURLに、ISBNとAPIキーが正しく含まれているかを検証します。
-4.  **`return Http::response(...)`**: 偽のレスポンスを返します。これにより、実際のAPIの動作に関わらず、テストを安定して実行できます。
+/** @test */
+public function test_book_index_with_search_query_displays_results(): void
+{
+    // Arrange: 検索キーワードにヒットする書籍と、しない書籍を用意
+    Book::factory()->create(["title" => "Laravel Testing Guide"]);
+    Book::factory()->create(["title" => "Another Book"]);
 
-### 読書レポートのテスト (`ReportTest`)
-
-```php
-// test_reports_index_displays_stats_for_authenticated_user
-$response = $this->actingAs($user)->get(route("reports.index"));
-$stats = $response->viewData("stats");
-$this->assertSame(3, $stats["summary"]["total_reviews"]);
-$this->assertSame([0, 0, 1, 1, 1], $stats["rating_distribution"]);
-$this->assertSame([...], $stats["top_rated_books"]->toArray());
+    // Act: `keyword` パラメータ付きで一覧ページにアクセス
+    $this->get(route("books.index", ["keyword" => "Laravel"]))
+        // Assert: ヒットする書籍が表示され、しない書籍が表示されないことを検証
+        ->assertOk()
+        ->assertSee("Laravel Testing Guide")
+        ->assertDontSee("Another Book");
+}
 ```
-1.  **`$response->viewData("stats")`**: レポートページに渡された`stats`変数の内容を全て取得します。
-2.  **`$this->assertSame(...)`**: 取得した`stats`配列の各キー（`summary`, `rating_distribution`など）の値が、事前に準備したデータから計算される期待値と完全に一致するかを検証します。`toArray()`は、EloquentコレクションをPHPの配列に変換するために使用します。
+
+- **テストのポイント**: 最も基本的な検索機能のテストです。`assertSee`（指定した文字列がレスポンスに含まれる）と`assertDontSee`（含まれない）を組み合わせることで、「意図したものが表示され、意図しないものが表示されていない」ことを同時に検証するのが重要です。
+
+#### `test_book_index_can_sort_by_title`
 
 ```php
-// test_reports_index_handles_user_without_reviews
-$this->assertTrue($stats["top_rated_books"]->isEmpty());
+/** @test */
+public function test_book_index_can_sort_by_title(): void
+{
+    // Arrange: 意図的に逆のアルファベット順の書籍を用意
+    $bookZ = Book::factory()->create(["title" => "Zeta Title"]);
+    $bookA = Book::factory()->create(["title" => "Alpha Title"]);
+
+    // Act: `sort=title` を指定してアクセス
+    $response = $this->get(route("books.index", ["sort" => "title"]));
+
+    // Assert: Viewに渡されたデータそのものの順序を検証
+    $response->assertOk();
+    $titles = collect($response->viewData("books")->items())->pluck("title")->all();
+    $this->assertSame([$bookA->title, $bookZ->title], $titles);
+}
 ```
-1.  **`isEmpty()`**: コレクションが空であることを検証します。レビューがないユーザーの場合、ランキングなどが空のコレクションとして正しく処理されていることを確認します。
+
+- **テストのポイント**: `assertSeeInOrder`はHTML全体の出現順を見るため、レイアウトの変更に弱いという側面があります。ここでは`$response->viewData("books")`を使って、コントローラーからViewに渡された**データそのもの**を取得しています。これにより、HTMLの構造に依存しない、より堅牢なテストになります。
+- **`assertSame` vs `assertEquals`**: `assertSame`は値だけでなく**型と順序**も厳密に比較します。データの並び順を検証する際には、`assertSame`を使うことで、意図通りの順序でデータが渡されていることを正確に保証できます。
+
+### 2. CSVエクスポート機能のテスト (`BookTest`)
+
+このテストグループの目的は、CSVファイルが正しくダウンロードされること、そしてその**内容**が検索条件や並び替え順を反映していることを保証することです。
+
+#### `test_authenticated_user_can_export_csv`
+
+```php
+/** @test */
+public function test_authenticated_user_can_export_csv(): void
+{
+    // ... (Arrange, Act)
+
+    // Assert: レスポンスヘッダーを検証
+    $response->assertOk();
+    $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
+    $this->assertStringContainsString("attachment; filename=", $response->headers->get("Content-Disposition"));
+    $this->assertStringContainsString(".csv", $response->headers->get("Content-Disposition"));
+}
+```
+
+- **テストのポイント**: CSVエクスポート機能は`StreamedResponse`を返すため、`assertHeaderContains`のような一部のアサーションが使えません。そこで、`$response->headers->get("Content-Disposition")`でヘッダーの値（文字列）を直接取得し、PHPUnitの`assertStringContainsString`を使ってファイル名が含まれているかを検証しています。これにより、タイムスタンプ付きの動的なファイル名にも対応できます。
+
+#### `test_export_csv_can_sort_by_title`
+
+```php
+/** @test */
+public function test_export_csv_can_sort_by_title(): void
+{
+    // ... (Arrange, Act)
+
+    // Assert: CSVコンテンツ内の文字列の出現位置を比較
+    $content = $response->streamedContent();
+    $this->assertTrue(strpos($content, $bookA->title) < strpos($content, $bookZ->title));
+}
+```
+
+- **テストのポイント**: CSVは単なる文字列なので、`assertSeeInOrder`は使えません。ここではPHPの標準関数`strpos()`を利用します。`strpos()`は文字列内で特定の単語が**最初に出現した位置（インデックス）**を返すため、`strpos(A) < strpos(Z)`を検証することで、「AがZより先に出現する」＝「アルファベット順にソートされている」ことを保証できます。これは非常に実践的なテクニックです。
+
+### 3. 外部API連携（ISBN検索）のテスト (`BookTest`)
+
+このテストグループの目的は、外部APIとの連携部分を、**実際のAPI通信に依存せずに**テストすることです。正常系だけでなく、バリデーションエラーやAPI障害などの異常系も網羅します。
+
+#### `test_search_by_isbn_returns_book_information`
+
+```php
+/** @test */
+public function test_search_by_isbn_returns_book_information(): void
+{
+    // Arrange: APIキーをテスト用に設定し、HTTPクライアントを偽装
+    config(["services.google.books_api_key" => "fake-key"]);
+    Http::fake(function ($request) use ($isbn) {
+        // リクエストURLにISBNとAPIキーが含まれているか検証
+        $this->assertStringContainsString("isbn:{$isbn}", $request->url());
+        $this->assertStringContainsString("fake-key", $request->url());
+
+        // 偽の成功レスポンスを返す
+        return Http::response([...], 200);
+    });
+
+    // Act & Assert
+    $this->get(route("books.searchByIsbn", ["isbn" => $isbn]))
+        ->assertOk()
+        ->assertJson([...]);
+}
+```
+
+- **テストのポイント**: `Http::fake()`がこのテストの核心です。これにより、テスト実行時に実際のGoogle Books APIへリクエストが飛ぶのを防ぎます。代わりに、クロージャ内で「送信されるはずだったリクエスト」を検証し、「偽のレスポンス」を返します。これにより、外部APIの稼働状況やネットワーク環境に左右されない、**安定・高速・再現可能**なテストが実現します。
+
+#### `test_search_by_isbn_handles_http_exception`
+
+```php
+/** @test */
+public function test_search_by_isbn_handles_http_exception(): void
+{
+    // Arrange: HTTPクライアントが例外をスローするように偽装
+    Http::fake(function (): void {
+        throw new \Exception("API failure");
+    });
+
+    // Act & Assert: 500エラーとエラーメッセージを検証
+    $this->get(route("books.searchByIsbn", ["isbn" => "9781234567890"]))
+        ->assertStatus(500)
+        ->assertJson(["error" => "API通信エラーが発生しました。"]);
+}
+```
+
+- **テストのポイント**: `Http::fake()`を使えば、「APIがダウンしている」といった異常系の状況も簡単にシミュレートできます。クロージャ内で意図的に例外を`throw`させることで、コントローラーの`try...catch`ブロックが正しく機能し、ユーザーフレンドリーな500エラーを返せているかを検証できます。
+
+### 4. 読書レポート機能のテスト (`ReportTest`)
+
+このテストグループの目的は、複数のCollectionメソッドを駆使して計算された複雑な統計情報が、**期待値と完全に一致する**ことを保証することです。また、データが存在しない「空の状態（エッジケース）」も検証します。
+
+#### `test_reports_index_displays_stats_for_authenticated_user`
+
+```php
+/** @test */
+public function test_reports_index_displays_stats_for_authenticated_user(): void
+{
+    // Arrange: 複数の書籍、ジャンル、レビューを複雑に組み合わせて用意
+    // ...
+
+    // Act
+    $response = $this->actingAs($user)->get(route("reports.index"));
+
+    // Assert: Viewに渡された`stats`配列の中身を厳密に検証
+    $stats = $response->viewData("stats");
+    $this->assertSame(3, $stats["summary"]["total_reviews"]);
+    $this->assertSame(4.0, $stats["summary"]["average_rating"]);
+    $this->assertSame([0, 0, 1, 1, 1], $stats["rating_distribution"]);
+    $this->assertSame([...], $stats["top_rated_books"]->toArray());
+    $this->assertSame([...], $stats["genre_ratings"]->toArray());
+}
+```
+
+- **テストのポイント**: このテストは、まさに「動く仕様書」です。`viewData()`でコントローラーから渡された`stats`配列をまるごと取得し、その中の各キーの値（`total_reviews`や`average_rating`など）が、手計算した期待値と`assertSame`で完全に一致することを検証します。これにより、複雑な集計ロジックの正しさを強力に保証します。
+
+#### `test_reports_index_handles_user_without_reviews`
+
+```php
+/** @test */
+public function test_reports_index_handles_user_without_reviews(): void
+{
+    // Arrange: レビューを持たないユーザーを用意
+    $user = User::factory()->create();
+
+    // Act & Assert
+    // ...
+    $this->assertSame(0.0, $stats["summary"]["average_rating"]);
+    $this->assertTrue($stats["top_rated_books"]->isEmpty());
+}
+```
+
+- **テストのポイント**: 「データが1件もない」という状態は、`0`での割り算エラー（ゼロ除算）や`null`アクセスによるエラーを引き起こしやすい、典型的なエッジケースです。このテストでは、レビューが0件の場合でもプログラムがエラーを起こさず、各種統計情報が`0`や空のコレクションとして安全に処理されることを保証しています。
 
 ---
 
