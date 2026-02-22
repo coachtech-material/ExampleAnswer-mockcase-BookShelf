@@ -72,7 +72,6 @@
 | 5. phpMyAdminの追加 | compose.yaml を開き、mysql サービスの後に以下の設定を追加してください。<br><br>```yaml<br>phpmyadmin:<br>    image: 'phpmyadmin:latest'<br>    ports:<br>        - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'<br>    environment:<br>        PMA_HOST: mysql<br>        PMA_USER: '${DB_USERNAME}'<br>        PMA_PASSWORD: '${DB_PASSWORD}'<br>    networks:<br>        - sail<br>    depends_on:<br>        - mysql<br>``` |
 | 6. Sailの起動とエイリアス設定 | # Sailをバックグラウンドで起動<br>`./vendor/bin/sail up -d`<br><br># エイリアスを設定して 'sail' だけでコマンドを実行できるようにする<br>`echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc`<br><br># シェルを再起動するか、新しいターミナルを開いてエイリアスを有効にする<br>`exec $SHELL` |
 | 7. アプリケーションキーの生成 | ルートで以下のコマンドを実行する<br>`sail artisan key:generate` |
-| 8. Laravel Fortifyのインストール | 認証機能に Laravel Fortify を使用します。<br><br>`sail composer require laravel/fortify`<br>`sail artisan fortify:install`<br>`sail artisan migrate`<br><br>FortifyServiceProvider にログイン/登録ビューを設定してください。 |
 
 ---
 
