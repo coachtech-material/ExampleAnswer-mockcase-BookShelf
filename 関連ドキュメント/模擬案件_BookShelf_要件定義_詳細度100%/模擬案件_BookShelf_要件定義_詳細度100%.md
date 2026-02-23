@@ -328,45 +328,45 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 
 | テスト種別 | カテゴリ | テスト対象 | 実装要件 | 基本/応用 |
 |---|---|---|---|---|
-| 単体テスト<br>(Unit Tests) | モデル | Userモデル関連 | Userモデルのリレーション（books, reviews, favoriteBooks, likedReviews）が正しく定義されていること。<br>ファイル: tests/Unit/UserModelTest.php<br>メソッド: test_user_relationships_are_defined | 基本 |
-| | モデル | Bookモデル関連 | Bookモデルのリレーション（user, reviews, genres, favoritedByUsers）が正しく定義されていること。<br>ファイル: tests/Unit/BookModelTest.php<br>メソッド: test_book_relationships_are_defined | 基本 |
-| | モデル | Reviewモデル関連 | Reviewモデルのリレーション（user, book, likedByUsers）が正しく定義されていること。<br>ファイル: tests/Unit/ReviewModelTest.php<br>メソッド: test_review_relationships_are_defined | 基本 |
-| 機能テスト<br>(Feature Tests) | 画面アクセス | 書籍一覧 | 書籍一覧ページ（/books）が正常に表示されること（200レスポンス）。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_index_page_can_be_rendered | 基本 |
-| | 画面アクセス | 書籍登録フォーム | 認証ユーザーのみが書籍登録フォーム（/books/create）を表示でき、ゲストはログインにリダイレクトされること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_authenticated_user_can_view_create_form, test_guest_cannot_view_create_form | 基本 |
-| | 書籍CRUD | 書籍詳細 | 書籍詳細ページ（/books/{book}）が正常に表示され、書籍タイトルが画面に含まれること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_show_page_can_be_rendered | 基本 |
-| | 書籍CRUD | 書籍登録 | 認証ユーザーが書籍を登録でき、ジャンルがbook_genreテーブルに紐付けられること。バリデーションエラー時は適切にエラーが返されること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_authenticated_user_can_create_book, test_book_store_validation_errors | 基本 |
-| | 書籍CRUD | 書籍編集 | 書籍所有者のみが編集でき、ジャンルの同期（sync）が正しく動作すること。他ユーザーがアクセスした場合は403 Forbiddenとなること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_authenticated_user_can_update_book, test_only_owner_can_view_edit_form | 基本 |
-| | 書籍CRUD | 書籍削除 | 書籍所有者のみが削除でき、削除後に書籍一覧にリダイレクトされること。DBからレコードが削除されること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_authenticated_user_can_delete_book | 基本 |
-| | 書籍CRUD | 書籍検索 | 検索クエリに一致する書籍が検索結果に表示されること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_search_returns_matching_results | 基本 |
-| | レビュー | レビュー投稿 | 認証ユーザーがレビューを投稿でき、reviewsテーブルにレコードが作成されること。ゲストはログインにリダイレクトされること。ratingのバリデーション（1〜5の範囲）が動作すること。<br>ファイル: tests/Feature/ReviewTest.php<br>メソッド: test_authenticated_user_can_create_review, test_guest_cannot_create_review, test_review_store_validation_errors | 基本 |
-| | レビュー | レビュー編集 | レビュー投稿者のみが編集フォームを表示・更新でき、他ユーザーは403 Forbiddenとなること。<br>ファイル: tests/Feature/ReviewTest.php<br>メソッド: test_only_owner_can_edit_review, test_only_owner_can_update_review | 基本 |
-| | レビュー | レビュー削除 | レビュー投稿者のみが削除でき、他ユーザーは403 Forbiddenとなること。<br>ファイル: tests/Feature/ReviewTest.php<br>メソッド: test_only_owner_can_delete_review | 基本 |
-| | ジャンル | ジャンル一覧 | ジャンル一覧ページが正常に表示されること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_genre_index_page_can_be_rendered | 基本 |
-| | ジャンル | ジャンル登録 | 認証ユーザーがジャンルを作成でき、genresテーブルにレコードが作成されること。バリデーションエラー時は適切にエラーが返されること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_authenticated_user_can_create_genre, test_genre_store_validation_errors | 基本 |
-| | ジャンル | ジャンル登録フォーム | 認証ユーザーがジャンル登録フォーム（/genres/create）を表示できること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_authenticated_user_can_view_create_form | 基本 |
-| | ジャンル | ジャンル詳細 | ジャンル詳細ページ（/genres/{genre}）でジャンルに紐づく書籍タイトルが表示されること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_genre_show_page_displays_books | 基本 |
-| | ジャンル | ジャンル編集 | 認証ユーザーがジャンル名を更新でき、genresテーブルのレコードが更新されること。編集フォームが表示できること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_authenticated_user_can_update_genre, test_authenticated_user_can_view_edit_form | 基本 |
-| | ジャンル | ジャンル削除制約 | 書籍が紐付いているジャンルは削除できず、エラーメッセージが表示されること。紐付きがないジャンルは正常に削除できること。<br>ファイル: tests/Feature/GenreTest.php<br>メソッド: test_genre_with_books_cannot_be_deleted, test_genre_without_books_can_be_deleted | 基本 |
-| | お気に入り | お気に入り追加 | 認証ユーザーがお気に入りを追加でき、favoritesテーブルにレコードが作成されること。<br>ファイル: tests/Feature/FavoriteTest.php<br>メソッド: test_user_can_add_favorite | 基本 |
-| | お気に入り | お気に入り解除 | 認証ユーザーがお気に入りを解除でき、favoritesテーブルからレコードが削除されること。<br>ファイル: tests/Feature/FavoriteTest.php<br>メソッド: test_user_can_remove_favorite | 基本 |
-| | お気に入り | お気に入りトグル | お気に入りのトグル（追加→解除→追加）が正しく動作すること。<br>ファイル: tests/Feature/FavoriteTest.php<br>メソッド: test_favorite_toggle_works_correctly | 基本 |
-| | お気に入り | お気に入り一覧 | お気に入り一覧ページが正常に表示されること。<br>ファイル: tests/Feature/FavoriteTest.php<br>メソッド: test_favorite_index_page_can_be_rendered | 基本 |
-| | お気に入り | ゲスト制限 | ゲストがお気に入り操作を行うとログインにリダイレクトされること。<br>ファイル: tests/Feature/FavoriteTest.php<br>メソッド: test_guest_cannot_toggle_favorite | 基本 |
-| | いいね | いいね追加 | 認証ユーザーがレビューにいいねを追加でき、review_likesテーブルにレコードが作成されること。<br>ファイル: tests/Feature/ReviewLikeTest.php<br>メソッド: test_user_can_like_review | 基本 |
-| | いいね | いいね解除 | 認証ユーザーがレビューのいいねを解除でき、review_likesテーブルからレコードが削除されること。<br>ファイル: tests/Feature/ReviewLikeTest.php<br>メソッド: test_user_can_unlike_review | 基本 |
-| | いいね | いいねトグル | いいねのトグル（追加→解除→追加）が正しく動作すること。<br>ファイル: tests/Feature/ReviewLikeTest.php<br>メソッド: test_like_toggle_works_correctly | 基本 |
-| | いいね | ゲスト制限 | ゲストがいいね操作を行うとログインにリダイレクトされること。<br>ファイル: tests/Feature/ReviewLikeTest.php<br>メソッド: test_guest_cannot_like_review | 基本 |
-| | ランキング | ランキング表示 | ランキングページ（/ranking）が正常に表示され、レビューのある書籍タイトルが含まれること。<br>ファイル: tests/Feature/RankingTest.php<br>メソッド: test_ranking_page_can_be_rendered | 基本 |
-| | ランキング | ランキング順序 | 書籍が平均評価の降順で正しく並ぶこと。<br>ファイル: tests/Feature/RankingTest.php<br>メソッド: test_ranking_is_ordered_by_average_rating | 基本 |
-| | 認証 | 認証済みリダイレクト | 認証済みユーザーがログインページにアクセスした場合、ホームにリダイレクトされること。ゲストはアクセス可能であること。<br>ファイル: tests/Feature/RedirectIfAuthenticatedTest.php<br>メソッド: test_authenticated_user_is_redirected_to_home, test_guest_can_access_route | 基本 |
-| ★ 機能テスト<br>(Feature Tests) | ★ 検索・フィルタ | ★ キーワード検索 | キーワード検索で該当書籍が表示され、非該当書籍が表示されないこと。assertSee / assertDontSee で検証。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_index_with_search_query_displays_results | ★ 応用 |
-| | ★ 検索・フィルタ | ★ ジャンルフィルタ | ジャンルフィルタで該当ジャンルの書籍のみが表示されること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_index_with_genre_filter_displays_results | ★ 応用 |
-| | ★ ソート | ★ 書籍一覧ソート | 新着順（デフォルト）と古い順のソートが正しく動作すること（assertSeeInOrder）。タイトル昇順ソート（viewData）。評価順ソート（viewData）。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_book_index_is_ordered_correctly, test_book_index_can_sort_by_title, test_book_index_can_sort_by_average_rating | ★ 応用 |
-| | ★ CSVエクスポート | ★ CSV出力 | 認証ユーザーがCSVをエクスポートでき、Content-Typeとファイル名が正しいこと（assertHeader）。検索条件がCSVの内容に反映されていること（streamedContent）。ゲストはログインにリダイレクトされること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_authenticated_user_can_export_csv, test_csv_export_with_search_filters, test_guest_cannot_export_csv | ★ 応用 |
-| | ★ CSVエクスポート | ★ CSVソート | CSV出力が古い順・タイトル順・評価順でそれぞれ正しくソートされること。strpos() で出現位置を比較。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_export_csv_can_sort_by_oldest, test_export_csv_can_sort_by_title, test_export_csv_can_sort_by_average_rating | ★ 応用 |
-| | ★ 書籍CRUD | ★ 書籍編集認可 | BookPolicy による認可テスト。所有者は can('update', $book) が true、他ユーザーは403 Forbidden。コントローラーの edit メソッドを直接呼び出し、View オブジェクトに正しい book と genres が渡されていること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_only_owner_can_view_edit_form（更新）, test_owner_receives_edit_view_with_genres | ★ 応用 |
-| | ★ ISBN検索 | ★ 外部API連携 | Http::fake() で外部APIをモック化し、正常に書籍情報が返ること。13桁以外のISBNで400エラーが返ること。APIが空の結果を返した場合に404エラーが返ること。API通信例外時に500エラーが返ること。<br>ファイル: tests/Feature/BookTest.php<br>メソッド: test_search_by_isbn_returns_book_information, test_search_by_isbn_requires_13_digit_value, test_search_by_isbn_returns_404_when_results_empty, test_search_by_isbn_handles_http_exception | ★ 応用 |
-| | ★ マイ読書レポート | ★ レポート表示 | ゲストがレポートページにアクセスするとログインにリダイレクトされること。認証ユーザーの統計情報（summary, rating_distribution, top_rated_books, genre_ratings）が正しく計算されること。レビューがないユーザーの場合、各統計が0/空として安全に処理されること。<br>ファイル: tests/Feature/ReportTest.php<br>メソッド: test_guest_is_redirected_from_reports_index, test_reports_index_displays_stats_for_authenticated_user, test_reports_index_handles_user_without_reviews | ★ 応用 |
+| 単体テスト<br>(Unit Tests) | モデル | Userモデル関連 | Userモデルのリレーション（books, reviews, favoriteBooks, likedReviews）が正しく定義されていること。 | 基本 |
+| | モデル | Bookモデル関連 | Bookモデルのリレーション（user, reviews, genres, favoritedByUsers）が正しく定義されていること。 | 基本 |
+| | モデル | Reviewモデル関連 | Reviewモデルのリレーション（user, book, likedByUsers）が正しく定義されていること。 | 基本 |
+| 機能テスト<br>(Feature Tests) | 画面アクセス | 書籍一覧 | 書籍一覧ページ（/books）が正常に表示されること（200レスポンス）。 | 基本 |
+| | 画面アクセス | 書籍登録フォーム | 認証ユーザーのみが書籍登録フォーム（/books/create）を表示でき、ゲストはログインにリダイレクトされること。 | 基本 |
+| | 書籍CRUD | 書籍詳細 | 書籍詳細ページ（/books/{book}）が正常に表示され、書籍タイトルが画面に含まれること。 | 基本 |
+| | 書籍CRUD | 書籍登録 | 認証ユーザーが書籍を登録でき、ジャンルがbook_genreテーブルに紐付けられること。バリデーションエラー時は適切にエラーが返されること。 | 基本 |
+| | 書籍CRUD | 書籍編集 | 書籍所有者のみが編集でき、ジャンルの同期（sync）が正しく動作すること。他ユーザーがアクセスした場合は403 Forbiddenとなること。 | 基本 |
+| | 書籍CRUD | 書籍削除 | 書籍所有者のみが削除でき、削除後に書籍一覧にリダイレクトされること。DBからレコードが削除されること。 | 基本 |
+| | 書籍CRUD | 書籍検索 | 検索クエリに一致する書籍が検索結果に表示されること。 | 基本 |
+| | レビュー | レビュー投稿 | 認証ユーザーがレビューを投稿でき、reviewsテーブルにレコードが作成されること。ゲストはログインにリダイレクトされること。ratingのバリデーション（1〜5の範囲）が動作すること。 | 基本 |
+| | レビュー | レビュー編集 | レビュー投稿者のみが編集フォームを表示・更新でき、他ユーザーは403 Forbiddenとなること。 | 基本 |
+| | レビュー | レビュー削除 | レビュー投稿者のみが削除でき、他ユーザーは403 Forbiddenとなること。 | 基本 |
+| | ジャンル | ジャンル一覧 | ジャンル一覧ページが正常に表示されること。 | 基本 |
+| | ジャンル | ジャンル登録 | 認証ユーザーがジャンルを作成でき、genresテーブルにレコードが作成されること。バリデーションエラー時は適切にエラーが返されること。 | 基本 |
+| | ジャンル | ジャンル登録フォーム | 認証ユーザーがジャンル登録フォーム（/genres/create）を表示できること。 | 基本 |
+| | ジャンル | ジャンル詳細 | ジャンル詳細ページ（/genres/{genre}）でジャンルに紐づく書籍タイトルが表示されること。 | 基本 |
+| | ジャンル | ジャンル編集 | 認証ユーザーがジャンル名を更新でき、genresテーブルのレコードが更新されること。編集フォームが表示できること。 | 基本 |
+| | ジャンル | ジャンル削除制約 | 書籍が紐付いているジャンルは削除できず、エラーメッセージが表示されること。紐付きがないジャンルは正常に削除できること。 | 基本 |
+| | お気に入り | お気に入り追加 | 認証ユーザーがお気に入りを追加でき、favoritesテーブルにレコードが作成されること。 | 基本 |
+| | お気に入り | お気に入り解除 | 認証ユーザーがお気に入りを解除でき、favoritesテーブルからレコードが削除されること。 | 基本 |
+| | お気に入り | お気に入りトグル | お気に入りのトグル（追加→解除→追加）が正しく動作すること。 | 基本 |
+| | お気に入り | お気に入り一覧 | お気に入り一覧ページが正常に表示されること。 | 基本 |
+| | お気に入り | ゲスト制限 | ゲストがお気に入り操作を行うとログインにリダイレクトされること。 | 基本 |
+| | いいね | いいね追加 | 認証ユーザーがレビューにいいねを追加でき、review_likesテーブルにレコードが作成されること。 | 基本 |
+| | いいね | いいね解除 | 認証ユーザーがレビューのいいねを解除でき、review_likesテーブルからレコードが削除されること。 | 基本 |
+| | いいね | いいねトグル | いいねのトグル（追加→解除→追加）が正しく動作すること。 | 基本 |
+| | いいね | ゲスト制限 | ゲストがいいね操作を行うとログインにリダイレクトされること。 | 基本 |
+| | ランキング | ランキング表示 | ランキングページ（/ranking）が正常に表示され、レビューのある書籍タイトルが含まれること。 | 基本 |
+| | ランキング | ランキング順序 | 書籍が平均評価の降順で正しく並ぶこと。 | 基本 |
+| | 認証 | 認証済みリダイレクト | 認証済みユーザーがログインページにアクセスした場合、ホームにリダイレクトされること。ゲストはアクセス可能であること。 | 基本 |
+| ★ 機能テスト<br>(Feature Tests) | ★ 検索・フィルタ | ★ キーワード検索 | キーワード検索で該当書籍が表示され、非該当書籍が表示されないこと。assertSee / assertDontSee で検証。 | ★ 応用 |
+| | ★ 検索・フィルタ | ★ ジャンルフィルタ | ジャンルフィルタで該当ジャンルの書籍のみが表示されること。 | ★ 応用 |
+| | ★ ソート | ★ 書籍一覧ソート | 新着順（デフォルト）と古い順のソートが正しく動作すること（assertSeeInOrder）。タイトル昇順ソート（viewData）。評価順ソート（viewData）。 | ★ 応用 |
+| | ★ CSVエクスポート | ★ CSV出力 | 認証ユーザーがCSVをエクスポートでき、Content-Typeとファイル名が正しいこと（assertHeader）。検索条件がCSVの内容に反映されていること（streamedContent）。ゲストはログインにリダイレクトされること。 | ★ 応用 |
+| | ★ CSVエクスポート | ★ CSVソート | CSV出力が古い順・タイトル順・評価順でそれぞれ正しくソートされること。strpos() で出現位置を比較。 | ★ 応用 |
+| | ★ 書籍CRUD | ★ 書籍編集認可 | BookPolicy による認可テスト。所有者は can('update', $book) が true、他ユーザーは403 Forbidden。コントローラーの edit メソッドを直接呼び出し、View オブジェクトに正しい book と genres が渡されていること。 | ★ 応用 |
+| | ★ ISBN検索 | ★ 外部API連携 | Http::fake() で外部APIをモック化し、正常に書籍情報が返ること。13桁以外のISBNで400エラーが返ること。APIが空の結果を返した場合に404エラーが返ること。API通信例外時に500エラーが返ること。 | ★ 応用 |
+| | ★ マイ読書レポート | ★ レポート表示 | ゲストがレポートページにアクセスするとログインにリダイレクトされること。認証ユーザーの統計情報（summary, rating_distribution, top_rated_books, genre_ratings）が正しく計算されること。レビューがないユーザーの場合、各統計が0/空として安全に処理されること。 | ★ 応用 |
 
 ---
 
