@@ -1,0 +1,16 @@
+,,,,
+,シーディング要件,,,
+,,"本確認テストで実装するシーディングの詳細仕様です。
+本要件を忘れてしまいますと、採点において差し戻しが発生する場合があるのでご注意ください。",,
+,,,対象,入力項目
+,,,UserSeeder,- users テーブルに初期管理者を1件登録する。
+,,,,"name: Test User, email: test@example.com, password:password"
+,,,,- フロントで認証を行うため、このアカウントでログイン可能であること。
+,,,CategorySeeder,- categories テーブルに問い合わせ分類を固定で5件投入する。
+,,,,- 内容例: 「商品のお届けについて」「商品の交換について」「商品トラブル」「ショップへのお問い合わせ」「その他」。
+,,,TagSeeder,- tags テーブルにタグ候補を固定で5件投入する。
+,,,,- 内容例: 「質問」「要望」「不具合報告」「ご意見」「その他」。
+,,,ContactSeeder,- Faker (ja_JP) を用いて contacts テーブルに20件のダミーデータを投入する。
+,,,,- カテゴリは既存の categories からランダムに選択し、category_id を付与する。
+,,,,- 入力する項目（first_name/last_name/gender/email/tel/address/building/detail など）は実際のフォーム入力に近い値を生成する。
+,,,DatabaseSeeder,"- 上記 Seeder (UserSeeder, CategorySeeder, TagSeeder, ContactSeeder) を DatabaseSeeder の run() で順番に呼び出し、php artisan db:seed でまとめて投入できるようにする。"

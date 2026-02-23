@@ -1,0 +1,27 @@
+,,,,,
+,バリデーションルール,,,,
+,,本確認テストで実装する各種バリデーションの詳細仕様です。,,,
+,,,対象機能,入力項目,ルール
+,,,お問い合わせフォーム表示／入力内容確認／お問い合わせ送信,"first_name, last_name",必須 / string / max:255
+,,,,gender,"必須 / integer / in:1,2,3"
+,,,,email,必須 / string / email / max:255
+,,,,tel,"必須 / string / regex:/^[0-9]{10,11}$/"
+,,,,address,必須 / string / max:255
+,,,,building,nullable / string / max:255
+,,,,category_id,"必須 / integer / exists:categories,id"
+,,,,detail,必須 / string / max:120
+,,,お問い合わせ送信（タグ）,tag_ids[],"array / integer / exists:tags,id"
+,,,問い合わせ検索・一覧,keyword,nullable / string / max:255
+,,,,gender,"nullable / integer / in:0,1,2,3"
+,,,,category_id,"nullable / integer / exists:categories,id"
+,,,,date,nullable / date
+,,,タグマスタ管理,name,必須 / string / max:50 / unique
+,,,CSVエクスポート,keyword,nullable / string / max:255
+,,,,gender,"nullable / integer / in:0,1,2,3"
+,,,,category_id,"nullable / integer / exists:categories,id"
+,,,,date,nullable / date
+,,,管理ユーザー登録,name,必須 / string / max:255
+,,,,email,必須 / email / max:255 / unique
+,,,,password,Fortify標準（8文字以上・確認用一致）
+,,,ログイン/ログアウト,email,必須 / email / max:255
+,,,,password,必須

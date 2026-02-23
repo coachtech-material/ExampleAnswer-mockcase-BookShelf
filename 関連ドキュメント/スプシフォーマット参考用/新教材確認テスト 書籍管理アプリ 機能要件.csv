@@ -1,0 +1,61 @@
+,,,,,,,,,,,
+,機能要件一覧,,,,,,,,,,
+,,"本確認テストで実装する機能の詳細仕様です。
+Bladeは提供済みのため、バックエンドの実装に集中してください。
+また赤字は応用要件です。基本要件実装後に着手してください。",,,,,,,,,
+,,,,,,,,,,,
+,,No.,EPIC名,機能ID.,機能名,概要(ビジネスロジック）,入力条件/制約,期待結果,バックエンド挙動,関連ソース/責務,基本/応用
+,,1,お問い合わせ受付（ユーザー向け）,WF01,フォーム表示・初期入力,ユーザーが / で問い合わせフォーム全項目を閲覧し、入力を開始できる。,"- URL: GET /
+- 認証: 不要",画面がエラーなく表示され、入力できる。,"- / ルートで contact.index を返す。
+- CSRF/metaタグをBladeに埋め込む。
+- カテゴリ/タグ取得API（公開）が稼働していること。","- routes/web.php:18
+- app/Http/Controllers/ContactController@index
+- resources/views/contact/*.blade.php",基本
+,,,,WF02,入力内容確認,入力値を画面内で確認し、カテゴリ・タグ名称を含めて表示する。,"- URL: GET /
+- 認証: 不要",確認画面で名称付きの値を確認し、修正に戻れる。,"- StoreContactRequest と同一ルールを維持（JSと同期）。
+- /api/categories /api/tags でIDに対応する名称を返す。
+- APIレスポンス形式を変更しない。","- app/Http/Requests/StoreContactRequest
+- resources/js/contact/*.js",基本
+,,,,WF04,お問い合わせ送信,ユーザーが入力内容を送信し、問い合わせと任意タグを登録できる。,"- URL: POST /api/contacts
+- 認証: 不要
+- バリデーション: StoreContactRequest",成功時 Thanks 画面へ遷移し、失敗時はエラー表示,"- POST /api/contacts でJSON受領。
+- バリデーション通過時に contacts と contact_tag を作成。
+- 201/422 を適切に返却。","- routes/api.php:25
+- app/Http/Controllers/Api/ContactController@store
+- app/Models/Contact Tag",基本
+,,,,WF05,完了画面表示,送信後に完了メッセージを提示し、HOMEへ戻す導線を提供する。,"- URL: GET /thanks
+- 認証: 不要",メッセージとHOMEリンクが表示される。,- /thanks ルートで contact.thanks を返す。,"- routes/web.php:21
+- app/Http/Controllers/ContactController@thanks",基本
+,,2,問い合わせ運用（管理者向け）,WF06,お問い合わせ一覧・検索,管理者が認証後の画面で条件検索し、7件ごとの一覧とページ切り替えができる。,"- 画面URL: GET /admin（要ログイン）
+- API: GET /api/contacts（公開）
+- クエリ: keyword/gender/category_id/date/page",JSON結果に data と meta.links が含まれ、UIが描画される。,"- /admin は auth ミドルウェアで保護。
+- IndexContactRequest で入力検証。
+- Contact::with(...)->paginate(7) を返却し、meta に現在ページ/linksを含める。","- routes/web.php:25
+- app/Http/Controllers/AdminController@index
+- app/Http/Controllers/Api/ContactController@index
+- app/Http/Resources/ContactResource",基本
+,,,,WF07,詳細参照＆削除,一覧から詳細を閲覧し、不要な問い合わせを削除できる。,- API: GET/DELETE /api/contacts/{id}（公開）,詳細表示用JSONにカテゴリ・タグが含まれ、削除成功時204を返す。,"- GET で ContactResource（カテゴリ/タグ読み込み）を返す。
+- DELETE で contact_tag も含め削除し204を返す。","- routes/api.php:27-29
+- app/Http/Controllers/Api/ContactController@show,@destroy",基本
+,,,,WF08,CSVエクスポート,検索条件に一致する問い合わせ一覧をCSVとしてダウンロードできる。,- URL: GET /contacts/export + query（auth必須）,BOM付きCSVがダウンロードされる。,"- auth グループ下で /contacts/export を提供。
+- ExportContactRequest で条件検証。
+- 条件に従い Contact を取得し、CSV列（ID/氏名/性別文言/メール/電話/住所/建物/カテゴリ/詳細/作成日時）を出力。","- routes/web.php:25-28
+- app/Http/Controllers/ContactController@export
+- app/Http/Requests/ExportContactRequest",応用
+,,,,WF09,タグマスタ管理,管理者がタグを追加・更新・削除し、問い合わせフォームの候補を管理できる。,"- API: /api/tags (GET/POST/PUT/DELETE) 公開
+- name必須/<=50/ユニーク",タグ一覧が常に最新化される。,"- StoreTagRequest / UpdateTagRequest で入力を検証。
+- 作成/更新/削除で204/201/422を正しく返す。
+- Tag::all() を TagResource で返す。","- routes/api.php:32-38
+- app/Http/Controllers/Api/TagController
+- app/Http/Requests/StoreTagRequest UpdateTagRequest",応用
+,,3,認証機能（管理者向け）,AF01,管理ユーザー登録,管理者がFortifyの登録画面から新しい管理ユーザーを作成できる。,"- URL: GET/POST /register
+- バリデーション: CreateNewUser",作成後 /admin に遷移。,"- Fortify CreateNewUser で入力検証・ハッシュ化保存。
+- ユーザー作成後 config/fortify.php の home に従って /admin へ。","- app/Providers/FortifyServiceProvider
+- app/Actions/Fortify/CreateNewUser
+- resources/views/auth/register.blade.php",基本
+,,,,AF02,ログイン/ログアウトと保護,管理者がログインし、保護された画面を利用し、ログアウトできる。,"- URL: GET/POST /login, POST /logout
+- RateLimit:5/分",ログイン成功で /admin、ログアウトでセッション破棄。,"- Fortifyログインビューを提供。
+- auth ミドルウェアで /admin /contacts/export を保護。
+- /logout POST をハンドリング。","- app/Providers/FortifyServiceProvider
+- resources/views/auth/login.blade.php
+- routes/web.php",基本
