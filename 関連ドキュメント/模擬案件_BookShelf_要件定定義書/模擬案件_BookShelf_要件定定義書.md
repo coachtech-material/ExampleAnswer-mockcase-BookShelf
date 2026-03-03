@@ -1,0 +1,697 @@
+# 模擬案件_BookShelf_要件定定義書
+
+> 本ドキュメントは、模擬案件「BookShelf（書籍レビューアプリ）」の統合要件定義書です。
+> 基本機能（Basic）と応用機能（Advanced）を1つのドキュメントに統合しています。
+> **対象ブランチ: basic（基本機能）→ advanced（応用機能）**
+
+---
+
+## 1. ターム内容
+
+本模擬案件における全体概要です。
+赤字の項目については、入力が必要な項目になります。担当コーチと確認しながら進めてください。
+こちらは模擬案件になりますので、コーチの方は提出時にお間違えの無いように提出してください。
+
+| 項目 | 内容 |
+|---|---|
+| タイトル | 模擬案件\_書籍レビューアプリ BookShelf |
+| 目的 | 模擬案件を通して、実務を想定したWebアプリケーション開発を経験すること |
+| 期間 | コーチと相談の上決めてください。 |
+| やること | バックエンド開発（DB設計、認証/認可、CRUD実装、テスト作成）<br>※Bladeテンプレートは完成品として提供されるため、フロントエンド実装は不要です<br><br>【2フェーズ構成】<br>本模擬案件は以下の2フェーズに分かれています。<br><br>**フェーズ1: 基本機能の実装**<br>認証、書籍CRUD、レビュー、お気に入り、いいね、ジャンル管理、ランキング機能を実装します。<br>Bladeテンプレートは `coachtech-material/Preparedblade-mockcase-BookShelf` リポジトリの **Basicブランチ** から取得します。<br><br>**フェーズ2: 応用機能の実装**<br>基本機能の完成後、高度な検索・フィルタ、CSVエクスポート、ISBN検索（Google Books API連携）、マイ読書レポート、公開APIを実装します。<br>Bladeテンプレートは同リポジトリの **Advancedブランチ** から再取得します。<br>また、型宣言の徹底やCollectionメソッド活用など、コーディング品質の向上にも取り組みます。 |
+| 作成物 | BookShelf 書籍レビューアプリ<br><br>【システム概要】<br>本システムは、書籍レビューアプリケーション「BookShelf」です。<br>ユーザーは書籍を登録・閲覧し、レビューの投稿やお気に入り登録ができます。<br>ジャンルによる分類やレビューへのいいね機能、平均評価に基づくランキング機能も備えています。<br><br>【応用機能で追加される要素】<br>・キーワード・ジャンル・並び順を組み合わせた高度な検索機能<br>・検索結果のCSVエクスポート機能<br>・ISBN-13によるGoogle Books API連携（書籍情報自動取得）<br>・マイ読書レポート（統計ダッシュボード）<br>・外部アプリケーション向け公開API（JSON） |
+| ルール | 原則質問チャットサポートの利用は禁止です。<br><br>留意点：<br>1. 教材やブラウザで検索した記事を参考にすることは可能です。<br>2. GitHubでのエラーが解決できず、模擬案件の提出が困難な場合はコーチに相談してください。<br>3. 質問の利用数はCOACHTECH Proの合格基準とさせていただきますので、できるだけ質問対応は利用しないようにしましょう！ |
+| 提出方法 | LMSのテスト一覧画面から提出してください。 |
+| 注意点 | 教材学習の集大成で、少し難易度が高いです。<br>焦らず、一歩一歩開発を進めていきましょう。<br>また基本機能の開発が終了次第、応用機能の開発に着手してください。 |
+
+---
+
+## 2. 開発プロセス
+
+こちらは環境構築、コード品質、テスト要件の詳細資料です。
+採点において重要な要件やアプリケーション全体を跨ぐ要件が記載していますので、十分に確認してください。
+赤字（★マーク）は応用要件になります。基本要件実装後に着手してください。
+
+| 項目 | カテゴリ | 詳細仕様 | 留意点 | 基本/応用 |
+|---|---|---|---|---|
+| 仕様理解 | アーキテクチャ | 【重要】本プロジェクトのアーキテクチャについて（Traditional Web）<br><br>本課題では、Traditional Web（Blade + セッション認証）アーキテクチャを採用します。<br><br>Webブラウザ向け機能（Traditional Web）:<br>Bladeテンプレートを使用し、セッション認証（Cookie）で動作する従来のWebアプリケーション機能。<br>routes/web.php と通常のコントローラーを使用します。<br><br>※応用機能で公開API（認証不要）を追加実装します。 | | 基本 |
+| 環境 | 技術スタック | OS（Dockerが動作する任意のOS）: -<br>PHP: 8.2<br>Laravel: 10.x<br>DB: MySQL 8.0<br>フロントエンド: Vite, Tailwind CSS ^3.4.0<br>開発ツール: Docker, Laravel Sail, phpMyAdmin | | 基本 |
+| | 構成管理 | ・DockerとDocker Composeを使用して環境をコンテナ化する<br>・COACHTECH側が提示した環境構築手順を遵守する | | 基本 |
+| | 初期設定手順 | 「環境構築手順」シートを参考の上初期設定を行うこと | | 基本 |
+| README.md 記載必須項目 | プロジェクト名 | 「BookShelf 書籍レビューアプリ」など、内容がわかるタイトル | READMEが不十分で、採点者が環境構築、機能確認ができない場合は再提出、または大きく減点される可能性があるので、十分に気をつけること | 基本 |
+| | 概要 | プロジェクトの目的と、実装した機能の概要説明 | | 基本 |
+| | ER図 | 自分で設計したER図の画像またはMermaid記法でのテキスト | | 基本 |
+| | 環境構築手順 | 上記「初期設定手順」を参考に、誰でも環境構築ができるように詳細に記載 | | 基本 |
+| | 使用技術 | Laravel 10, MySQL 8.0, Dockerなど、使用した技術スタック一覧 | | 基本 |
+| | 作成者 | 自分の名前 | | 基本 |
+| コード品質担保のための指示 | 命名規則 | ・Laravelの標準命名規則（PSR-12準拠）に従うこと<br> - 変数/メソッド: `camelCase`<br> - クラス: `PascalCase`<br> - DBテーブル: `snake_case`（複数形）<br> - DBカラム: `snake_case`（単数形）<br> - モデル名：アッパーキャメル<br> - コントローラー名：アッパーキャメル<br> - フォームリクエスト名：アッパーキャメル<br> - マイグレーションファイル名：スネークケース<br> - シーディングファイル名：アッパーキャメル | | 基本 |
+| | コードフォーマット | ・Laravel Pintを使用してコードを自動整形すること<br>・コミット前に `vendor/bin/pint` を実行し、整形されたコードをコミットする | | 基本 |
+| | Eloquent ORM | ・DB操作にはEloquentを最大限活用し、クエリビルダや生SQLは原則使用しない<br>・N+1問題を避けるため、`with()`メソッドによるEager Loadingを適切に使用する | | 基本 |
+| | コントローラーの責務 | ・コントローラーはリクエストの受付とレスポンスの返却に専念させる<br>・複雑なビジネスロジックはモデルやサービスクラス（任意）に記述する | | 基本 |
+| | FormRequest | ・バリデーションロジックは必ずFormRequestクラスに分離する | | 基本 |
+| | Policy | ・認可処理（リソースの所有者チェック等）は必ずPolicyクラスで実装する<br>・コントローラーで `$this->authorize()` を使用してPolicyを適用する | | 基本 |
+| | 設定のハードコーディング禁止 | ・DB接続情報やAPIキーなどの設定値は、必ず`.env`ファイルで管理する<br>・コード内に直接設定値を書き込まない | | 基本 |
+| | Git運用 | ・コミットメッセージは「何をしたか」が明確にわかるように記述する<br>（例: `feat: 書籍一覧表示を実装`）<br>・機能ごとにブランチを作成し、`main`ブランチにマージする | | 基本 |
+| 要件遵守 | 開発言語 | 開発言語はCOACHTECの教材内の言語を使用すること | | 基本 |
+| | 各種設計 | 開発については、案件シート内の設計に沿って作成すること | - ルーティングは「画面設計」の画面定義に従って作成すること<br>- システムは「機能要件」の要件に従って作成すること | 基本 |
+| | 機能要件の使用技術を遵守しているか | 認証やバリデーションなど、指定した技術以外で実装されていないか | | 基本 |
+| ★ コード品質担保のための指示 | ★ 型宣言 | ・すべてのコントローラ、モデル、FormRequest、Policyのメソッドに、引数と戻り値の型を明示的に宣言する<br>（例: `public function index(): View`）<br>・モデルのリレーションメソッドには `HasMany`, `BelongsTo`, `BelongsToMany` などの具体的な戻り値型を宣言する | 基本機能では型宣言は不要だが、応用機能の開発時に全メソッドに追加する | ★ 応用 |
+| | ★ PHPDoc | ・主要なメソッドには、処理内容、引数、戻り値を説明するPHPDocコメントを記述する | | ★ 応用 |
+| | ★ Collectionメソッド活用 | ・`foreach` などの手続き的なループを避け、`map`, `filter`, `groupBy`, `flatMap` などのCollectionメソッドを積極的に活用する<br>・宣言的で可読性の高いコードを記述すること<br>・特にマイ読書レポート機能でこれを徹底する | | ★ 応用 |
+| | ★ 外部API連携 | ・外部APIとの通信には、Laravel標準のHTTPクライアント (`Illuminate\Support\Facades\Http`) を使用する | | ★ 応用 |
+| | ★ StreamedResponse | ・CSVエクスポートなどの大容量ファイルを扱う可能性がある機能では、メモリ消費を抑えるため `StreamedResponse` を使用してレスポンスをストリーミングする | | ★ 応用 |
+| ★ テストカバレッジ | ★ 目標 | ・応用機能を含むテストカバレッジは **80%** 以上を目標とする<br>・`sail artisan test --coverage` で確認できる | 基本機能のみの場合は60%が目標 | ★ 応用 |
+
+---
+
+## 3. 環境構築手順
+
+こちらは初期プロジェクトのセッティングにおいて必要な環境構築手順を記載したものです。
+詳細な内容は、coachtech-material/Preparedblade-mockcase-BookShelf リポジトリの環境構築.mdを参照して下さい。
+採点時の環境はこちらで行いますので、違う手順によって環境構築された場合は採点を致しかねます。ご注意してください。
+赤字（★マーク）は応用要件になります。基本要件実装後に着手してください。
+
+### 1. Laravelプロジェクトの作成 (Laravel 10.x)【基本】
+
+注意: `curl -s "https://laravel.build/..."` は最新版のLaravelをインストールするため、今回は使用しません。
+
+以下のDockerコマンドを実行して、Laravel 10.xを明示的に指定してプロジェクトを作成します。
+
+```
+docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest composer create-project laravel/laravel:^10.0 bookshelf-app
+```
+
+### 2. Laravel Sailのインストール【基本】
+
+プロジェクト作成後、bookshelf-app ディレクトリに移動し、Laravel Sailをインストールします。
+
+プロジェクトディレクトリに移動
+
+```
+cd bookshelf-app
+```
+
+Laravel Sailをインストール
+
+```
+docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest composer require laravel/sail --dev
+```
+
+Sailの設定ファイルをパブリッシュ（MySQLを選択）
+
+```
+docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest php artisan sail:install --with=mysql
+```
+
+※M1/M2/M3 Mac（Apple Silicon）をお使いの方：
+`sail up -d` 実行時に `no matching manifest for linux/arm64/v8` エラーが発生した場合、compose.yaml の mysql サービスに `platform: 'linux/amd64'` を追加してください。
+
+### 3. .env ファイルの設定【基本】
+
+.env ファイルを開き、データベース接続情報が以下と一致していることを確認します。
+
+```
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=laravel
+DB_USERNAME=sail
+DB_PASSWORD=password
+```
+
+重要: DB_HOST は localhost や 127.0.0.1 ではなく、Dockerコンテナ名である mysql を指定します。
+
+### 4. フロントエンドのセットアップ (Vite & Tailwind CSS)【基本】
+
+本プロジェクトでは、フロントエンドのスタイリングにTailwind CSSを使用します。
+以下の手順でセットアップを行ってください。
+
+1. NPM依存パッケージのインストール
+
+```
+sail npm install
+```
+
+※Sailコンテナが起動していることを確認。起動していない場合は `./vendor/bin/sail up -d` を実行
+
+2. Alpine.jsのインストール
+
+```
+sail npm install alpinejs
+```
+
+3. Tailwind CSSのインストール
+
+```
+sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer
+```
+
+4. 設定ファイルの生成
+
+```
+sail npx tailwindcss init -p
+```
+
+5. Tailwind CSSのテンプレートパス設定
+
+tailwind.config.js を開き、content に以下を指定：
+
+```
+"./resources/**/*.blade.php"
+"./resources/**/*.js"
+"./resources/**/*.vue"
+```
+
+6. 本プロジェクトのresourcesファイルを coachtech-material/Preparedblade-mockcase-BookShelf リポジトリの Basicブランチ のresourcesファイルと入れ替え
+
+7. Vite開発サーバーの起動
+
+```
+sail npm run dev
+```
+
+注意: 開発中は常にこのコマンドを実行した状態にしておいてください。
+
+### 5. phpMyAdminの追加【基本】
+
+compose.yaml を開き、mysql サービスの後に以下の設定を追加してください。
+
+```yaml
+phpmyadmin:
+    image: 'phpmyadmin:latest'
+    ports:
+        - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
+    environment:
+        PMA_HOST: mysql
+        PMA_USER: '${DB_USERNAME}'
+        PMA_PASSWORD: '${DB_PASSWORD}'
+    networks:
+        - sail
+    depends_on:
+        - mysql
+```
+
+### 6. Sailの起動とエイリアス設定【基本】
+
+Sailをバックグラウンドで起動
+
+```
+./vendor/bin/sail up -d
+```
+
+エイリアスを設定して 'sail' だけでコマンドを実行できるようにする
+
+```
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
+```
+
+シェルを再起動するか、新しいターミナルを開いてエイリアスを有効にする
+
+```
+exec $SHELL
+```
+
+### 7. アプリケーションキーの生成【基本】
+
+ルートで以下のコマンドを実行する
+
+```
+sail artisan key:generate
+```
+
+### ★ 8. 応用機能用Bladeテンプレートのインポート【応用】
+
+基本機能の実装完了後、応用機能の画面に対応するBladeテンプレートを取得します。
+
+coachtech-material/Preparedblade-mockcase-BookShelf リポジトリの Advancedブランチ からresourcesファイルを再度インポートし、プロジェクトのresourcesディレクトリを置き換えてください。
+
+※ Google Books APIキーの取得・.env設定は環境構築ではなく、ISBN検索機能（IS01）の実装に内包される手順です。
+
+---
+
+## 4. 画面設計
+
+各画面の仕様とUIデザイン要件の詳細資料です。
+アプリケーションの実装に入る前に確認し、これらの要件を満たすように実装しましょう。
+赤字（★マーク）は応用要件になります。基本要件実装後に着手してください。
+
+### 画面定義
+
+| 画面ID | 画面名称 | HTTPメソッド | パス | 備考 | 基本/応用 |
+|---|---|---|---|---|---|
+| PG01 | 書籍一覧（トップ） | GET | / または /books | Blade提供済み。<br>公開ページ。全書籍をページネーション（10件/ページ）で最新順に表示。ジャンル情報をEager Loading。<br>routes/web.php<br>app/Http/Controllers/BookController@index<br>resources/views/books/index.blade.php | 基本 |
+| PG02 | 書籍詳細 | GET | /books/{book} | Blade提供済み。<br>公開ページ。書籍詳細とレビュー・ジャンル・お気に入り・いいね機能を表示。<br>routes/web.php<br>app/Http/Controllers/BookController@show<br>resources/views/books/show.blade.php | 基本 |
+| PG03 | 書籍登録 | GET | /books/create | Blade提供済み。<br>認証必須。全ジャンル一覧をセレクトボックスで表示。<br>routes/web.php<br>app/Http/Controllers/BookController@create<br>resources/views/books/create.blade.php | 基本 |
+| PG04 | 書籍編集 | GET | /books/{book}/edit | Blade提供済み。<br>認証+認可（BookPolicy@update）必須。作成者のみ閲覧可。<br>routes/web.php<br>app/Http/Controllers/BookController@edit<br>resources/views/books/edit.blade.php | 基本 |
+| PG05 | ジャンル一覧 | GET | /genres | Blade提供済み。<br>認証必須。各ジャンルの書籍数を表示。<br>routes/web.php<br>app/Http/Controllers/GenreController@index<br>resources/views/genres/index.blade.php | 基本 |
+| PG06 | ジャンル詳細 | GET | /genres/{genre} | Blade提供済み。<br>公開ページ。ジャンルに紐づく書籍をページネーション（10件/ページ）で表示。<br>routes/web.php<br>app/Http/Controllers/GenreController@show<br>resources/views/genres/show.blade.php | 基本 |
+| PG07 | ジャンル登録 | GET | /genres/create | Blade提供済み。<br>認証必須。<br>routes/web.php<br>app/Http/Controllers/GenreController@create<br>resources/views/genres/create.blade.php | 基本 |
+| PG08 | ジャンル編集 | GET | /genres/{genre}/edit | Blade提供済み。<br>認証必須。<br>routes/web.php<br>app/Http/Controllers/GenreController@edit<br>resources/views/genres/edit.blade.php | 基本 |
+| PG09 | レビュー編集 | GET | /reviews/{review}/edit | Blade提供済み。<br>認証+認可（ReviewPolicy@update）必須。投稿者のみ閲覧可。<br>routes/web.php<br>app/Http/Controllers/ReviewController@edit<br>resources/views/reviews/edit.blade.php | 基本 |
+| PG10 | お気に入り一覧 | GET | /favorites | Blade提供済み。<br>認証必須。ユーザーのお気に入り書籍をページネーション（10件/ページ）で表示。<br>routes/web.php<br>app/Http/Controllers/FavoriteController@index<br>resources/views/favorites/index.blade.php | 基本 |
+| PG11 | ランキング | GET | /ranking | Blade提供済み。<br>公開ページ。レビュー平均評価TOP10を表示。<br>routes/web.php<br>app/Http/Controllers/RankingController@index<br>resources/views/ranking/index.blade.php | 基本 |
+| PG12 | ログイン | GET | /login | Blade提供済み。<br>Fortifyが提供するログインビュー。<br>メール・パスワード入力と送信。<br>resources/views/auth/login.blade.php | 基本 |
+| PG13 | 会員登録 | GET | /register | Blade提供済み。<br>Fortifyが提供する登録ビュー。<br>氏名・メール・パスワードを登録。<br>resources/views/auth/register.blade.php | 基本 |
+| ★ PG01 | ★ 書籍一覧（トップ）<br>【変更】 | GET | / または /books | Blade提供済み（Advancedブランチ）。<br>基本機能に加え、以下を追加：<br>・キーワード検索フォーム（keyword）<br>・ジャンルフィルタ（genre プルダウン）<br>・並び順ソート（sort プルダウン）<br>・CSVエクスポートボタン<br>検索条件はページネーションに引き継がれる。 | ★ 応用 |
+| ★ PG03 | ★ 書籍登録<br>【変更】 | GET | /books/create | Blade提供済み（Advancedブランチ）。<br>基本機能に加え、以下を追加：<br>・ISBN検索フォーム（ISBN-13入力 + 検索ボタン）<br>・JavaScriptで `/books/isbn/{isbn}` にリクエストし、取得した書籍情報をフォームに自動入力 | ★ 応用 |
+| ★ PG14 | ★ マイ読書レポート<br>【新規】 | GET | /reports | Blade提供済み（Advancedブランチ）。<br>認証必須。ログインユーザーの読書統計を表示。<br>routes/web.php<br>app/Http/Controllers/ReportController@index<br>resources/views/reports/index.blade.php | ★ 応用 |
+
+### Bladeファイルの提供
+
+| 手順 | 詳細 |
+|---|---|
+| Step 1 | BladeファイルはBasicブランチとAdvancedブランチに分かれて提供されます。<br>まず `coachtech-material/Preparedblade-mockcase-BookShelf` リポジトリの **Basicブランチ** からresourcesファイルをプロジェクトに移入し、基本機能を実装します。 |
+| Step 2 | 基本機能の実装完了後、同リポジトリの **Advancedブランチ** からresourcesファイルを再度インポートし、応用機能の画面に対応するBladeテンプレートを取得します。 |
+| Step 3 | 環境構築手順シートを参照しつつフロントエンドの環境構築を行う。 |
+
+---
+
+## 5. デザインUI
+
+各画面のUI画像を添付してあります。
+模擬案件の実装に入る前に確認し、こちらを参考にレイアウトを完成させましょう。
+赤字（★マーク）は応用機能で追加・変更される画面です。
+
+#### 書籍管理
+
+| 書籍一覧画面 | 書籍詳細画面 | 書籍登録画面 |
+|---|---|---|
+| （画像を添付） | （画像を添付） | （画像を添付） |
+
+| 書籍編集画面 | | |
+|---|---|---|
+| （画像を添付） | | |
+
+#### ジャンル管理
+
+| ジャンル一覧画面 | ジャンル詳細画面 | ジャンル登録画面 |
+|---|---|---|
+| （画像を添付） | （画像を添付） | （画像を添付） |
+
+| ジャンル編集画面 | | |
+|---|---|---|
+| （画像を添付） | | |
+
+#### レビュー・お気に入り・ランキング
+
+| レビュー編集画面 | お気に入り一覧画面 | ランキング画面 |
+|---|---|---|
+| （画像を添付） | （画像を添付） | （画像を添付） |
+
+#### 認証
+
+| 会員登録画面 | ログイン画面 |
+|---|---|
+| （画像を添付） | （画像を添付） |
+
+#### 応用機能（変更・追加画面）
+
+| ★ 書籍一覧画面（検索・フィルタ・ソート・CSV追加） | ★ 書籍登録画面（ISBN検索追加） |
+|---|---|
+| （画像を添付） | （画像を添付） |
+
+| ★ マイ読書レポート画面 | |
+|---|---|
+| （画像を添付） | |
+
+---
+
+## 6. 機能要件一覧
+
+本模擬案件で実装する機能の詳細仕様です。
+Bladeは提供済みのため、バックエンドの実装に集中してください。
+赤字（★マーク）は応用要件です。基本要件実装後に着手してください。
+
+| No. | EPIC名 | 機能ID | 機能名 | 概要（ビジネスロジック） | 入力条件/制約 | 期待結果 | バックエンド挙動 | 関連ソース/責務 | 基本/応用 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 認証機能 | AF01 | ユーザー登録 | ユーザーがFortifyの登録画面から新規アカウントを作成できる。<br><br>※ Laravel Fortifyの導入（`composer require laravel/fortify`、サービスプロバイダ登録、マイグレーション実行、設定ファイル調整）は環境構築ではなく認証機能の実装手順として行う。 | URL: GET/POST /register<br><br>バリデーション:<br>name(required/string/max:255)<br>email(required/email/max:255/unique:users)<br>password(Fortify標準 8文字以上・確認用一致) | 登録成功後 / にリダイレクト。 | Fortify CreateNewUser で入力検証・ハッシュ化保存。<br>ユーザー作成後 config/fortify.php の home に従ってリダイレクト。 | app/Providers/FortifyServiceProvider<br>app/Actions/Fortify/CreateNewUser<br>resources/views/auth/register.blade.php | 基本 |
+| | | AF02 | ログイン/ログアウト | ユーザーがログインし、保護された機能を利用し、ログアウトできる。 | URL: GET/POST /login<br>URL: POST /logout | ログイン成功で / にリダイレクト。<br>ログアウトでセッション破棄しログイン画面へ。 | Fortifyログインビューを提供。<br>auth ミドルウェアで保護されたルートへのアクセス制御。<br>/logout POST でセッション破棄。 | app/Providers/FortifyServiceProvider<br>resources/views/auth/login.blade.php<br>routes/web.php | 基本 |
+| 2 | 書籍管理 | BK01 | 書籍一覧表示 | 全書籍をページネーション付きで一覧表示する。 | URL: GET / または GET /books<br>認証: 不要 | 書籍一覧が10件/ページでページネーション表示される。<br>各書籍にジャンルが表示される。 | Book::with("genres")->latest()->paginate(10) で書籍を取得し books.index ビューを返す。<br>N+1対策としてgenresをEager Loading。 | routes/web.php<br>app/Http/Controllers/BookController@index<br>resources/views/books/index.blade.php | 基本 |
+| | | BK02 | 書籍詳細表示 | 書籍の詳細情報をレビュー・ジャンルと共に表示する。 | URL: GET /books/{book}<br>認証: 不要 | 書籍詳細画面にタイトル・著者・ISBN・出版日・説明・画像・ジャンル・レビュー一覧が表示される。<br>お気に入り・いいね操作が可能（認証時）。 | ルートモデルバインディングで Book を取得。<br>$book->load(["reviews.user", "genres"]) でリレーションを読み込み。<br>books.show ビューを返す。 | routes/web.php<br>app/Http/Controllers/BookController@show<br>resources/views/books/show.blade.php | 基本 |
+| | | BK03 | 書籍登録 | 認証ユーザーが新しい書籍を登録し、ジャンルを紐付けられる。 | URL: GET /books/create（フォーム）<br>URL: POST /books（登録）<br>認証: 必須<br>バリデーション: StoreBookRequest | 登録成功時、書籍詳細画面にリダイレクトし「書籍を登録しました。」と表示。<br>バリデーションエラー時はフォームに戻りエラー表示。 | StoreBookRequest でバリデーション。<br>$request->user()->books()->create($bookData) で書籍作成（user_id自動設定）。<br>$book->genres()->attach($genres) でジャンル紐付け。 | routes/web.php<br>app/Http/Controllers/BookController@create,store<br>app/Http/Requests/StoreBookRequest<br>resources/views/books/create.blade.php | 基本 |
+| | | BK04 | 書籍編集 | 書籍の作成者のみが書籍情報を編集できる。 | URL: GET /books/{book}/edit（フォーム）<br>URL: PUT /books/{book}（更新）<br>認証: 必須<br>認可: BookPolicy@update（作成者のみ）<br>バリデーション: UpdateBookRequest | 更新成功時、書籍詳細画面にリダイレクトし「書籍情報を更新しました。」と表示。<br>他ユーザーは403エラー。 | $this->authorize("update", $book) で認可チェック。<br>$book->update($request->validated()) で更新。<br>$book->genres()->sync($request->genres) でジャンル同期。 | routes/web.php<br>app/Http/Controllers/BookController@edit,update<br>app/Http/Requests/UpdateBookRequest<br>app/Policies/BookPolicy<br>resources/views/books/edit.blade.php | 基本 |
+| | | BK05 | 書籍削除 | 書籍の作成者のみが書籍を削除できる。 | URL: DELETE /books/{book}<br>認証: 必須<br>認可: BookPolicy@delete（作成者のみ） | 削除成功時、書籍一覧にリダイレクトし「書籍を削除しました。」と表示。<br>関連レビュー・お気に入り・ジャンル紐付けはカスケード削除。<br>他ユーザーは403エラー。 | $this->authorize("delete", $book) で認可チェック。<br>$book->delete() で削除。<br>外部キーのON DELETE CASCADEにより関連データも削除。 | routes/web.php<br>app/Http/Controllers/BookController@destroy<br>app/Policies/BookPolicy | 基本 |
+| 3 | レビュー管理 | RV01 | レビュー投稿 | 認証ユーザーが書籍にレビュー（評価+コメント）を投稿できる。 | URL: POST /books/{book}/reviews<br>認証: 必須<br>バリデーション: StoreReviewRequest | 投稿成功時、書籍詳細画面にリダイレクトし「レビューを投稿しました。」と表示。<br>ゲストはログイン画面にリダイレクト。 | StoreReviewRequest でバリデーション。<br>$book->reviews()->create(['user_id' => Auth::id(), 'rating' => ..., 'comment' => ...]) でレビュー作成。 | routes/web.php<br>app/Http/Controllers/ReviewController@store<br>app/Http/Requests/StoreReviewRequest | 基本 |
+| | | RV02 | レビュー編集 | レビューの投稿者のみがレビューを編集できる。 | URL: GET /reviews/{review}/edit（フォーム）<br>URL: PUT /reviews/{review}（更新）<br>認証: 必須<br>認可: ReviewPolicy@update（投稿者のみ）<br>バリデーション: UpdateReviewRequest | 更新成功時、書籍詳細画面にリダイレクトし「レビューを更新しました。」と表示。<br>他ユーザーは403エラー。 | $this->authorize('update', $review) で認可チェック。<br>$review->update(['rating' => ..., 'comment' => ...]) で更新。 | routes/web.php<br>app/Http/Controllers/ReviewController@edit,update<br>app/Http/Requests/UpdateReviewRequest<br>app/Policies/ReviewPolicy<br>resources/views/reviews/edit.blade.php | 基本 |
+| | | RV03 | レビュー削除 | レビューの投稿者のみがレビューを削除できる。 | URL: DELETE /reviews/{review}<br>認証: 必須<br>認可: ReviewPolicy@delete（投稿者のみ） | 削除成功時、書籍詳細画面にリダイレクトし「レビューを削除しました。」と表示。<br>関連いいねはカスケード削除。<br>他ユーザーは403エラー。 | $this->authorize('delete', $review) で認可チェック。<br>$review->delete() で削除。<br>外部キーのON DELETE CASCADEにより関連いいねも削除。 | routes/web.php<br>app/Http/Controllers/ReviewController@destroy<br>app/Policies/ReviewPolicy | 基本 |
+| 4 | お気に入り | FV01 | お気に入り登録/解除（トグル） | 認証ユーザーが書籍をお気に入りに追加/解除できる。<br>同一操作でトグル動作する。 | URL: POST /books/{book}/favorites<br>認証: 必須 | お気に入り追加時はfavoritesテーブルにレコード追加、解除時は削除。<br>操作後、元のページにリダイレクト。<br>ゲストはログイン画面にリダイレクト。 | Auth::user()->favoriteBooks()->toggle($book->id) でトグル処理。<br>return back() で元のページに戻る。 | routes/web.php<br>app/Http/Controllers/FavoriteController@toggle | 基本 |
+| | | FV02 | お気に入り一覧表示 | 認証ユーザーの全お気に入り書籍を一覧表示する。 | URL: GET /favorites<br>認証: 必須 | ユーザーのお気に入り書籍がページネーション（10件/ページ）で表示される。 | Auth::user()->favoriteBooks()->paginate(10) でお気に入り書籍を取得。<br>favorites.index ビューを返す。 | routes/web.php<br>app/Http/Controllers/FavoriteController@index<br>resources/views/favorites/index.blade.php | 基本 |
+| 5 | いいね | LK01 | レビューいいね登録/解除（トグル） | 認証ユーザーがレビューにいいねを追加/解除できる。<br>同一操作でトグル動作する。 | URL: POST /reviews/{review}/like<br>認証: 必須 | いいね追加時はreview_likesテーブルにレコード追加、解除時は削除。<br>操作後、元のページにリダイレクト。<br>ゲストはログイン画面にリダイレクト。 | Auth::user()->likedReviews()->toggle($review->id) でトグル処理。<br>return back() で元のページに戻る。 | routes/web.php<br>app/Http/Controllers/ReviewLikeController@toggle | 基本 |
+| 6 | ジャンル管理 | GN01 | ジャンル一覧表示 | 認証ユーザーが全ジャンルを書籍数付きで一覧表示する。 | URL: GET /genres<br>認証: 必須 | ジャンル一覧が各ジャンルの書籍数と共に表示される。 | Genre::withCount('books')->get() でジャンルを書籍数付きで取得。<br>genres.index ビューを返す。 | routes/web.php<br>app/Http/Controllers/GenreController@index<br>resources/views/genres/index.blade.php | 基本 |
+| | | GN02 | ジャンル詳細（ジャンル内書籍一覧） | ジャンルに紐づく書籍をページネーション付きで表示する。 | URL: GET /genres/{genre}<br>認証: 不要 | ジャンル名と紐づく書籍がページネーション（10件/ページ）で表示される。 | ルートモデルバインディングで Genre を取得。<br>$genre->books()->with('genres')->paginate(10) で書籍を取得。<br>genres.show ビューを返す。 | routes/web.php<br>app/Http/Controllers/GenreController@show<br>resources/views/genres/show.blade.php | 基本 |
+| | | GN03 | ジャンル登録 | 認証ユーザーが新しいジャンルを登録できる。 | URL: GET /genres/create（フォーム）<br>URL: POST /genres（登録）<br>認証: 必須<br>バリデーション: StoreGenreRequest | 登録成功時、ジャンル一覧にリダイレクトし「ジャンルを作成しました。」と表示。<br>名前重複時はバリデーションエラー。 | StoreGenreRequest でバリデーション。<br>Genre::create($request->validated()) でジャンル作成。 | routes/web.php<br>app/Http/Controllers/GenreController@create,store<br>app/Http/Requests/StoreGenreRequest<br>resources/views/genres/create.blade.php | 基本 |
+| | | GN04 | ジャンル編集 | 認証ユーザーがジャンル名を編集できる。 | URL: GET /genres/{genre}/edit（フォーム）<br>URL: PUT /genres/{genre}（更新）<br>認証: 必須<br>バリデーション: UpdateGenreRequest | 更新成功時、ジャンル一覧にリダイレクトし「ジャンルを更新しました。」と表示。<br>名前重複時はバリデーションエラー（自身を除外）。 | UpdateGenreRequest でバリデーション（unique制約で自身を除外）。<br>$genre->update($request->validated()) で更新。 | routes/web.php<br>app/Http/Controllers/GenreController@edit,update<br>app/Http/Requests/UpdateGenreRequest<br>resources/views/genres/edit.blade.php | 基本 |
+| | | GN05 | ジャンル削除 | 認証ユーザーがジャンルを削除できる。<br>ただし書籍が紐付いている場合は削除不可。 | URL: DELETE /genres/{genre}<br>認証: 必須<br>制約: 書籍が紐付いている場合は削除を拒否 | 書籍紐付きなし: ジャンル一覧にリダイレクトし「ジャンルを削除しました。」と表示。<br>書籍紐付きあり: 「このジャンルには書籍が紐付いているため削除できません。」とエラー表示。 | $genre->books()->count() > 0 のチェック。<br>紐付きあり: redirect with error。<br>紐付きなし: $genre->delete() 後 redirect with success。 | routes/web.php<br>app/Http/Controllers/GenreController@destroy | 基本 |
+| 7 | ランキング | RK01 | 書籍ランキング表示 | レビュー平均評価のTOP10書籍をランキング表示する。 | URL: GET /ranking<br>認証: 不要 | レビューが存在する書籍が平均評価の降順でTOP10表示される。<br>レビューがない書籍は表示されない。 | Book::select('books.*', DB::raw('AVG(reviews.rating) as average_rating'))<br>->join('reviews', 'books.id', '=', 'reviews.book_id')<br>->groupBy('books.id')<br>->orderByDesc('average_rating')<br>->take(10)->get() でランキング取得。 | routes/web.php<br>app/Http/Controllers/RankingController@index<br>resources/views/ranking/index.blade.php | 基本 |
+| - | ★ 書籍管理 | BK01 | ★ 書籍一覧表示<br>【変更】 | 基本機能に加え、検索・フィルタ・ソート・CSVエクスポートボタンを追加する。 | URL: GET / または GET /books<br>認証: 不要<br><br>検索パラメータ:<br>keyword（任意）: タイトル・著者で部分一致検索<br>genre（任意）: ジャンルIDで絞り込み<br>sort（任意）: latest/oldest/title/rating | 検索条件に合致する書籍が表示される。<br>検索条件はページネーションに引き継がれる。<br>CSVエクスポートボタンが表示される。 | Builder::when() を使用して動的にクエリを構築。<br>keyword: title, author に対して LIKE 検索。<br>genre: whereHas('genres', ...) で絞り込み。<br>sort: orderBy() で並び替え。<br>rating の場合は withAvg + orderByDesc('reviews_avg_rating')。 | routes/web.php<br>app/Http/Controllers/BookController@index<br>resources/views/books/index.blade.php | ★ 応用 |
+| - | ★ 書籍管理 | BK03 | ★ 書籍登録<br>【変更】 | 基本機能に加え、ISBN検索フォームを追加する。 | URL: GET /books/create（フォーム）<br>URL: POST /books（登録）<br>認証: 必須 | ISBN-13入力+検索ボタンで書籍情報を自動取得し、フォームに入力される。 | JavaScriptが /books/isbn/{isbn} にリクエストを送信し、取得した書籍情報をフォームに自動入力。<br>バックエンドの変更はISBN検索機能（IS01）に集約。 | resources/views/books/create.blade.php | ★ 応用 |
+| 8 | ★ 書籍検索・フィルタ | SR01 | ★ キーワード検索 | 書籍一覧でキーワード（タイトル・著者）による部分一致検索を行う。 | URL: GET /books?keyword=xxx<br>認証: 不要 | キーワードにマッチする書籍のみが表示される。<br>マッチしない書籍は非表示。 | Builder::when($keyword, ...) で keyword が存在する場合のみ WHERE句を追加。<br>title, author に対して LIKE '%keyword%' 検索。 | app/Http/Controllers/BookController@index | ★ 応用 |
+| | | SR02 | ★ ジャンルフィルタ | 書籍一覧で選択したジャンルに紐付く書籍のみを表示する。 | URL: GET /books?genre=xxx<br>認証: 不要 | 選択したジャンルの書籍のみが表示される。 | Builder::when($genre, ...) で genre が存在する場合 whereHas('genres', fn($q) => $q->where('genres.id', $genre)) を追加。 | app/Http/Controllers/BookController@index | ★ 応用 |
+| | | SR03 | ★ ソート | 書籍一覧の並び順を変更する。 | URL: GET /books?sort=xxx<br>認証: 不要<br><br>ソートオプション:<br>latest: 登録日が新しい順（デフォルト）<br>oldest: 登録日が古い順<br>title: タイトル昇順<br>rating: 評価が高い順 | 指定した並び順で書籍が表示される。<br>rating の場合、レビューがない書籍は最後に表示。 | sort 値に応じて orderBy() を変更。<br>rating: withAvg('reviews', 'rating')->orderByDesc('reviews_avg_rating')。<br>デフォルトは latest()->。 | app/Http/Controllers/BookController@index | ★ 応用 |
+| 9 | ★ CSVエクスポート | EX01 | ★ 書籍CSV出力 | 書籍一覧の検索結果をCSVファイルとしてダウンロードする。 | URL: GET /books/csv<br>ルート名: books.csv<br>認証: 必須<br><br>検索条件（keyword, genre, sort）を引き継ぐ | BOM付UTF-8のCSVファイルがダウンロードされる。<br>ファイル名: books_YYYYMMDD_HHMMSS.csv<br><br>ヘッダー7列:<br>ID / タイトル / 著者 / ISBN / 出版日 / ジャンル / 登録日<br><br>ジャンルは複数の場合カンマ区切りで出力。 | StreamedResponse を使用。<br>1. HTTPヘッダ（Content-Type: text/csv; charset=UTF-8, Content-Disposition）設定。<br>2. fopen('php://output', 'w') で出力ストリームを開く。<br>3. BOM（\xEF\xBB\xBF）を出力。<br>4. fputcsv() でヘッダー行を書き込む。<br>5. cursor() で1件ずつ書籍データを取得し fputcsv() で書き込む。 | routes/web.php<br>app/Http/Controllers/BookController@csvExport | ★ 応用 |
+| 10 | ★ ISBN検索 | IS01 | ★ Google Books API連携 | 書籍登録画面でISBN-13を入力し、Google Books APIから書籍情報を自動取得する。<br><br>※ Google Books APIキーの取得と .env / config 設定は、この機能の実装に内包される手順です（環境構築手順シートには含みません）。<br><br>.envに `GOOGLE_BOOKS_API_KEY=Your-API-Key` を追加し、config/services.php に `'google' => ['books_api_key' => env('GOOGLE_BOOKS_API_KEY')]` を設定する。 | URL: GET /books/isbn/{isbn}<br>ルート名: books.searchByIsbn<br>認証: 必須<br><br>URLパラメータ: isbn（13桁文字列）<br><br>外部API: Google Books API<br>https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key={API_KEY} | 成功時 200 OK:<br>title, author, published_date, description, image_url をJSONで返却。<br><br>バリデーションエラー 400:<br>{"error": "ISBNは13桁で入力してください。"}<br><br>書籍見つからず 404:<br>{"error": "書籍が見つかりませんでした。"}<br><br>API通信エラー 500:<br>{"error": "API通信エラーが発生しました。"} | Http::get() で Google Books API を呼び出し。<br>q パラメータに isbn:{isbn}、key パラメータに APIキーを指定。<br><br>成功時（successful() かつ totalItems > 0）:<br>items[0].volumeInfo から書籍情報を抽出してJSONで返す。<br><br>自動入力マッピング:<br>volumeInfo.title → title<br>volumeInfo.authors[0] → author<br>volumeInfo.publishedDate → published_date<br>volumeInfo.description → description<br>volumeInfo.imageLinks.thumbnail → image_url | routes/web.php<br>app/Http/Controllers/BookController@searchByIsbn | ★ 応用 |
+| 11 | ★ マイ読書レポート | RP01 | ★ 読書統計ダッシュボード | ログインユーザーの読書活動に関する統計情報を表示する。<br><br>Collectionメソッド活用必須（map/filter/groupBy/flatMap/sortByDesc/take/pluck/unique/avg/count/values）。 | URL: GET /reports<br>ルート名: reports.index<br>認証: 必須 | 4種の統計情報が表示される：<br><br>1. 基本サマリー: 総レビュー数、読了冊数（ユニーク書籍数）、平均評価点<br><br>2. 評価分布: 1〜5星ごとの件数を横バーで表示<br><br>3. 高評価書籍TOP5: 4星以上の書籍を評価の高い順に最大5件表示（書籍詳細へのリンク付き）<br><br>4. ジャンル別評価傾向TOP5: ジャンルごとの平均評価と件数を高い順に最大5件表示（ジャンル詳細へのリンク付き） | データ取得: Auth::user()->reviews()->with('book.genres')->get()<br><br>基本サマリー:<br>$reviews->count()（総レビュー数）<br>$reviews->pluck('book_id')->unique()->count()（読了冊数）<br>$reviews->avg('rating')（平均評価）<br><br>評価分布:<br>$reviews->groupBy('rating')->map(fn($g) => $g->count())<br>存在しない評価は0で補完。<br><br>高評価TOP5:<br>$reviews->filter(fn($r) => $r->rating >= 4)->sortByDesc('rating')->take(5)->map(...)<br><br>ジャンル別TOP5:<br>$reviews->flatMap(...)でBook↔Genre展開→groupBy('genre_id')->map(...)で集計→sortByDesc('average_rating')->take(5) | routes/web.php<br>app/Http/Controllers/ReportController@index<br>resources/views/reports/index.blade.php | ★ 応用 |
+| 12 | ★ 公開API | AP01 | ★ 書籍一覧API | 外部アプリケーション向けに書籍一覧をJSON形式で提供する。<br><br>※ Sanctumは不要（認証なしの公開API）。 | URL: GET /api/v1/books<br>認証: 不要<br><br>パラメータ:<br>keyword（任意）: タイトル・著者で検索<br>genre_id（任意）: ジャンルIDで絞り込み<br>page（任意）: ページ番号（デフォルト: 1）<br>per_page（任意）: 件数/ページ（デフォルト: 20、最大: 100） | 書籍一覧がJSON形式で返却される。<br>各書籍にジャンル、平均評価、レビュー件数を含む。<br>ページネーション情報（meta）を含む。 | Book::query() で検索条件に応じたクエリを構築。<br>paginate($perPage) で結果を返す。<br><br>BookResource/GenreResourceでレスポンスを整形。<br>BookCollectionでコレクションをラップ。 | routes/api.php<br>app/Http/Controllers/Api/V1/BookController@index<br>app/Http/Resources/Api/V1/BookResource<br>app/Http/Resources/Api/V1/BookCollection<br>app/Http/Resources/Api/V1/GenreResource | ★ 応用 |
+| | | AP02 | ★ 書籍詳細API | 外部アプリケーション向けに書籍詳細をJSON形式で提供する。 | URL: GET /api/v1/books/{book}<br>認証: 不要 | 書籍詳細がJSON形式で返却される。<br>ジャンル・レビュー（ユーザー名・評価・コメント・投稿日時）を含む。<br><br>存在しない場合は404エラー:<br>{"error": "書籍が見つかりませんでした。"} | load(["reviews.user", "genres"]) で関連情報をロード。<br>BookResource/ReviewResource/GenreResourceでレスポンスを整形。 | routes/api.php<br>app/Http/Controllers/Api/V1/BookController@show<br>app/Http/Resources/Api/V1/BookResource<br>app/Http/Resources/Api/V1/ReviewResource | ★ 応用 |
+
+---
+
+## 7. バリデーションルール
+
+本模擬案件で実装する各種バリデーションの詳細仕様です。
+赤字（★マーク）は応用要件です。基本要件実装後に着手してください。
+
+| 対象機能 | 入力項目 | ルール | 基本/応用 |
+|---|---|---|---|
+| 書籍登録<br>(StoreBookRequest) | title | required / string / max:255 | 基本 |
+| | author | required / string / max:255 | 基本 |
+| | isbn | required / string / size:13 / unique:books,isbn | 基本 |
+| | published_date | required / date | 基本 |
+| | description | nullable / string | 基本 |
+| | image_url | nullable / url | 基本 |
+| | genres | required / array | 基本 |
+| | genres.* | exists:genres,id | 基本 |
+| 書籍編集<br>(UpdateBookRequest) | title | required / string / max:255 | 基本 |
+| | author | required / string / max:255 | 基本 |
+| | isbn | required / string / size:13 / unique:books,isbn<br>（自身を除外: Rule::unique('books')->ignore($this->book)） | 基本 |
+| | published_date | required / date | 基本 |
+| | description | nullable / string | 基本 |
+| | image_url | nullable / url | 基本 |
+| | genres | required / array | 基本 |
+| | genres.* | exists:genres,id | 基本 |
+| レビュー投稿<br>(StoreReviewRequest) | rating | required / integer / min:1 / max:5 | 基本 |
+| | comment | nullable / string / max:1000 | 基本 |
+| レビュー編集<br>(UpdateReviewRequest) | rating | required / integer / min:1 / max:5 | 基本 |
+| | comment | nullable / string / max:1000 | 基本 |
+| ジャンル登録<br>(StoreGenreRequest) | name | required / string / max:255 / unique:genres,name | 基本 |
+| ジャンル編集<br>(UpdateGenreRequest) | name | required / string / max:255 / unique:genres,name<br>（自身を除外: Rule::unique('genres')->ignore($this->genre)） | 基本 |
+| ユーザー登録 | name | required / string / max:255 | 基本 |
+| | email | required / email / max:255 / unique:users,email | 基本 |
+| | password | Fortify標準（8文字以上・確認用一致） | 基本 |
+| ログイン | email | required / email | 基本 |
+| | password | required | 基本 |
+| ★ 書籍登録<br>(StoreBookRequest) | isbn | ★ nullable / string / size:13 / unique:books,isbn（required→nullable変更） | ★ 応用 |
+| | published_date | ★ nullable / date（required→nullable変更） | ★ 応用 |
+| | image_url | ★ nullable / url / max:255（max:255追加） | ★ 応用 |
+| | genres | ★ required / array / min:1（min:1追加） | ★ 応用 |
+| ★ 書籍編集<br>(UpdateBookRequest) | isbn | ★ nullable / string / size:13 / unique:books,isbn<br>（自身を除外: Rule::unique('books')->ignore($this->book)）（required→nullable変更） | ★ 応用 |
+| | published_date | ★ nullable / date（required→nullable変更） | ★ 応用 |
+| | image_url | ★ nullable / url / max:255（max:255追加） | ★ 応用 |
+| | genres | ★ required / array / min:1（min:1追加） | ★ 応用 |
+
+### バリデーションメッセージ（応用）
+
+★ 応用機能の実装時に、全FormRequestに `messages()` メソッドを追加し、日本語のバリデーションメッセージを定義します。
+
+| FormRequest | メッセージ定義 |
+|---|---|
+| StoreBookRequest<br>UpdateBookRequest | title.required: タイトルは必須です。<br>title.string: タイトルは文字列で入力してください。<br>title.max: タイトルは255文字以内で入力してください。<br>author.required: 著者名は必須です。<br>author.string: 著者名は文字列で入力してください。<br>author.max: 著者名は255文字以内で入力してください。<br>isbn.string: ISBNは文字列で入力してください。<br>isbn.size: ISBNは13桁で入力してください。<br>isbn.unique: そのISBNは既に使用されています。<br>published_date.date: 出版日は有効な日付形式で入力してください。<br>description.string: 概要は文字列で入力してください。<br>image_url.url: 画像URLは有効なURL形式で入力してください。<br>image_url.max: 画像URLは255文字以内で入力してください。<br>genres.required: ジャンルは1つ以上選択してください。<br>genres.array: ジャンルは配列で入力してください。<br>genres.min: ジャンルは1つ以上選択してください。<br>genres.*.exists: 選択されたジャンルは存在しません。 |
+| StoreReviewRequest<br>UpdateReviewRequest | rating.required: 評価は必須です。<br>rating.integer: 評価は整数で入力してください。<br>rating.min: 評価は1以上で入力してください。<br>rating.max: 評価は5以下で入力してください。<br>comment.string: コメントは文字列で入力してください。<br>comment.max: コメントは1000文字以内で入力してください。 |
+| StoreGenreRequest<br>UpdateGenreRequest | name.required: ジャンル名は必須です。<br>name.string: ジャンル名は文字列で入力してください。<br>name.max: ジャンル名は255文字以内で入力してください。<br>name.unique: そのジャンル名は既に使用されています。 |
+
+---
+
+## 8. シーディング要件
+
+本模擬案件で実装するシーディングの詳細仕様です。
+本要件を忘れてしまいますと、採点において差し戻しが発生する場合があるのでご注意ください。
+赤字（★マーク）は応用要件です。基本要件実装後に着手してください。
+
+| 対象 | 仕様 | 基本/応用 |
+|---|---|---|
+| UserSeeder | users テーブルに初期ユーザーを5件登録する。<br><br>name: 山田太郎, email: yamada@example.com, password: password<br>name: 鈴木花子, email: suzuki@example.com, password: password<br>name: 田中一郎, email: tanaka@example.com, password: password<br>name: 佐藤美咲, email: sato@example.com, password: password<br>name: 高橋健太, email: takahashi@example.com, password: password<br><br>firstOrCreate を使用し、email の重複を防ぐこと。 | 基本 |
+| GenreSeeder | genres テーブルにジャンルを固定で10件投入する。<br><br>内容: 「小説」「ビジネス」「技術書」「自己啓発」「エッセイ」「歴史」「科学」「芸術」「料理」「旅行」<br><br>firstOrCreate を使用し、name の重複を防ぐこと。 | 基本 |
+| BookSeeder | books テーブルに書籍データを11件投入する。<br>登録者は User::first()（山田太郎）とする。<br><br>1. 吾輩は猫である / 夏目漱石 / ISBN:9784101010014 / 1905-01-01 / ジャンル: 小説<br>2. 人を動かす / D・カーネギー / ISBN:9784422100524 / 1936-10-01 / ジャンル: ビジネス, 自己啓発<br>3. リーダブルコード / Dustin Boswell / ISBN:9784873115658 / 2012-06-23 / ジャンル: 技術書<br>4. 7つの習慣 / スティーブン・R・コヴィー / ISBN:9784863940246 / 2013-08-30 / ジャンル: ビジネス, 自己啓発<br>5. 坊っちゃん / 夏目漱石 / ISBN:9784101010021 / 1906-04-01 / ジャンル: 小説<br>6. サピエンス全史 / ユヴァル・ノア・ハラリ / ISBN:9784309226712 / 2016-09-08 / ジャンル: 歴史, 科学<br>7. Clean Code / Robert C. Martin / ISBN:9784048930598 / 2017-12-18 / ジャンル: 技術書<br>8. 嫌われる勇気 / 岸見一郎・古賀史健 / ISBN:9784478025819 / 2013-12-13 / ジャンル: 自己啓発<br>9. 火花 / 又吉直樹 / ISBN:9784163902302 / 2015-03-11 / ジャンル: 小説<br>10. FACTFULNESS / ハンス・ロスリング / ISBN:9784822289607 / 2019-01-11 / ジャンル: ビジネス, 科学<br>11. コンテナ物語 / マルク・レビンソン / ISBN:9784822251468 / 2007-01-18 / ジャンル: ビジネス, 歴史<br><br>各書籍に description と image_url も設定すること。<br>firstOrCreate（ISBN重複防止）と genres()->sync() を使用。 | 基本 |
+| ReviewSeeder | reviews テーブルにレビューデータを32件投入する。<br><br>5人のユーザーが11冊の書籍に対してレビューを投稿。<br>rating は 3〜5 の範囲。<br>各書籍に2〜4件のレビューを配分。<br>具体的なコメント内容を設定すること。<br><br>firstOrCreate（book_id + user_id の重複防止）を使用。 | 基本 |
+| FavoriteSeeder | favorites テーブルにお気に入りデータを投入する。<br><br>各ユーザーに3〜5冊のお気に入りを設定。<br>syncWithoutDetaching を使用。 | 基本 |
+| ReviewLikeSeeder | review_likes テーブルにいいねデータを投入する。<br><br>各レビューに0〜3人のユーザーがいいね（自分のレビューを除く）。<br>syncWithoutDetaching を使用。 | 基本 |
+| DatabaseSeeder | 上記 Seeder を DatabaseSeeder の run() で依存関係を考慮した順番に呼び出す。<br><br>実行順:<br>1. UserSeeder<br>2. GenreSeeder<br>3. BookSeeder<br>4. ReviewSeeder<br>5. FavoriteSeeder<br>6. ReviewLikeSeeder<br><br>`php artisan db:seed` でまとめて投入できるようにする。 | 基本 |
+| ★ GenreSeeder | ジャンル名を全10件変更する。<br><br>変更後:<br>「文学・小説」「ビジネス・経済」「自己啓発」「コンピュータ・IT」「科学・テクノロジー」「歴史・地理」「芸術・エンターテインメント」「健康・医学」「料理・グルメ」「旅行・ガイド」<br><br>`firstOrCreate` → `create()` に変更。 | ★ 応用 |
+| ★ UserSeeder | `firstOrCreate` → `create()` に変更。 | ★ 応用 |
+| ★ BookSeeder | ・登録者を `User::first()` → `$users->random()->id` に変更（ランダムユーザー割当）。<br>・ISBN1件変更: コンテナ物語のISBNを `9784822251468` → `9784822245566` に変更。<br>・ジャンル名を応用版のジャンル名に合わせて変更。<br>・`firstOrCreate` → `create()` に変更。<br>・`genres()->sync()` → `genres()->attach()` に変更。 | ★ 応用 |
+| ★ ReviewSeeder | ・レビュー件数をランダム化: 各書籍に2〜4件（`rand(2, 4)`）。<br>・投稿者をランダム化: `$users->random($reviewCount)` で選出。<br>・評価を1〜5の全範囲に拡大（基本の3〜5から変更）。<br>・コメントを評価別日本語テンプレート5段階に変更:<br>  5: 「素晴らしい本でした！」「人生が変わりました。」「何度も読み返しています。」<br>  4: 「とても参考になりました。」「読みやすくておすすめです。」「期待通りの内容でした。」<br>  3: 「普通でした。」「可もなく不可もなく。」「期待したほどではなかった。」<br>  2: 「少し期待外れでした。」「内容が薄い印象。」「もう少し深掘りしてほしかった。」<br>  1: 「残念ながら合いませんでした。」「期待と違いました。」<br>・`firstOrCreate` → `create()` に変更。 | ★ 応用 |
+| ★ FavoriteSeeder | ・お気に入り数をランダム化: 各ユーザー3〜5冊（`rand(3, 5)`）。<br>・`syncWithoutDetaching` → `attach()` に変更。 | ★ 応用 |
+| ★ ReviewLikeSeeder | ・いいね数をランダム化: 各レビュー0〜3件（`rand(0, 3)`）。<br>・`syncWithoutDetaching` → `attach()` に変更。 | ★ 応用 |
+| ★ DatabaseSeeder | 呼出順序を変更:<br><br>1. GenreSeeder（※UserSeederより先に変更）<br>2. UserSeeder<br>3. BookSeeder<br>4. ReviewSeeder<br>5. FavoriteSeeder<br>6. ReviewLikeSeeder | ★ 応用 |
+
+---
+
+## 9. テスト要件
+
+このプロジェクトで実装するべきテストの一覧です。
+赤字（★マーク）は応用要件です。基本要件実装後に着手してください。
+
+#### 全体要件
+
+- テストが全て通過すること
+- `sail artisan test --coverage` コマンドで表示されるテストカバレッジが60%超を目指すこと
+  ※実装されたテストケースごとに採点が行われるため、すべてのテストケースを書かなければ点数が入らないということはありません。
+- ★ 応用機能を含むテストカバレッジは **80%** 以上を目指すこと
+- ★ 外部APIテストでは `Http::fake()` を使用してモック化し、安定したテストを実現すること
+
+#### テスト要件
+
+| テスト種別 | カテゴリ | テスト対象 | 実装要件 | 基本/応用 |
+|---|---|---|---|---|
+| 単体テスト<br>(Unit Tests) | モデル | Userモデル関連 | Userモデルのリレーション（books, reviews, favoriteBooks, likedReviews）が正しく定義されていること。 | 基本 |
+| | モデル | Bookモデル関連 | Bookモデルのリレーション（user, reviews, genres, favoritedByUsers）が正しく定義されていること。 | 基本 |
+| | モデル | Reviewモデル関連 | Reviewモデルのリレーション（user, book, likedByUsers）が正しく定義されていること。 | 基本 |
+| 機能テスト<br>(Feature Tests) | 画面アクセス | 書籍一覧 | 書籍一覧ページ（/books）が正常に表示されること（200レスポンス）。 | 基本 |
+| | 画面アクセス | 書籍登録フォーム | 認証ユーザーのみが書籍登録フォーム（/books/create）を表示でき、ゲストはログインにリダイレクトされること。 | 基本 |
+| | 書籍CRUD | 書籍詳細 | 書籍詳細ページ（/books/{book}）が正常に表示され、書籍タイトルが画面に含まれること。 | 基本 |
+| | 書籍CRUD | 書籍登録 | 認証ユーザーが書籍を登録でき、ジャンルがbook_genreテーブルに紐付けられること。バリデーションエラー時は適切にエラーが返されること。 | 基本 |
+| | 書籍CRUD | 書籍編集 | 書籍所有者のみが編集でき、ジャンルの同期（sync）が正しく動作すること。他ユーザーがアクセスした場合は403 Forbiddenとなること。 | 基本 |
+| | 書籍CRUD | 書籍削除 | 書籍所有者のみが削除でき、削除後に書籍一覧にリダイレクトされること。DBからレコードが削除されること。 | 基本 |
+| | 書籍CRUD | 書籍検索 | 検索クエリに一致する書籍が検索結果に表示されること。 | 基本 |
+| | レビュー | レビュー投稿 | 認証ユーザーがレビューを投稿でき、reviewsテーブルにレコードが作成されること。ゲストはログインにリダイレクトされること。ratingのバリデーション（1〜5の範囲）が動作すること。 | 基本 |
+| | レビュー | レビュー編集 | レビュー投稿者のみが編集フォームを表示・更新でき、他ユーザーは403 Forbiddenとなること。 | 基本 |
+| | レビュー | レビュー削除 | レビュー投稿者のみが削除でき、他ユーザーは403 Forbiddenとなること。 | 基本 |
+| | ジャンル | ジャンル一覧 | ジャンル一覧ページが正常に表示されること。 | 基本 |
+| | ジャンル | ジャンル登録 | 認証ユーザーがジャンルを作成でき、genresテーブルにレコードが作成されること。バリデーションエラー時は適切にエラーが返されること。 | 基本 |
+| | ジャンル | ジャンル登録フォーム | 認証ユーザーがジャンル登録フォーム（/genres/create）を表示できること。 | 基本 |
+| | ジャンル | ジャンル詳細 | ジャンル詳細ページ（/genres/{genre}）でジャンルに紐づく書籍タイトルが表示されること。 | 基本 |
+| | ジャンル | ジャンル編集 | 認証ユーザーがジャンル名を更新でき、genresテーブルのレコードが更新されること。編集フォームが表示できること。 | 基本 |
+| | ジャンル | ジャンル削除制約 | 書籍が紐付いているジャンルは削除できず、エラーメッセージが表示されること。紐付きがないジャンルは正常に削除できること。 | 基本 |
+| | お気に入り | お気に入り追加 | 認証ユーザーがお気に入りを追加でき、favoritesテーブルにレコードが作成されること。 | 基本 |
+| | お気に入り | お気に入り解除 | 認証ユーザーがお気に入りを解除でき、favoritesテーブルからレコードが削除されること。 | 基本 |
+| | お気に入り | お気に入りトグル | お気に入りのトグル（追加→解除→追加）が正しく動作すること。 | 基本 |
+| | お気に入り | お気に入り一覧 | お気に入り一覧ページが正常に表示されること。 | 基本 |
+| | お気に入り | ゲスト制限 | ゲストがお気に入り操作を行うとログインにリダイレクトされること。 | 基本 |
+| | いいね | いいね追加 | 認証ユーザーがレビューにいいねを追加でき、review_likesテーブルにレコードが作成されること。 | 基本 |
+| | いいね | いいね解除 | 認証ユーザーがレビューのいいねを解除でき、review_likesテーブルからレコードが削除されること。 | 基本 |
+| | いいね | いいねトグル | いいねのトグル（追加→解除→追加）が正しく動作すること。 | 基本 |
+| | いいね | ゲスト制限 | ゲストがいいね操作を行うとログインにリダイレクトされること。 | 基本 |
+| | ランキング | ランキング表示 | ランキングページ（/ranking）が正常に表示され、レビューのある書籍タイトルが含まれること。 | 基本 |
+| | ランキング | ランキング順序 | 書籍が平均評価の降順で正しく並ぶこと。 | 基本 |
+| | 認証 | 認証済みリダイレクト | 認証済みユーザーがログインページにアクセスした場合、ホームにリダイレクトされること。ゲストはアクセス可能であること。 | 基本 |
+| ★ 機能テスト<br>(Feature Tests) | ★ 検索・フィルタ | ★ キーワード検索 | キーワード検索で該当書籍が表示され、非該当書籍が表示されないこと。assertSee / assertDontSee で検証。 | ★ 応用 |
+| | ★ 検索・フィルタ | ★ ジャンルフィルタ | ジャンルフィルタで該当ジャンルの書籍のみが表示されること。 | ★ 応用 |
+| | ★ ソート | ★ 書籍一覧ソート | 新着順（デフォルト）と古い順のソートが正しく動作すること（assertSeeInOrder）。タイトル昇順ソート（viewData）。評価順ソート（viewData）。 | ★ 応用 |
+| | ★ CSVエクスポート | ★ CSV出力 | 認証ユーザーがCSVをエクスポートでき、Content-Typeとファイル名が正しいこと（assertHeader）。検索条件がCSVの内容に反映されていること（streamedContent）。ゲストはログインにリダイレクトされること。 | ★ 応用 |
+| | ★ CSVエクスポート | ★ CSVソート | CSV出力が古い順・タイトル順・評価順でそれぞれ正しくソートされること。strpos() で出現位置を比較。 | ★ 応用 |
+| | ★ 書籍CRUD | ★ 書籍編集認可 | BookPolicy による認可テスト。所有者は can('update', $book) が true、他ユーザーは403 Forbidden。コントローラーの edit メソッドを直接呼び出し、View オブジェクトに正しい book と genres が渡されていること。 | ★ 応用 |
+| | ★ ISBN検索 | ★ 外部API連携 | Http::fake() で外部APIをモック化し、正常に書籍情報が返ること。13桁以外のISBNで400エラーが返ること。APIが空の結果を返した場合に404エラーが返ること。API通信例外時に500エラーが返ること。 | ★ 応用 |
+| | ★ マイ読書レポート | ★ レポート表示 | ゲストがレポートページにアクセスするとログインにリダイレクトされること。認証ユーザーの統計情報（summary, rating_distribution, top_rated_books, genre_ratings）が正しく計算されること。レビューがないユーザーの場合、各統計が0/空として安全に処理されること。 | ★ 応用 |
+
+---
+
+## 10. データ要件
+
+このセクションで定義された情報を管理するために、最適なテーブル構造を自分で設計し、ER図を作成してください。
+【重要】ER図をコーチに提出し、承認を得てから実装に進んでください。
+赤字（★マーク）は応用要件です。基本要件実装後に着手してください。
+
+| No. | データ名 | 説明 | 管理すべき情報 | 備考 | 基本/応用 |
+|---|---|---|---|---|---|
+| DR01 | 書籍情報 | ユーザーが登録する書籍 | タイトル（<=255）<br>著者（<=255）<br>ISBN（13桁、ユニーク）<br>出版日（date）<br>説明（text、任意）<br>画像URL（任意）<br>作成者ID | books テーブル。<br>app/Models/Book | 基本 |
+| DR02 | ジャンルマスタ | 書籍分類 | name（<=255、ユニーク） | genres テーブル。<br>database/seeders/GenreSeeder.php | 基本 |
+| DR03 | 書籍×ジャンル | 多対多紐付け | book_id, genre_id（複合主キー） | book_genre テーブル。<br>中間テーブル。 | 基本 |
+| DR04 | レビュー | 書籍へのレビュー | user_id<br>book_id<br>rating（1〜5）<br>comment（text） | reviews テーブル。<br>app/Models/Review | 基本 |
+| DR05 | お気に入り | ユーザーのお気に入り書籍 | user_id, book_id（複合主キー） | favorites テーブル。<br>中間テーブル。 | 基本 |
+| DR06 | いいね | レビューへのいいね | user_id, review_id（複合主キー） | review_likes テーブル。<br>中間テーブル。 | 基本 |
+| DR07 | ユーザー | アプリケーション利用者 | name（<=255）<br>email（<=255、ユニーク）<br>password（ハッシュ化）<br>remember_token<br>email_verified_at | users テーブル。<br>database/seeders/UserSeeder.php | 基本 |
+| DR08 | 認証補助 | パスワードリセットトークン等 | password_reset_tokens<br>personal_access_tokens<br>failed_jobs | Laravel標準マイグレーション。 | 基本 |
+| DR01 | ★ 書籍情報 | 【変更】 | isbn: NOT NULL → nullable に変更<br>published_date: NOT NULL → nullable に変更 | | ★ 応用 |
+| DR03 | ★ 書籍×ジャンル | 【変更】 | 複合主キー → id + timestamps 追加、unique制約に変更 | | ★ 応用 |
+| DR04 | ★ レビュー | 【変更】 | comment: NOT NULL → nullable に変更<br>user_id + book_id に unique制約を追加（1ユーザー1書籍1レビュー） | | ★ 応用 |
+| DR05 | ★ お気に入り | 【変更】 | 複合主キー → id + timestamps 追加、unique制約に変更 | | ★ 応用 |
+| DR06 | ★ いいね | 【変更】 | 複合主キー → id + timestamps 追加、unique制約に変更 | | ★ 応用 |
+
+---
+
+## 11. テーブル仕様書
+
+こちらには模擬案件のテーブル仕様書を記載しています。
+こちらの仕様書は評価対象になりますので、提出時にアプリケーションと仕様が一致するか必ず確認してください。
+また、テーブル仕様書を参考にER図を作成し、右側のER図の箇所に添付してください。ER図はREADMEにも忘れず添付するようにしましょう。
+
+※ 以下は応用機能（Advanced）実装後の最終テーブル定義です。基本機能のみの状態との差分は補足欄に記載しています。
+
+### テーブル仕様
+
+| No. | テーブル名 | カラム名 | 型 | PRIMARY KEY | NOT NULL | FOREIGN KEY | 補足 |
+|---|---|---|---|---|---|---|---|
+| 1 | usersテーブル | | | | | | |
+| | | id | bigint unsigned | ○ | ○ | | $table->id() |
+| | | name | varchar(255) | | ○ | | |
+| | | email | varchar(255) | | ○ | | UNIQUE |
+| | | email_verified_at | timestamp | | | | NULL許可（nullable） |
+| | | password | varchar(255) | | ○ | | |
+| | | remember_token | varchar(100) | | | | $table->rememberToken()<br>（NULL許可） |
+| | | created_at | timestamp | | | | $table->timestamps() |
+| | | updated_at | timestamp | | | | $table->timestamps() |
+| | | | | | | | ※ 基本機能版ではFortifyの two_factor_secret, two_factor_recovery_codes, two_factor_confirmed_at の3カラムが追加されるが、応用機能版では不要。 |
+| 2 | genresテーブル | | | | | | |
+| | | id | bigint unsigned | ○ | ○ | | $table->id() |
+| | | name | varchar(255) | | ○ | | UNIQUE |
+| | | created_at | timestamp | | | | $table->timestamps() |
+| | | updated_at | timestamp | | | | $table->timestamps() |
+| 3 | booksテーブル | | | | | | |
+| | | id | bigint unsigned | ○ | ○ | | $table->id() |
+| | | user_id | bigint unsigned | | ○ | users.id | ON DELETE CASCADE<br>書籍の登録者 |
+| | | title | varchar(255) | | ○ | | |
+| | | author | varchar(255) | | ○ | | |
+| | | isbn | varchar(13) | | | | UNIQUE<br>NULL許可（nullable）<br>※ 基本機能版ではNOT NULL |
+| | | published_date | date | | | | NULL許可（nullable）<br>※ 基本機能版ではNOT NULL |
+| | | description | text | | | | NULL許可（nullable） |
+| | | image_url | varchar(255) | | | | NULL許可（nullable） |
+| | | created_at | timestamp | | | | $table->timestamps() |
+| | | updated_at | timestamp | | | | $table->timestamps() |
+| 4 | reviewsテーブル | | | | | | |
+| | | id | bigint unsigned | ○ | ○ | | $table->id() |
+| | | user_id | bigint unsigned | | ○ | users.id | ON DELETE CASCADE |
+| | | book_id | bigint unsigned | | ○ | books.id | ON DELETE CASCADE |
+| | | rating | tinyint | | ○ | | 1〜5の評価値<br>$table->tinyInteger('rating') |
+| | | comment | text | | | | NULL許可（nullable）<br>※ 基本機能版ではNOT NULL |
+| | | created_at | timestamp | | | | $table->timestamps() |
+| | | updated_at | timestamp | | | | $table->timestamps() |
+| | | | | | | | UNIQUE制約: (user_id, book_id)<br>1ユーザーにつき1書籍1レビュー |
+| 5 | book_genreテーブル | | | | | | ※ 基本機能版では複合主キー（id/timestampsなし） |
+| | | id | bigint unsigned | ○ | ○ | | $table->id()<br>※ 応用機能版で追加 |
+| | | book_id | bigint unsigned | | ○ | books.id | ON DELETE CASCADE |
+| | | genre_id | bigint unsigned | | ○ | genres.id | ON DELETE CASCADE |
+| | | created_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | updated_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | | | | | | UNIQUE制約: (book_id, genre_id) |
+| 6 | favoritesテーブル | | | | | | ※ 基本機能版では複合主キー（id/timestampsなし） |
+| | | id | bigint unsigned | ○ | ○ | | $table->id()<br>※ 応用機能版で追加 |
+| | | user_id | bigint unsigned | | ○ | users.id | ON DELETE CASCADE |
+| | | book_id | bigint unsigned | | ○ | books.id | ON DELETE CASCADE |
+| | | created_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | updated_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | | | | | | UNIQUE制約: (user_id, book_id) |
+| 7 | review_likesテーブル | | | | | | ※ 基本機能版では複合主キー（id/timestampsなし） |
+| | | id | bigint unsigned | ○ | ○ | | $table->id()<br>※ 応用機能版で追加 |
+| | | user_id | bigint unsigned | | ○ | users.id | ON DELETE CASCADE |
+| | | review_id | bigint unsigned | | ○ | reviews.id | ON DELETE CASCADE |
+| | | created_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | updated_at | timestamp | | | | $table->timestamps()<br>※ 応用機能版で追加 |
+| | | | | | | | UNIQUE制約: (user_id, review_id) |
+
+### ER図
+
+（ER図を添付してください）
+
+---
+
+## 12. API仕様書
+
+本模擬案件で実装する公開APIの仕様です。
+認証は不要です（Sanctumは使用しません）。
+本シートの内容は全て応用機能です。基本要件実装後に着手してください。
+
+### エンドポイント一覧
+
+| HTTPメソッド | URI | 説明 | 認証 |
+|---|---|---|---|
+| GET | /api/v1/books | 書籍一覧を取得する | 不要 |
+| GET | /api/v1/books/{book} | 書籍詳細を取得する | 不要 |
+
+### AP01: 書籍一覧API
+
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/books |
+| メソッド | GET |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 書籍一覧を取得する。検索・ページネーション対応 |
+
+リクエストパラメータ
+
+| パラメータ名 | 型 | 必須 | 説明 | 例 |
+|---|---|---|---|---|
+| keyword | string | 任意 | タイトル・著者での部分一致検索 | PHP |
+| genre_id | integer | 任意 | ジャンルIDでの絞り込み | 1 |
+| page | integer | 任意 | ページ番号（デフォルト: 1） | 2 |
+| per_page | integer | 任意 | 1ページあたりの件数（デフォルト: 20、最大: 100） | 20 |
+
+レスポンス
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 200 OK | 取得成功 | { "data": [{ "id": 1, "title": "パーフェクトPHP", "author": "小川 雄大", "isbn": "9784297124219", "published_date": "2021-10-19", "genres": [{"id": 1, "name": "技術書"}], "average_rating": 4.5, "review_count": 10 }], "meta": { "current_page": 1, "last_page": 5, "per_page": 20, "total": 100 } } |
+
+実装方法/補足
+
+| 内容 |
+|---|
+| Api\V1\BookController@index |
+| BookResource::collection() でページネーション付きレスポンス |
+| keyword は title/author を orWhere で部分一致検索 |
+| genre_id は whereHas('genres') でフィルタリング |
+| paginate($perPage) でページネーション（デフォルト20件、最大100件） |
+
+### AP02: 書籍詳細API
+
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/books/{book} |
+| メソッド | GET |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 指定IDの書籍詳細（ジャンル・レビュー含む）を取得する |
+
+リクエストパラメータ
+
+| パラメータ名 | 型 | 必須 | 説明 | 例 |
+|---|---|---|---|---|
+| book | integer (path) | 必須（URL） | 書籍ID | 5 |
+
+レスポンス
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 200 OK | 取得成功 | { "data": { "id": 1, "title": "パーフェクトPHP", "author": "小川 雄大", "isbn": "9784297124219", "published_date": "2021-10-19", "description": "...", "image_url": "...", "genres": [{"id": 1, "name": "技術書"}], "average_rating": 4.5, "reviews": [{"id": 1, "user_name": "山田太郎", "rating": 5, "comment": "とても参考になりました。", "created_at": "2026-01-01T12:00:00+00:00"}] } } |
+| 404 Not Found | IDが存在しない場合 | { "error": "書籍が見つかりませんでした。" } |
+
+実装方法/補足
+
+| 内容 |
+|---|
+| Api\V1\BookController@show |
+| ルートモデルバインディングで Book $book |
+| $book->load(['genres', 'reviews.user']) を BookResource でラップ |
+| 詳細時は description, image_url, reviews を追加で返却 |
+
+### API Resourceの構造
+
+| Resource | フィールド | データ元 |
+|---|---|---|
+| BookResource | id | $this->id |
+| | title | $this->title |
+| | author | $this->author |
+| | isbn | $this->isbn |
+| | published_date | $this->published_date |
+| | genres | GenreResource::collection($this->whenLoaded('genres')) |
+| | average_rating | round($this->whenAggregated('reviews', 'rating', 'avg'), 1) |
+| | review_count | (int) $this->whenCounted('reviews') |
+| BookResource（詳細時追加） | description | $this->when($this->relationLoaded('reviews'), $this->description) |
+| | image_url | $this->when($this->relationLoaded('reviews'), $this->image_url) |
+| | reviews | ReviewResource::collection($this->whenLoaded('reviews')) |
+| GenreResource | id | $this->id |
+| | name | $this->name |
+| ReviewResource | id | $this->id |
+| | user_name | $this->user->name |
+| | rating | $this->rating |
+| | comment | $this->comment |
+| | created_at | $this->created_at->toIso8601String() |
