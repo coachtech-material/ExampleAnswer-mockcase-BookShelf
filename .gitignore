@@ -17,3 +17,7 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+.DS_Store
+
+# Archive（旧ファイル保管用・ローカル参照のみ）
+関連ドキュメント/Archive/
