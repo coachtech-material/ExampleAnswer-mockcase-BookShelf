@@ -8,7 +8,6 @@ use App\Http\Requests\UpdateBookRequest;
 use App\Models\Genre;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
-use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
@@ -16,18 +15,6 @@ class BookController extends Controller
     {
         $books = Book::with("genres")->latest()->paginate(10);
         return view("books.index", compact("books"));
-    }
-
-    public function search(Request $request): View
-    {
-        $query = $request->input("query");
-        $books = Book::where("title", "like", "%{$query}%")
-            ->orWhere("author", "like", "%{$query}%")
-            ->with("genres")
-            ->latest()
-            ->paginate(10);
-
-        return view("books.index", compact("books", "query"));
     }
 
     public function create(): View

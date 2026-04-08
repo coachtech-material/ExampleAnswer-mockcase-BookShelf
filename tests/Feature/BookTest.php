@@ -20,17 +20,6 @@ class BookTest extends TestCase
             ->assertOk();
     }
 
-    public function test_book_search_returns_matching_results(): void
-    {
-        Book::factory()->create(['title' => 'Laravel Testing Guide']);
-        Book::factory()->create(['title' => 'Another Book']);
-
-        $this->get(route('books.search', ['query' => 'Laravel']))
-            ->assertOk()
-            ->assertSee('Laravel Testing Guide')
-            ->assertDontSee('Another Book');
-    }
-
     public function test_authenticated_user_can_view_create_form(): void
     {
         $user = User::factory()->create();

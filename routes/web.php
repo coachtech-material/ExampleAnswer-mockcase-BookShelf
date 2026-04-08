@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Route;
 // --- 1. 具体的な名前を持つ公開ルート (最優先) ---
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/search', [BookController::class, 'search'])->name('books.search');
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
 
 
