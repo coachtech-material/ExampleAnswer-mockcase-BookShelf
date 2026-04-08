@@ -14,9 +14,11 @@ class ReviewLikeSeeder extends Seeder
         $reviews = Review::all();
 
         foreach ($reviews as $review) {
-            $likeCount = rand(0, 3);
+            $candidates = $users->where('id', '!=', $review->user_id);
+            $maxLikes = min(3, $candidates->count());
+            $likeCount = rand(0, $maxLikes);
             if ($likeCount > 0) {
-                $likers = $users->random($likeCount);
+                $likers = $candidates->random($likeCount);
                 $review->likedByUsers()->attach($likers->pluck('id'));
             }
         }
