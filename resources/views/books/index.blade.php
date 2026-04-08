@@ -58,12 +58,6 @@
                             <a href="{{ route('books.index') }}" class="text-gray-600 hover:text-gray-900">
                                 リセット
                             </a>
-                            @auth
-                                <a href="{{ route('books.export') }}?{{ http_build_query(request()->query()) }}" 
-                                   class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-auto">
-                                    CSVエクスポート
-                                </a>
-                            @endauth
                         </div>
                     </form>
                 </div>

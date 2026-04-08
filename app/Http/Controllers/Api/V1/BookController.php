@@ -3,44 +3,110 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IndexBookRequest;
+use App\Http\Requests\Api\V1\StoreBookRequest;
+use App\Http\Requests\Api\V1\UpdateBookRequest;
+use App\Http\Resources\Api\V1\BookResource;
 use App\Models\Book;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class BookController extends Controller
 {
     /**
      * 書籍一覧を取得
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
-    public function index(Request $request): JsonResponse
+    public function index(IndexBookRequest $request): AnonymousResourceCollection
     {
-        $query = $request->input('query');
+        $query = Book::with('genres')
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating');
 
-        $books = Book::query()
-            ->with('genres')
-            ->when($query, function ($q, $query): void {
-                $q->where('title', 'like', "%{$query}%")
-                  ->orWhere('author', 'like', "%{$query}%");
-            })
-            ->latest()
-            ->paginate(10);
+        if ($request->filled('keyword')) {
+            $keyword = $request->input('keyword');
+            $query->where(function ($q) use ($keyword): void {
+                $q->where('title', 'like', "%{$keyword}%")
+                    ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
 
-        return response()->json($books);
+        if ($request->filled('genre_id')) {
+            $genreId = $request->input('genre_id');
+            $query->whereHas('genres', function ($q) use ($genreId): void {
+                $q->where('genres.id', $genreId);
+            });
+        }
+
+        $perPage = (int) $request->input('per_page', 20);
+        $books = $query->latest()->paginate($perPage);
+
+        return BookResource::collection($books);
     }
 
     /**
      * 書籍詳細を取得
-     *
-     * @param Book $book
-     * @return JsonResponse
      */
-    public function show(Book $book): JsonResponse
+    public function show(Book $book): BookResource
     {
         $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
 
-        return response()->json($book);
+        return new BookResource($book);
+    }
+
+    /**
+     * 書籍を新規登録（要 Sanctum 認証）
+     */
+    public function store(StoreBookRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $genreIds = $validated['genres'];
+        unset($validated['genres']);
+
+        $book = $request->user()->books()->create($validated);
+        $book->genres()->sync($genreIds);
+
+        $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
+
+        return (new BookResource($book))
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    /**
+     * 書籍を更新（要 Sanctum 認証 + 書籍所有者）
+     */
+    public function update(UpdateBookRequest $request, Book $book): BookResource
+    {
+        $this->authorize('update', $book);
+
+        $validated = $request->validated();
+        $genreIds = $validated['genres'];
+        unset($validated['genres']);
+
+        $book->update($validated);
+        $book->genres()->sync($genreIds);
+
+        $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
+
+        return new BookResource($book);
+    }
+
+    /**
+     * 書籍を削除（要 Sanctum 認証 + 書籍所有者）
+     */
+    public function destroy(Book $book): JsonResponse
+    {
+        $this->authorize('delete', $book);
+
+        $book->delete();
+
+        return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 }

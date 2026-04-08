@@ -25,9 +25,8 @@ Route::middleware('auth')->group(function () {
     // ジャンル管理
     Route::resource('genres', GenreController::class)->except(['show']);
 
-    // 書籍管理（createとexportは{book}より先に定義）
+    // 書籍管理（createは{book}より先に定義）
     Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
-    Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
     Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
     Route::post('/books', [BookController::class, 'store'])->name('books.store');
     Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');

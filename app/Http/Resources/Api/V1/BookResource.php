@@ -20,11 +20,13 @@ class BookResource extends JsonResource
             'author' => $this->author,
             'isbn' => $this->isbn,
             'published_date' => $this->published_date,
-            'description' => $this->when($this->relationLoaded('reviews'), $this->description),
-            'image_url' => $this->when($this->relationLoaded('reviews'), $this->image_url),
+            'description' => $this->description,
+            'image_url' => $this->image_url,
             'genres' => GenreResource::collection($this->whenLoaded('genres')),
-            'average_rating' => round($this->whenAggregated('reviews', 'rating', 'avg'), 1),
-            'review_count' => (int) $this->whenCounted('reviews'),
+            'average_rating' => $this->reviews_avg_rating !== null
+                ? round((float) $this->reviews_avg_rating, 1)
+                : null,
+            'review_count' => (int) ($this->reviews_count ?? 0),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
     }

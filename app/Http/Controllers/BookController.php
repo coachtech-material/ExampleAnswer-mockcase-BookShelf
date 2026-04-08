@@ -11,7 +11,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BookController extends Controller
 {
@@ -126,57 +125,6 @@ class BookController extends Controller
         $book->delete();
 
         return redirect()->route('books.index')->with('success', '書籍を削除しました。');
-    }
-
-    /**
-     * 書籍一覧をCSVでエクスポート（応用機能）
-     */
-    public function exportCsv(Request $request): StreamedResponse
-    {
-        $keyword = $request->input('keyword');
-        $genreId = $request->input('genre');
-
-        $query = Book::with('genres');
-
-        if ($keyword) {
-            $query->where(function ($q) use ($keyword): void {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
-            });
-        }
-
-        if ($genreId) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
-                $q->where('genres.id', $genreId);
-            });
-        }
-
-        $books = $query->get();
-
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="books_' . date('Ymd_His') . '.csv"',
-        ];
-
-        return response()->stream(function () use ($books): void {
-            $handle = fopen('php://output', 'w');
-            fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['ID', 'タイトル', '著者', 'ISBN', '出版日', 'ジャンル', '登録日']);
-
-            foreach ($books as $book) {
-                fputcsv($handle, [
-                    $book->id,
-                    $book->title,
-                    $book->author,
-                    $book->isbn ?? '',
-                    $book->published_date?->format('Y-m-d') ?? '',
-                    $book->genres->pluck('name')->implode(', '),
-                    $book->created_at->format('Y-m-d H:i:s'),
-                ]);
-            }
-
-            fclose($handle);
-        }, 200, $headers);
     }
 
     /**
