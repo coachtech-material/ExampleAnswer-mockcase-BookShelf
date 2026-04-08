@@ -100,7 +100,7 @@ class BookControllerTest extends TestCase
         $book1->genres()->attach($genre->id);
         $book2->genres()->attach($genre->id);
 
-        $response = $this->get(route('books.search', ['query' => 'Laravel']));
+        $response = $this->get(route('books.index', ['keyword' => 'Laravel']));
         $response->assertStatus(200);
         $response->assertSee('Laravel入門');
         $response->assertDontSee('PHP基礎');

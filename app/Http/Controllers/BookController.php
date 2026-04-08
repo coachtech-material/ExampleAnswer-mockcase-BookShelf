@@ -182,11 +182,9 @@ class BookController extends Controller
     /**
      * ISBN検索（Google Books API）（応用機能）
      */
-    public function fetch(Request $request): JsonResponse
+    public function searchByIsbn(string $isbn): JsonResponse
     {
-        $isbn = $request->input('isbn');
-
-        if (!$isbn || strlen($isbn) !== 13) {
+        if (strlen($isbn) !== 13) {
             return response()->json(['error' => 'ISBNは13桁で入力してください。'], 400);
         }
 

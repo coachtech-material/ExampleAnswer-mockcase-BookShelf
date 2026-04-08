@@ -28,7 +28,7 @@ Route::middleware('auth')->group(function () {
     // 書籍管理（createとexportは{book}より先に定義）
     Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
     Route::get('/books/export/csv', [BookController::class, 'exportCsv'])->name('books.export');
-    Route::get('/books/fetch', [BookController::class, 'fetch'])->name('books.fetch');
+    Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
     Route::post('/books', [BookController::class, 'store'])->name('books.store');
     Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
     Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
@@ -42,7 +42,7 @@ Route::middleware('auth')->group(function () {
 
     // お気に入り
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
-    Route::post('/books/{book}/favorite', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
 
     // いいね
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
