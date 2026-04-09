@@ -39,7 +39,7 @@ class BookRequestTest extends TestCase
         $response->assertSessionHasErrors('author');
     }
 
-    public function test_ISBNは13桁でなければならない(): void
+    public function test_isb_nは13桁でなければならない(): void
     {
         $user = User::factory()->create();
         $genre = Genre::factory()->create();

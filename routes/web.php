@@ -1,13 +1,12 @@
 <?php
 
 use App\Http\Controllers\BookController;
-use App\Http\Controllers\GenreController;
-use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\ReviewLikeController;
+use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReportController;
-
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
 
 // トップページ（書籍一覧）
@@ -15,7 +14,6 @@ Route::get('/', [BookController::class, 'index'])->name('home');
 
 // 書籍関連（認証不要）
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
-
 
 // ランキング（認証不要）
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
@@ -45,7 +43,6 @@ Route::middleware('auth')->group(function () {
 
     // いいね
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
-
 
     // マイ読書レポート
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

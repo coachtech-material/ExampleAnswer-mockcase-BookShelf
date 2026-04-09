@@ -25,7 +25,7 @@ class BookController extends Controller
         if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword): void {
                 $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
+                    ->orWhere('author', 'like', "%{$keyword}%");
             });
         }
 
@@ -147,7 +147,7 @@ class BookController extends Controller
             $response = Http::get($url);
             $data = $response->json();
 
-            if (!isset($data['items'][0])) {
+            if (! isset($data['items'][0])) {
                 return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
             }
 

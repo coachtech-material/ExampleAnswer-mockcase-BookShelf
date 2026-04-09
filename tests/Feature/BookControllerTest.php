@@ -245,7 +245,7 @@ class BookControllerTest extends TestCase
 
         $response->assertOk();
         $view = $response->viewData('book');
-        $this->assertInstanceOf(\App\Models\Book::class, $view);
+        $this->assertInstanceOf(Book::class, $view);
         $this->assertSame($book->id, $view->id);
 
         $genres = $response->viewData('genres');

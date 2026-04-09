@@ -16,7 +16,7 @@ class RedirectIfAuthenticatedTest extends TestCase
 
     public function test_authenticated_user_is_redirected_to_home(): void
     {
-        $middleware = new RedirectIfAuthenticated();
+        $middleware = new RedirectIfAuthenticated;
         $request = Request::create('/login', 'GET');
         $user = User::factory()->create();
 
@@ -31,7 +31,7 @@ class RedirectIfAuthenticatedTest extends TestCase
 
     public function test_guest_can_access_route(): void
     {
-        $middleware = new RedirectIfAuthenticated();
+        $middleware = new RedirectIfAuthenticated;
         $request = Request::create('/login', 'GET');
 
         $response = $middleware->handle($request, fn () => response('allowed'));
