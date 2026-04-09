@@ -145,6 +145,13 @@ class BookController extends Controller
 
         try {
             $response = Http::get($url);
+
+            if ($response->status() === 429) {
+                return response()->json([
+                    'error' => 'Google Books API のクォータを超過しました。.env に GOOGLE_BOOKS_API_KEY を設定してください。',
+                ], 429);
+            }
+
             $data = $response->json();
 
             if (! isset($data['items'][0])) {

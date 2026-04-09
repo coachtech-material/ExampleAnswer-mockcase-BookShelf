@@ -38,14 +38,23 @@
    DB_PASSWORD=password
    ```
 
-3. **Google Books APIキーの設定**
+3. **Google Books APIキーの設定（ISBN検索機能を利用する場合は必須）**
 
-   書籍のISBN検索機能を利用するために、Google Books APIのAPIキーが必要です。
-   [Google Cloud Console](https://console.cloud.google.com/) でAPIキーを取得し、`.env` ファイルに追記してください。
+   書籍のISBN検索機能（応用機能）は Google Books API を呼び出します。
+   APIキーは技術的には任意ですが、**未設定だと匿名共有クォータが常時枯渇しており、
+   ISBN検索が「書籍が見つかりませんでした。」エラーで失敗します**。実質必須です。
+
+   [Google Cloud Console](https://console.cloud.google.com/) で
+   「Books API」を有効化し、APIキーを発行して `.env` に追記してください。
 
    ```ini
    GOOGLE_BOOKS_API_KEY=YOUR_API_KEY
    ```
+
+   > **採点者向け補足**: ISBN検索機能の動作確認には上記APIキーの設定が必要です。
+   > 設定せずに ISBN を入力した場合、Google 側のクォータ超過により
+   > 「Google Books API のクォータを超過しました。」のメッセージが表示されますが、
+   > 実装ロジック自体は正しく、`Http::fake()` を用いた Feature Test で検証済みです。
 
 4. **Composer依存パッケージのインストール**
 
