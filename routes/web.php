@@ -54,4 +54,5 @@ Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show')
 // ジャンル別書籍一覧（認証不要）
 Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
-require __DIR__.'/auth.php';
+// 認証機能用ルート、RouteServiceProvider.php でミドルウェアを設定しているので必要ない
+// require __DIR__.'/auth.php';
