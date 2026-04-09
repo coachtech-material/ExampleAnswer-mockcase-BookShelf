@@ -172,8 +172,8 @@ return [
         AuthServiceProvider::class,
         // App\Providers\BroadcastServiceProvider::class,
         EventServiceProvider::class,
-        FortifyServiceProvider::class,
         RouteServiceProvider::class,
+        FortifyServiceProvider::class,
     ])->toArray(),
 
     /*
