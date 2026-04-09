@@ -43,23 +43,22 @@ class ReportController extends Controller
     /**
      * 評価分布（1〜5星ごとの件数）を計算する
      *
-     * @return array<int, int>
+     * @return Collection<int, int>
      */
-    private function calculateRatingDistribution(Collection $reviews): array
+    private function calculateRatingDistribution(Collection $reviews): Collection
     {
         $grouped = $reviews->groupBy('rating');
 
         return collect(range(1, 5))
-            ->map(fn ($rating) => $grouped->has($rating) ? $grouped[$rating]->count() : 0)
-            ->toArray();
+            ->map(fn ($rating) => $grouped->has($rating) ? $grouped[$rating]->count() : 0);
     }
 
     /**
      * 高評価書籍TOP5（4星以上）を計算する
      *
-     * @return array<int, array{id: int, title: string, author: string, rating: int}>
+     * @return Collection<int, array{id: int, title: string, author: string, rating: int}>
      */
-    private function calculateTopRatedBooks(Collection $reviews): array
+    private function calculateTopRatedBooks(Collection $reviews): Collection
     {
         return $reviews
             ->filter(fn ($review) => $review->rating >= 4)
@@ -71,8 +70,7 @@ class ReportController extends Controller
                 'author' => $review->book->author,
                 'rating' => $review->rating,
             ])
-            ->values()
-            ->toArray();
+            ->values();
     }
 
     /**
@@ -80,9 +78,9 @@ class ReportController extends Controller
      *
      * flatMap()で多対多リレーションを展開し、groupBy()で集計する
      *
-     * @return array<int, array{id: int, name: string, count: int, average_rating: float}>
+     * @return Collection<int, array{id: int, name: string, count: int, average_rating: float}>
      */
-    private function calculateGenreRatings(Collection $reviews): array
+    private function calculateGenreRatings(Collection $reviews): Collection
     {
         return $reviews
             // flatMap: 1レビュー → 複数ジャンルに展開（多対多の扱い）
@@ -101,7 +99,6 @@ class ReportController extends Controller
             ])
             ->sortByDesc('average_rating')
             ->take(5)
-            ->values()
-            ->toArray();
+            ->values();
     }
 }

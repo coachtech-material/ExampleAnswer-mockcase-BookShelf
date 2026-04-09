@@ -43,7 +43,7 @@
                             @foreach ($stats['rating_distribution'] as $index => $count)
                                 @php
                                     $rating = $index + 1;
-                                    $maxCount = max($stats['rating_distribution']) ?: 1;
+                                    $maxCount = $stats['rating_distribution']->max() ?: 1;
                                     $percentage = ($count / $maxCount) * 100;
                                 @endphp
                                 <div class="flex items-center">

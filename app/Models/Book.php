@@ -28,16 +28,13 @@ class Book extends Model
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'published_date' => 'date',
-        ];
-    }
+    protected $casts = [
+        'published_date' => 'date',
+    ];
 
     /**
      * 書籍を登録したユーザー
