@@ -12,7 +12,7 @@ class BookSeeder extends Seeder
     public function run(): void
     {
         $user = User::first();
-        
+
         $books = [
             [
                 'title' => '吾輩は猫である',
@@ -118,7 +118,7 @@ class BookSeeder extends Seeder
         foreach ($books as $bookData) {
             $genreNames = $bookData['genres'];
             unset($bookData['genres']);
-            
+
             $book = Book::firstOrCreate(
                 ['isbn' => $bookData['isbn']],
                 array_merge($bookData, ['user_id' => $user->id])

@@ -12,6 +12,7 @@ class ReviewLikeController extends Controller
     {
         // ユーザーがすでにいいねしていれば解除、していなければ登録を自動で行う
         Auth::user()->likedReviews()->toggle($review->id);
+
         return back();
     }
 }

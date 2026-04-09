@@ -30,4 +30,3 @@ class UserModelTest extends TestCase
         $this->assertTrue($user->likedReviews->contains($likedReview));
     }
 }
-

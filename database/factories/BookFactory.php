@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Book>
+ * @extends Factory<Book>
  */
 class BookFactory extends Factory
 {
@@ -26,4 +26,3 @@ class BookFactory extends Factory
         ];
     }
 }
-

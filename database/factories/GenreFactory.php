@@ -6,7 +6,7 @@ use App\Models\Genre;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Genre>
+ * @extends Factory<Genre>
  */
 class GenreFactory extends Factory
 {
@@ -19,4 +19,3 @@ class GenreFactory extends Factory
         ];
     }
 }
-

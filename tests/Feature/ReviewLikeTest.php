@@ -81,4 +81,3 @@ class ReviewLikeTest extends TestCase
             ->assertRedirect(route('login'));
     }
 }
-

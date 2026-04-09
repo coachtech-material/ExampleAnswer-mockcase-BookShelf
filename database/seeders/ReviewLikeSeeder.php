@@ -18,7 +18,7 @@ class ReviewLikeSeeder extends Seeder
             // 各レビューに0〜3人のユーザーがいいねする
             $likeCount = rand(0, 3);
             $likeUsers = $users->where('id', '!=', $review->user_id)->random(min($likeCount, $users->count() - 1));
-            
+
             foreach ($likeUsers as $user) {
                 $user->likedReviews()->syncWithoutDetaching([$review->id]);
             }

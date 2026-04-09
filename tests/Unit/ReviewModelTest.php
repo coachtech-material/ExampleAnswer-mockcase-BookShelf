@@ -25,4 +25,3 @@ class ReviewModelTest extends TestCase
         $this->assertTrue($review->likedByUsers->contains($liker));
     }
 }
-

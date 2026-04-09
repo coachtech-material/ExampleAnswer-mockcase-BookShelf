@@ -93,4 +93,3 @@ class FavoriteTest extends TestCase
             ->assertRedirect(route('login'));
     }
 }
-

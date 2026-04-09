@@ -12,12 +12,14 @@ class FavoriteController extends Controller
     {
         // ユーザーがすでにお気に入りにしていれば解除、していなければ登録を自動で行うメソッド
         Auth::user()->favoriteBooks()->toggle($book->id);
+
         return back();
     }
 
     public function index()
     {
         $books = Auth::user()->favoriteBooks()->paginate(10);
-        return view("favorites.index", compact("books"));
+
+        return view('favorites.index', compact('books'));
     }
 }

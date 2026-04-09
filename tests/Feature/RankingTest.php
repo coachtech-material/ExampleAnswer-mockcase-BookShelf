@@ -45,4 +45,3 @@ class RankingTest extends TestCase
             ]);
     }
 }
-

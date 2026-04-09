@@ -28,4 +28,3 @@ class BookModelTest extends TestCase
         $this->assertTrue($book->favoritedByUsers->contains($user));
     }
 }
-

@@ -29,7 +29,7 @@ class FavoriteSeeder extends Seeder
 
         foreach ($favorites as $favoriteData) {
             $user = $users[$favoriteData['user_index']];
-            $bookIds = collect($favoriteData['book_indices'])->map(fn($i) => $books[$i]->id)->toArray();
+            $bookIds = collect($favoriteData['book_indices'])->map(fn ($i) => $books[$i]->id)->toArray();
             $user->favoriteBooks()->syncWithoutDetaching($bookIds);
         }
     }

@@ -1,11 +1,11 @@
 <?php
 
 use App\Http\Controllers\BookController;
-use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\ReviewLikeController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [BookController::class, 'index'])->name('home');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
 Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
-
 
 // --- 2. 認証必須ルート ---
 Route::middleware('auth')->group(function () {
@@ -42,7 +41,6 @@ Route::middleware('auth')->group(function () {
     // レビューいいね機能 (▼ここを修正: Bladeに合わせて reviews.like / toggle に変更)
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
 });
-
 
 // --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
