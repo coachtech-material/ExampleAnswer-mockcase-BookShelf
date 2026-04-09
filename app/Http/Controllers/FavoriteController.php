@@ -14,7 +14,7 @@ class FavoriteController extends Controller
      */
     public function index(): View
     {
-        $books = Auth::user()->favoriteBooks()->with('genres')->paginate(10);
+        $books = Auth::user()->favoriteBooks()->paginate(10);
 
         return view('favorites.index', compact('books'));
     }
@@ -25,26 +25,6 @@ class FavoriteController extends Controller
     public function toggle(Book $book): RedirectResponse
     {
         Auth::user()->favoriteBooks()->toggle($book->id);
-
-        return back();
-    }
-
-    /**
-     * お気に入りに追加
-     */
-    public function store(Book $book): RedirectResponse
-    {
-        Auth::user()->favoriteBooks()->syncWithoutDetaching($book->id);
-
-        return back();
-    }
-
-    /**
-     * お気に入りから削除
-     */
-    public function destroy(Book $book): RedirectResponse
-    {
-        Auth::user()->favoriteBooks()->detach($book->id);
 
         return back();
     }

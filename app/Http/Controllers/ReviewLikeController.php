@@ -17,24 +17,4 @@ class ReviewLikeController extends Controller
 
         return back();
     }
-
-    /**
-     * いいねを追加
-     */
-    public function store(Review $review): RedirectResponse
-    {
-        Auth::user()->likedReviews()->syncWithoutDetaching($review->id);
-
-        return back();
-    }
-
-    /**
-     * いいねを削除
-     */
-    public function destroy(Review $review): RedirectResponse
-    {
-        Auth::user()->likedReviews()->detach($review->id);
-
-        return back();
-    }
 }
