@@ -2,14 +2,20 @@
 
 namespace Database\Factories;
 
+use App\Models\Genre;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends Factory<Genre>
+ */
 class GenreFactory extends Factory
 {
+    protected $model = Genre::class;
+
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->word(),
+            'name' => fake()->unique()->words(2, true),
         ];
     }
 }

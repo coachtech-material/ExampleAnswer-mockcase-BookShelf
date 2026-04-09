@@ -185,11 +185,11 @@
                                             <!-- 編集・削除ボタン -->
                                             @can('update', $review)
                                                 <div class="flex gap-2">
-                                                    <a href="{{ route('reviews.edit', $review) }}" class="text-sm text-gray-600 hover:text-gray-800">編集</a>
-                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" class="inline" onsubmit="return confirm('このレビューを削除しますか？')">
+                                                    <a href="{{ route('reviews.edit', $review) }}" class="text-sm text-gray-500 hover:text-gray-700">編集</a>
+                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" class="inline" onsubmit="return confirm('本当に削除しますか？')">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" class="text-sm text-red-600 hover:text-red-800">削除</button>
+                                                        <button type="submit" class="text-sm text-red-500 hover:text-red-700">削除</button>
                                                     </form>
                                                 </div>
                                             @endcan
@@ -205,7 +205,7 @@
             </div>
 
             <div class="mt-4">
-                <a href="{{ route('books.index') }}" class="text-blue-600 hover:underline">← 書籍一覧に戻る</a>
+                <a href="{{ route('books.index') }}" class="text-blue-600 hover:underline">← 一覧に戻る</a>
             </div>
         </div>
     </div>

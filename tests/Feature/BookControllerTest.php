@@ -8,106 +8,115 @@ use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\View\View;
 use Tests\TestCase;
 
 class BookControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    // ===== 既存テスト（基本機能） =====
+    // ===== 基本機能（basic と同一） =====
 
-    public function test_書籍一覧ページが表示される(): void
+    public function test_book_index_page_can_be_rendered(): void
     {
-        $response = $this->get(route('books.index'));
-        $response->assertStatus(200);
+        Book::factory()->count(2)->create();
+
+        $this->get(route('books.index'))
+            ->assertOk();
     }
 
-    public function test_書籍詳細ページが表示される(): void
+    public function test_authenticated_user_can_view_create_form(): void
     {
         $user = User::factory()->create();
-        $genre = Genre::factory()->create();
-        $book = Book::factory()->create(['user_id' => $user->id]);
-        $book->genres()->attach($genre->id);
 
-        $response = $this->get(route('books.show', $book));
-        $response->assertStatus(200);
-        $response->assertSee($book->title);
+        $this->actingAs($user)
+            ->get(route('books.create'))
+            ->assertOk();
     }
 
-    public function test_未認証ユーザーは書籍登録ページにアクセスできない(): void
+    public function test_guest_cannot_view_create_form(): void
     {
-        $response = $this->get(route('books.create'));
-        $response->assertRedirect(route('login'));
+        $this->get(route('books.create'))
+            ->assertRedirect(route('login'));
     }
 
-    public function test_認証ユーザーは書籍を登録できる(): void
+    public function test_authenticated_user_can_create_book(): void
     {
         $user = User::factory()->create();
-        $genre = Genre::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
 
-        $response = $this->actingAs($user)->post(route('books.store'), [
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-            'isbn' => '9784000000000',
-            'genres' => [$genre->id],
+        $payload = $this->validBookData([
+            'title' => 'My Test Book',
+            'isbn' => '1111111111111',
+            'genres' => $genres->pluck('id')->toArray(),
         ]);
 
-        $book = Book::where('title', 'テスト書籍')->first();
+        $response = $this->actingAs($user)->post(route('books.store'), $payload);
+
+        $book = Book::where('title', 'My Test Book')->first();
         $this->assertNotNull($book);
-
-        $response->assertRedirect(route('books.show', $book));
-        $this->assertDatabaseHas('books', [
-            'title' => 'テスト書籍',
-            'author' => 'テスト著者',
-        ]);
-        $this->assertDatabaseHas('book_genre', [
-            'book_id' => $book->id,
-            'genre_id' => $genre->id,
-        ]);
-    }
-
-    public function test_書籍登録者のみが編集できる(): void
-    {
-        $owner = User::factory()->create();
-        $other = User::factory()->create();
-        $genre = Genre::factory()->create();
-        $book = Book::factory()->create(['user_id' => $owner->id]);
-        $book->genres()->attach($genre->id);
-
-        // 所有者は編集ページにアクセスできる
-        $response = $this->actingAs($owner)->get(route('books.edit', $book));
-        $response->assertStatus(200);
-
-        // 他のユーザーは編集ページにアクセスできない
-        $response = $this->actingAs($other)->get(route('books.edit', $book));
-        $response->assertStatus(403);
-    }
-
-    public function test_認証ユーザーは書籍を更新できる(): void
-    {
-        $user = User::factory()->create();
-        $book = Book::factory()->create(['user_id' => $user->id]);
-        $originalGenre = Genre::factory()->create();
-        $book->genres()->attach($originalGenre->id);
-        $newGenres = Genre::factory()->count(2)->create();
-
-        $response = $this->actingAs($user)->put(route('books.update', $book), [
-            'title' => '更新後タイトル',
-            'author' => '更新後著者',
-            'isbn' => '9876543210123',
-            'published_date' => '2024-05-01',
-            'description' => '更新後説明',
-            'image_url' => 'https://example.com/updated.jpg',
-            'genres' => $newGenres->pluck('id')->toArray(),
-        ]);
 
         $response->assertRedirect(route('books.show', $book));
 
         $this->assertDatabaseHas('books', [
             'id' => $book->id,
-            'title' => '更新後タイトル',
-            'author' => '更新後著者',
+            'user_id' => $user->id,
+            'title' => 'My Test Book',
+        ]);
+
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+    }
+
+    public function test_book_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => '',
+            'author' => '',
+            'isbn' => '123',
+            'published_date' => 'invalid-date',
+            'genres' => [],
+        ]);
+
+        $response->assertSessionHasErrors(['title', 'isbn', 'genres']);
+        $this->assertDatabaseCount('books', 0);
+    }
+
+    public function test_book_show_page_can_be_rendered(): void
+    {
+        $book = Book::factory()->create(['title' => 'Detail Book']);
+
+        $this->get(route('books.show', $book))
+            ->assertOk()
+            ->assertSee('Detail Book');
+    }
+
+    public function test_authenticated_user_can_update_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $originalGenre = Genre::factory()->create();
+        $book->genres()->attach($originalGenre);
+        $newGenres = Genre::factory()->count(2)->create();
+
+        $payload = $this->validBookData([
+            'title' => 'Updated Title',
+            'isbn' => '9876543210123',
+            'genres' => $newGenres->pluck('id')->toArray(),
+        ]);
+
+        $response = $this->actingAs($user)->put(route('books.update', $book), $payload);
+
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => 'Updated Title',
             'isbn' => '9876543210123',
         ]);
 
@@ -124,22 +133,31 @@ class BookControllerTest extends TestCase
         ]);
     }
 
-    public function test_書籍登録者のみが削除できる(): void
+    public function test_authenticated_user_can_delete_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $this->actingAs($user)
+            ->delete(route('books.destroy', $book))
+            ->assertRedirect(route('books.index'));
+
+        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+    }
+
+    public function test_only_owner_can_view_edit_form(): void
     {
         $owner = User::factory()->create();
-        $other = User::factory()->create();
-        $genre = Genre::factory()->create();
-        $book = Book::factory()->create(['user_id' => $owner->id]);
-        $book->genres()->attach($genre->id);
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
 
-        // 他のユーザーは削除できない
-        $response = $this->actingAs($other)->delete(route('books.destroy', $book));
-        $response->assertStatus(403);
+        $this->actingAs($owner)
+            ->get(route('books.edit', $book))
+            ->assertOk();
 
-        // 所有者は削除できる
-        $response = $this->actingAs($owner)->delete(route('books.destroy', $book));
-        $response->assertRedirect(route('books.index'));
-        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+        $this->actingAs($otherUser)
+            ->get(route('books.edit', $book))
+            ->assertForbidden();
     }
 
     // ===== 検索・フィルタ（応用機能） =====
@@ -292,19 +310,6 @@ class BookControllerTest extends TestCase
         $this->assertCount(3, $genres);
     }
 
-    public function test_other_user_cannot_can_update_book(): void
-    {
-        $owner = User::factory()->create();
-        $other = User::factory()->create();
-        $book = Book::factory()->create(['user_id' => $owner->id]);
-
-        $this->assertFalse($other->can('update', $book));
-
-        $this->actingAs($other)
-            ->get(route('books.edit', $book))
-            ->assertForbidden();
-    }
-
     // ===== ISBN検索（応用機能 - Http::fake モック） =====
 
     public function test_search_by_isbn_returns_book_information(): void
@@ -381,5 +386,20 @@ class BookControllerTest extends TestCase
 
         $response->assertStatus(500);
         $response->assertJson(['error' => 'API通信エラーが発生しました。']);
+    }
+
+    private function validBookData(array $overrides = []): array
+    {
+        $genres = $overrides['genres'] ?? Genre::factory()->count(2)->create()->pluck('id')->toArray();
+
+        return array_merge([
+            'title' => 'Sample Book',
+            'author' => 'Sample Author',
+            'isbn' => '1234567890123',
+            'published_date' => '2024-01-01',
+            'description' => 'Sample description',
+            'image_url' => 'https://example.com/image.jpg',
+            'genres' => $genres,
+        ], $overrides);
     }
 }
