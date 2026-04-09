@@ -19,6 +19,14 @@
                 </div>
             @endif
 
+            @auth
+            <div class="mb-4 flex justify-end">
+                <a href="{{ route('books.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    新規登録
+                </a>
+            </div>
+            @endauth
+
             <!-- 検索フォーム -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900">

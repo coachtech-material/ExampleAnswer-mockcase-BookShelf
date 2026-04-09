@@ -118,9 +118,11 @@
                                             <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
                                         @enderror
                                     </div>
-                                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                        投稿する
-                                    </button>
+                                    <div class="flex justify-end">
+                                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                                            投稿する
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         @else
