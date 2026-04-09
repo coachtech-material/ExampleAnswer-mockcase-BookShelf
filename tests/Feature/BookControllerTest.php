@@ -84,6 +84,46 @@ class BookControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_認証ユーザーは書籍を更新できる(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['user_id' => $user->id]);
+        $originalGenre = Genre::factory()->create();
+        $book->genres()->attach($originalGenre->id);
+        $newGenres = Genre::factory()->count(2)->create();
+
+        $response = $this->actingAs($user)->put(route('books.update', $book), [
+            'title' => '更新後タイトル',
+            'author' => '更新後著者',
+            'isbn' => '9876543210123',
+            'published_date' => '2024-05-01',
+            'description' => '更新後説明',
+            'image_url' => 'https://example.com/updated.jpg',
+            'genres' => $newGenres->pluck('id')->toArray(),
+        ]);
+
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => '更新後タイトル',
+            'author' => '更新後著者',
+            'isbn' => '9876543210123',
+        ]);
+
+        foreach ($newGenres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+
+        $this->assertDatabaseMissing('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $originalGenre->id,
+        ]);
+    }
+
     public function test_書籍登録者のみが削除できる(): void
     {
         $owner = User::factory()->create();
