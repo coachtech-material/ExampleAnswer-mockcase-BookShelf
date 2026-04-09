@@ -26,11 +26,6 @@
                                         </a>
                                     </h3>
                                     <p class="text-gray-600 mb-2">{{ $book->author }}</p>
-                                    <div class="flex flex-wrap gap-1 mb-2">
-                                        @foreach($book->genres as $genre)
-                                            <span class="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">{{ $genre->name }}</span>
-                                        @endforeach
-                                    </div>
                                     <div class="flex items-center justify-between">
                                         <span class="text-sm text-gray-500">ISBN: {{ $book->isbn ?? '未登録' }}</span>
                                         <form action="{{ route('favorites.toggle', $book) }}" method="POST">

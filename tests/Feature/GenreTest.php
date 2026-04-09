@@ -100,7 +100,7 @@ class GenreTest extends TestCase
         $this->actingAs($user)
             ->delete(route('genres.destroy', $genre))
             ->assertRedirect(route('genres.index'))
-            ->assertSessionHas('error', 'このジャンルは書籍に使用されているため削除できません。');
+            ->assertSessionHas('error', 'このジャンルには書籍が紐付いているため削除できません。');
 
         $this->assertDatabaseHas('genres', ['id' => $genre->id]);
     }

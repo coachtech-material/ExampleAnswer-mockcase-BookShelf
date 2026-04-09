@@ -15,7 +15,7 @@ class GenreController extends Controller
      */
     public function index(): View
     {
-        $genres = Genre::withCount('books')->orderBy('name')->get();
+        $genres = Genre::withCount('books')->get();
 
         return view('genres.index', compact('genres'));
     }
@@ -35,7 +35,7 @@ class GenreController extends Controller
     {
         Genre::create($request->validated());
 
-        return redirect()->route('genres.index')->with('success', 'ジャンルを登録しました。');
+        return redirect()->route('genres.index')->with('success', 'ジャンルを作成しました。');
     }
 
     /**
@@ -71,8 +71,8 @@ class GenreController extends Controller
      */
     public function destroy(Genre $genre): RedirectResponse
     {
-        if ($genre->books()->exists()) {
-            return redirect()->route('genres.index')->with('error', 'このジャンルは書籍に使用されているため削除できません。');
+        if ($genre->books()->count() > 0) {
+            return redirect()->route('genres.index')->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
         }
 
         $genre->delete();
