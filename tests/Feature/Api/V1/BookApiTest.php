@@ -30,16 +30,14 @@ class BookApiTest extends TestCase
             'data' => [
                 '*' => [
                     'id', 'title', 'author', 'isbn', 'published_date',
-                    'genres', 'average_rating', 'review_count',
+                    'description', 'image_url', 'genres',
+                    'average_rating', 'review_count',
                 ],
             ],
             'meta' => ['current_page', 'last_page', 'per_page', 'total'],
         ]);
-        // 一覧では description / image_url / reviews は含まれない（詳細時のみ）
-        $firstBook = $response->json('data.0');
-        $this->assertArrayNotHasKey('description', $firstBook);
-        $this->assertArrayNotHasKey('image_url', $firstBook);
-        $this->assertArrayNotHasKey('reviews', $firstBook);
+        // 一覧では reviews フィールドは含まれない（whenLoaded のため）
+        $response->assertJsonMissing(['reviews' => []]);
     }
 
     public function test_index_filters_by_keyword(): void
