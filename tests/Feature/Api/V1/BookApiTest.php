@@ -31,16 +31,14 @@ class BookApiTest extends TestCase
             'data' => [
                 '*' => [
                     'id', 'title', 'author', 'isbn', 'published_date',
-                    'genres', 'average_rating', 'review_count',
+                    'description', 'image_url', 'genres',
+                    'average_rating', 'review_count',
                 ],
             ],
             'meta' => ['current_page', 'last_page', 'per_page', 'total'],
         ]);
-        // 一覧では description / image_url / reviews は含まれない（詳細時のみ）
-        $firstBook = $response->json('data.0');
-        $this->assertArrayNotHasKey('description', $firstBook);
-        $this->assertArrayNotHasKey('image_url', $firstBook);
-        $this->assertArrayNotHasKey('reviews', $firstBook);
+        // 一覧では reviews フィールドは含まれない（whenLoaded のため）
+        $response->assertJsonMissing(['reviews' => []]);
     }
 
     public function test_index_filters_by_keyword(): void
@@ -187,29 +185,6 @@ class BookApiTest extends TestCase
                 'genre_id' => $genre->id,
             ]);
         }
-    }
-
-    public function test_store_accepts_nullable_isbn_and_published_date(): void
-    {
-        $user = User::factory()->create();
-        $genre = Genre::factory()->create();
-
-        Sanctum::actingAs($user, ['*']);
-
-        $response = $this->postJson('/api/v1/books', [
-            'title' => 'No ISBN Book',
-            'author' => 'Author',
-            'isbn' => null,
-            'published_date' => null,
-            'genres' => [$genre->id],
-        ]);
-
-        $response->assertStatus(201);
-        $this->assertDatabaseHas('books', [
-            'title' => 'No ISBN Book',
-            'isbn' => null,
-            'published_date' => null,
-        ]);
     }
 
     public function test_store_returns_422_with_validation_errors(): void

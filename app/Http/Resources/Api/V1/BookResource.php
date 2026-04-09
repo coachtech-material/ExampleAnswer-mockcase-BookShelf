@@ -25,8 +25,8 @@ class BookResource extends JsonResource
                 ? round((float) $this->reviews_avg_rating, 1)
                 : null,
             'review_count' => (int) ($this->reviews_count ?? 0),
-            'description' => $this->when($this->relationLoaded('reviews'), $this->description),
-            'image_url' => $this->when($this->relationLoaded('reviews'), $this->image_url),
+            'description' => $this->description,
+            'image_url' => $this->image_url,
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
     }
