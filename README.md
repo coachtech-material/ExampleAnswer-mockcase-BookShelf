@@ -102,4 +102,90 @@
 - 書籍レビュー投稿・編集・削除
 - お気に入り登録・解除
 - レビューへのいいね登録・解除
-- ランキング表示（レビュー数、平均評価）
+- ランキング表示（レビュー平均評価 TOP10）
+- 公開API（書籍 CRUD — RESTful JSON API）
+
+## 使用技術
+
+- **PHP**: 8.2
+- **Laravel**: 10.x
+- **MySQL**: 8.0
+- **Docker / Laravel Sail**: 開発環境コンテナ化
+- **Tailwind CSS**: 3.4.x（フロントエンドスタイリング）
+- **Vite**: フロントエンドビルド
+- **Laravel Fortify**: 認証機能
+- **phpMyAdmin**: DB管理ツール
+
+## ER図
+
+```mermaid
+erDiagram
+    users ||--o{ books : "登録"
+    users ||--o{ reviews : "投稿"
+    users ||--o{ favorites : "お気に入り"
+    users ||--o{ review_likes : "いいね"
+    books ||--o{ reviews : ""
+    books ||--o{ book_genre : ""
+    books ||--o{ favorites : ""
+    genres ||--o{ book_genre : ""
+    reviews ||--o{ review_likes : ""
+
+    users {
+        bigint id PK
+        varchar name
+        varchar email UK
+        varchar password
+        timestamp email_verified_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    books {
+        bigint id PK
+        bigint user_id FK
+        varchar title
+        varchar author
+        varchar isbn UK
+        date published_date
+        text description
+        varchar image_url
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    genres {
+        bigint id PK
+        varchar name UK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    reviews {
+        bigint id PK
+        bigint user_id FK
+        bigint book_id FK
+        tinyint rating
+        text comment
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    book_genre {
+        bigint book_id FK
+        bigint genre_id FK
+    }
+
+    favorites {
+        bigint user_id FK
+        bigint book_id FK
+    }
+
+    review_likes {
+        bigint user_id FK
+        bigint review_id FK
+    }
+```
+
+## 作成者
+
+氏名（受講生名をここに記載してください）
