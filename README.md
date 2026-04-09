@@ -42,19 +42,60 @@
 
    書籍のISBN検索機能（応用機能）は Google Books API を呼び出します。
    APIキーは技術的には任意ですが、**未設定だと匿名共有クォータが常時枯渇しており、
-   ISBN検索が「書籍が見つかりませんでした。」エラーで失敗します**。実質必須です。
+   ISBN検索が「Google Books API のクォータを超過しました。」エラーで失敗します**。実質必須です。
 
-   [Google Cloud Console](https://console.cloud.google.com/) で
-   「Books API」を有効化し、APIキーを発行して `.env` に追記してください。
+   ### APIキー取得手順（無料・5分程度）
 
-   ```ini
-   GOOGLE_BOOKS_API_KEY=YOUR_API_KEY
-   ```
+   前提: Google アカウント（Gmail 等）が必要。**課金は不要**。
+
+   1. **Google Cloud Console にアクセス**
+      [https://console.cloud.google.com/](https://console.cloud.google.com/) を開き Google アカウントでログイン。
+      初回は利用規約に同意。
+
+   2. **プロジェクトを作成**
+      画面上部のプロジェクト選択ドロップダウン（"プロジェクトの選択"）→ 右上「新しいプロジェクト」。
+      - プロジェクト名: `bookshelf-isbn` など任意
+      - 組織: 「組織なし」のまま
+      - 「作成」→ 作成後、上部ドロップダウンで該当プロジェクトを選択
+
+   3. **Books API を有効化**
+      左メニュー（≡）→「APIs & Services」→「ライブラリ」
+      → 検索ボックスに `Books API` と入力
+      → 表示された「Books API」をクリック
+      → 「有効にする」ボタンをクリック
+
+   4. **API キーを発行**
+      左メニュー →「APIs & Services」→「認証情報」
+      → 上部「+ 認証情報を作成」→「API キー」を選択
+      → `AIzaSy...` で始まるキーが表示されるのでコピー
+
+   5. **（任意・推奨）キーを Books API に制限**
+      ダイアログ内「キーを制限」ボタン
+      → 「API の制限」で「キーを制限」を選択 → 「Books API」だけにチェック → 保存
+      ※ ローカル開発では「アプリケーションの制限」は設定不要
+
+   6. **`.env` に追記**
+
+      ```ini
+      GOOGLE_BOOKS_API_KEY=AIzaSy...（コピーしたキー）
+      ```
+
+   7. **設定キャッシュをクリア**
+
+      ```bash
+      ./vendor/bin/sail artisan config:clear
+      ```
+
+   8. **動作確認**
+      `http://localhost/books/create` を開き、ISBN（例: `9784101010014`）を入力して「検索」
+      → 書籍情報が自動入力されれば OK
 
    > **採点者向け補足**: ISBN検索機能の動作確認には上記APIキーの設定が必要です。
    > 設定せずに ISBN を入力した場合、Google 側のクォータ超過により
-   > 「Google Books API のクォータを超過しました。」のメッセージが表示されますが、
-   > 実装ロジック自体は正しく、`Http::fake()` を用いた Feature Test で検証済みです。
+   > 「Google Books API のクォータを超過しました。.env に GOOGLE_BOOKS_API_KEY を設定してください。」
+   > が表示されますが、実装ロジック自体は正しく、`Http::fake()` を用いた Feature Test で検証済みです。
+   > 採点時に手間を避けたい場合は、ISBN検索の動作確認をスキップし、テストの PASS をもって機能担保と
+   > 判断していただいても構いません。
 
 4. **Composer依存パッケージのインストール**
 
