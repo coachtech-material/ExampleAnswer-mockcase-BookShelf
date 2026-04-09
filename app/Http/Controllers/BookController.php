@@ -53,8 +53,10 @@ class BookController extends Controller
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
         $this->authorize('update', $book);
-        $book->update($request->validated());
-        $book->genres()->sync($request->genres);
+        $validated = $request->validated();
+        $bookData = collect($validated)->except('genres')->toArray();
+        $book->update($bookData);
+        $book->genres()->sync($validated['genres']);
 
         return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
     }

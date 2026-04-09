@@ -9,7 +9,7 @@ class RankingController extends Controller
 {
     public function index()
     {
-        $rankedBooks = Book::select('books.*', DB::raw('AVG(reviews.rating) as average_rating'))
+        $rankedBooks = Book::select('books.*', DB::raw('AVG(reviews.rating) as average_rating'), DB::raw('COUNT(reviews.id) as review_count'))
             ->join('reviews', 'books.id', '=', 'reviews.book_id')
             ->groupBy('books.id')
             ->orderByDesc('average_rating')
