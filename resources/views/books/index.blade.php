@@ -19,14 +19,6 @@
                 </div>
             @endif
 
-            @auth
-            <div class="mb-4 flex justify-end">
-                <a href="{{ route('books.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    新規登録
-                </a>
-            </div>
-            @endauth
-
             <!-- 検索フォーム -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900">
@@ -59,13 +51,20 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="flex items-center gap-4">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                検索
-                            </button>
-                            <a href="{{ route('books.index') }}" class="text-gray-600 hover:text-gray-900">
-                                リセット
-                            </a>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                                    検索
+                                </button>
+                                <a href="{{ route('books.index') }}" class="text-gray-600 hover:text-gray-900">
+                                    リセット
+                                </a>
+                            </div>
+                            @auth
+                                <a href="{{ route('books.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                                    新規登録
+                                </a>
+                            @endauth
                         </div>
                     </form>
                 </div>
