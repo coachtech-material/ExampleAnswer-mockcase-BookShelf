@@ -178,9 +178,9 @@
 
 ## 使用技術
 
-- **PHP**: 8.2
+- **PHP**: 8.5
 - **Laravel**: 10.x
-- **MySQL**: 8.0
+- **MySQL**: 8.4
 - **Docker / Laravel Sail**: 開発環境コンテナ化
 - **Tailwind CSS**: 3.4.x（フロントエンドスタイリング）
 - **Vite**: フロントエンドビルド
