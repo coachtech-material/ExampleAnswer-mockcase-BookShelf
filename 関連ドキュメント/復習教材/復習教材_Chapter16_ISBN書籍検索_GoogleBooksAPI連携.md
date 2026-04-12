@@ -42,7 +42,7 @@
 
 ### 思考4：API連携で起こりうる問題は？
 
-> 「外部API連携は『失敗する可能性』を常に考慮しないといけない。通信エラー、APIからのエラーレスポンス、期待したデータ形式じゃない、など。`try...catch`ブロックで通信例外を捕捉するのはもちろん、APIのレスポンスをちゃんとチェックして（`empty($data["items"])`）、想定外のデータが来てもエラーにならないようにする。ユーザーに『書籍が見つかりませんでした』とか『通信エラーです』とか、何が起きたかちゃんと伝えることが重要だ。」
+> 「外部API連携は『失敗する可能性』を常に考慮しないといけない。通信エラー、APIからのエラーレスポンス、期待したデータ形式じゃない、など。`try...catch`ブロックで通信例外を捕捉するのはもちろん、APIのレスポンスをちゃんとチェックして（`! isset($data['items'][0])`）、想定外のデータが来てもエラーにならないようにする。さらに、APIキーなしだとクォータ制限（429エラー）に引っかかることもあるから、そのチェックも忘れずに。ユーザーに『書籍が見つかりませんでした』とか『通信エラーです』とか、何が起きたかちゃんと伝えることが重要だ。」
 
 ## 4. 実装
 
@@ -106,10 +106,9 @@ class BookController extends Controller
     /**
      * ISBN検索（Google Books API）（応用機能）
      */
-      public function searchByIsbn(string $isbn): JsonResponse
+    public function searchByIsbn(string $isbn): JsonResponse
     {
-
-        if (!$isbn || strlen($isbn) !== 13) {
+        if (strlen($isbn) !== 13) {
             return response()->json(['error' => 'ISBNは13桁で入力してください。'], 400);
         }
 
@@ -122,20 +121,27 @@ class BookController extends Controller
 
         try {
             $response = Http::get($url);
+
+            if ($response->status() === 429) {
+                return response()->json([
+                    'error' => 'Google Books API のクォータを超過しました。.env に GOOGLE_BOOKS_API_KEY を設定してください。',
+                ], 429);
+            }
+
             $data = $response->json();
 
-            if (empty($data["items"])) {
-                return response()->json(["error" => "書籍が見つかりませんでした。"], 404);
+            if (! isset($data['items'][0])) {
+                return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
             }
 
             $volumeInfo = $data['items'][0]['volumeInfo'];
 
             return response()->json([
-                'title' => data_get($volumeInfo, 'title', ''),
-                'author' => implode(', ', data_get($volumeInfo, 'authors', [])),
-                'published_date' => data_get($volumeInfo, 'publishedDate', ''),
-                'description' => data_get($volumeInfo, 'description', ''),
-                'image_url' => data_get($volumeInfo, 'imageLinks.thumbnail', ''),
+                'title' => $volumeInfo['title'] ?? '',
+                'author' => isset($volumeInfo['authors']) ? implode(', ', $volumeInfo['authors']) : '',
+                'published_date' => $volumeInfo['publishedDate'] ?? '',
+                'description' => $volumeInfo['description'] ?? '',
+                'image_url' => $volumeInfo['imageLinks']['thumbnail'] ?? '',
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'API通信エラーが発生しました。'], 500);
@@ -149,12 +155,12 @@ class BookController extends Controller
 #### 1. ISBNのバリデーション
 
 ```php
-if (!$isbn || strlen($isbn) !== 13) {
+if (strlen($isbn) !== 13) {
     return response()->json(['error' => 'ISBNは13桁で入力してください。'], 400);
 }
 ```
 
-- APIを呼び出す前に、渡されたISBNが13桁であるかを確認しています。無効な値で無駄なAPIリクエストを送信しないための基本的なチェックです。
+- APIを呼び出す前に、渡されたISBNが13桁であるかを確認しています。ルート定義で`{isbn}`パラメータは必須のため、`!$isbn`のチェックは不要で、`strlen`のチェックだけで十分です。無効な値で無駄なAPIリクエストを送信しないための基本的なチェックです。
 - `response()->json()`は、連想配列をJSON形式に変換し、適切なヘッダーを付けてレスポンスを返します。第二引数はHTTPステータスコードです。`400`は「Bad Request（不正なリクエスト）」を意味します。
 
 #### 2. APIリクエストの組み立てと送信
@@ -185,31 +191,39 @@ try {
     return response()->json(['error' => 'API通信エラーが発生しました。'], 500);
 }
 
+// レート制限チェック
+if ($response->status() === 429) {
+    return response()->json([
+        'error' => 'Google Books API のクォータを超過しました。.env に GOOGLE_BOOKS_API_KEY を設定してください。',
+    ], 429);
+}
+
 // APIからのレスポンス内容のチェック
-if (empty($data["items"])) {
-    return response()->json(["error" => "書籍が見つかりませんでした。"], 404);
+if (! isset($data['items'][0])) {
+    return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
 }
 ```
 
 - **`try...catch`**: `Http::get()`がネットワークの問題などで失敗した場合、例外（Exception）が発生します。これを`catch`ブロックで捕捉し、サーバー内部のエラーを示す`500`ステータスコードと共にエラーメッセージを返します。
-- **`empty($data[
-items"]))`**: API通信が成功しても、該当する書籍が見つからない場合があります。その場合、レスポンスの`items`配列が空になるので、これをチェックして「見つかりませんでした」というエラーを返します。ステータスコード`404`は「Not Found」を意味します。
+- **`$response->status() === 429`**: APIキーなしでリクエストを送ると、Google Books APIのクォータ制限に引っかかる場合があります。HTTPステータスコード`429`（Too Many Requests）を検出して、APIキーの設定を促すメッセージを返します。
+- **`! isset($data['items'][0])`**: API通信が成功しても、該当する書籍が見つからない場合があります。その場合、レスポンスに`items`配列の最初の要素が存在しないので、`isset`でチェックして「見つかりませんでした」というエラーを返します。ステータスコード`404`は「Not Found」を意味します。
 
 #### 4. 成功レスポンスの整形
 ```php
 $volumeInfo = $data['items'][0]['volumeInfo'];
 
 return response()->json([
-    'title' => data_get($volumeInfo, 'title', ''),
-    'author' => implode(', ', data_get($volumeInfo, 'authors', [])),
-    'published_date' => data_get($volumeInfo, 'publishedDate', ''),
-    'description' => data_get($volumeInfo, 'description', ''),
-    'image_url' => data_get($volumeInfo, 'imageLinks.thumbnail', ''),
+    'title' => $volumeInfo['title'] ?? '',
+    'author' => isset($volumeInfo['authors']) ? implode(', ', $volumeInfo['authors']) : '',
+    'published_date' => $volumeInfo['publishedDate'] ?? '',
+    'description' => $volumeInfo['description'] ?? '',
+    'image_url' => $volumeInfo['imageLinks']['thumbnail'] ?? '',
 ]);
 ```
 - **`$volumeInfo = ...`**: 必要な書籍情報は、レスポンスの深い階層（`items`配列の最初の要素の`volumeInfo`キー）にあります。
-- **`data_get($volumeInfo, 'key', 'default')`**: `data_get`は、配列やオブジェクトから安全に値を取得するためのヘルパー関数です。例えば、`imageLinks.thumbnail`のようにドット記法で深い階層のデータにアクセスでき、もしキーが存在しなくてもエラーにならず、第三引数で指定したデフォルト値（この場合は空文字`''`）を返してくれます。APIレスポンスのように構造が不確実なデータを扱う際に非常に便利です。
-- **`implode(', ', ...)`**: 著者は配列（`authors`）で返ってくることがあるため、`implode`関数を使ってカンマ区切りの文字列に変換しています。
+- **`$volumeInfo['title'] ?? ''`**: PHPの**Null合体演算子（`??`）**を使って、配列のキーが存在しない場合やnullの場合にデフォルト値（空文字`''`）を返します。APIレスポンスのように構造が不確実なデータを扱う際に、安全に値を取得するための標準的なテクニックです。
+- **`isset($volumeInfo['authors']) ? implode(', ', $volumeInfo['authors']) : ''`**: 著者は配列（`authors`）で返ってくることがあるため、まず`isset`でキーの存在を確認し、存在する場合のみ`implode`関数を使ってカンマ区切りの文字列に変換しています。存在しない場合は空文字を返します。
+- **`$volumeInfo['imageLinks']['thumbnail'] ?? ''`**: ネストした配列に対しても`??`演算子で安全にアクセスできます。`imageLinks`キーや`thumbnail`キーが存在しない場合は空文字が返ります。
 
 ### 4.5. 提供されているBladeファイルの確認
 

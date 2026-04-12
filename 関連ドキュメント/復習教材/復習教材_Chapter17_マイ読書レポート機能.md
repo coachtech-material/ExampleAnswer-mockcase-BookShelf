@@ -31,11 +31,11 @@
 
 ### 思考3：どうやってコードを整理するか？ → 関心の分離
 
-> 「レポート機能は複数の統計データ（基本統計、評価分布など）の集合体だ。これを全部コントローラーの`index`メソッドにベタ書きすると、巨大で読みにくいメソッドが出来上がってしまう。そこで、`generateSummary`（基本統計を生成する）や`generateRatingDistribution`（評価分布を生成する）のように、**機能ごとにプライベートメソッドに分割する**のが定石だ。こうすることで、各メソッドは自分の仕事に集中できるし、コードの見通しが格段に良くなる。これを『関心の分離』と呼ぶんだ。」
+> 「レポート機能は複数の統計データ（基本統計、評価分布など）の集合体だ。これを全部コントローラーの`index`メソッドにベタ書きすると、巨大で読みにくいメソッドが出来上がってしまう。そこで、`calculateSummary`（基本統計を計算する）や`calculateRatingDistribution`（評価分布を計算する）のように、**機能ごとにプライベートメソッドに分割する**のが定石だ。こうすることで、各メソッドは自分の仕事に集中できるし、コードの見通しが格段に良くなる。これを『関心の分離』と呼ぶんだ。」
 
 ### 思考4：パフォーマンスは大丈夫か？ → N+1問題
 
-> 「『ジャンル別評価傾向』を計算するには、レビューに紐づく書籍、さらにその書籍に紐づくジャンルの情報が必要になる。何も考えずに実装すると、レビューの数だけクエリが発行される『N+1問題』が発生して、パフォーマンスが著しく悪化する。`Review::with(["book.genres"])`のように、`with()`を使ってリレーション先のデータをあらかじめ一括で読み込んでおく（Eager Loading）ことを絶対に忘れてはいけない。」
+> 「『ジャンル別評価傾向』を計算するには、レビューに紐づく書籍、さらにその書籍に紐づくジャンルの情報が必要になる。何も考えずに実装すると、レビューの数だけクエリが発行される『N+1問題』が発生して、パフォーマンスが著しく悪化する。`$user->reviews()->with('book.genres')`のように、`with()`を使ってリレーション先のデータをあらかじめ一括で読み込んでおく（Eager Loading）ことを絶対に忘れてはいけない。」
 
 ## 4. 実装
 
@@ -76,94 +76,102 @@ Route::middleware("auth")->group(function () {
 
 namespace App\Http\Controllers;
 
-use App\Models\Review;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    /**
+     * マイ読書レポートを表示します。
+     */
     public function index(): View
     {
         $user = Auth::user();
+        $reviews = $user->reviews()->with('book.genres')->get();
 
-        // ユーザーのレビューを全て取得（パフォーマンスのためリレーションをEager Load）
-        $reviews = Review::with(["book.genres"])
-            ->where("user_id", $user->id)
-            ->get();
+        $stats = [
+            'summary' => $this->calculateSummary($reviews),
+            'rating_distribution' => $this->calculateRatingDistribution($reviews),
+            'top_rated_books' => $this->calculateTopRatedBooks($reviews),
+            'genre_ratings' => $this->calculateGenreRatings($reviews),
+        ];
 
-        // 統計データを生成
-        $stats = $this->generateStats($reviews);
-
-        // ビューに統計データを渡して表示
-        return view("reports.index", compact("stats"));
+        return view('reports.index', compact('stats'));
     }
 
-    private function generateStats(Collection $reviews): array
+    /**
+     * 基本サマリー（総レビュー数、読了冊数、平均評価）を計算する
+     *
+     * @return array{total_reviews: int, books_read: int, average_rating: float}
+     */
+    private function calculateSummary(Collection $reviews): array
     {
         return [
-            "summary" => $this->generateSummary($reviews),
-            "rating_distribution" => $this->generateRatingDistribution($reviews),
-            "top_rated_books" => $this->getTopRatedBooks($reviews),
-            "genre_ratings" => $this->generateGenreRatings($reviews),
+            'total_reviews' => $reviews->count(),
+            'books_read' => $reviews->pluck('book_id')->unique()->count(),
+            'average_rating' => $reviews->avg('rating') ?? 0,
         ];
     }
 
-    private function generateSummary(Collection $reviews): array
+    /**
+     * 評価分布（1〜5星ごとの件数）を計算する
+     *
+     * @return Collection<int, int>
+     */
+    private function calculateRatingDistribution(Collection $reviews): Collection
     {
-        return [
-            "total_reviews" => $reviews->count(),
-            "books_read" => $reviews->pluck("book_id")->unique()->count(),
-            "average_rating" => round($reviews->avg("rating") ?? 0, 1),
-        ];
-    }
-
-    private function generateRatingDistribution(Collection $reviews): array
-    {
-        $distribution = $reviews
-            ->groupBy("rating")
-            ->map(fn (Collection $group): int => $group->count());
+        $grouped = $reviews->groupBy('rating');
 
         return collect(range(1, 5))
-            ->mapWithKeys(fn (int $rating): array => [$rating - 1 => $distribution->get($rating, 0)])
-            ->toArray();
+            ->map(fn ($rating) => $grouped->has($rating) ? $grouped[$rating]->count() : 0);
     }
 
-    private function getTopRatedBooks(Collection $reviews): Collection
+    /**
+     * 高評価書籍TOP5（4星以上）を計算する
+     *
+     * @return Collection<int, array{id: int, title: string, author: string, rating: int}>
+     */
+    private function calculateTopRatedBooks(Collection $reviews): Collection
     {
         return $reviews
-            ->filter(fn (Review $review): bool => $review->rating >= 4)
-            ->sortByDesc("rating")
+            ->filter(fn ($review) => $review->rating >= 4)
+            ->sortByDesc('rating')
             ->take(5)
-            ->map(fn (Review $review): array => [
-                "id" => $review->book->id,
-                "title" => $review->book->title,
-                "author" => $review->book->author,
-                "rating" => $review->rating,
+            ->map(fn ($review) => [
+                'id' => $review->book->id,
+                'title' => $review->book->title,
+                'author' => $review->book->author,
+                'rating' => $review->rating,
             ])
             ->values();
     }
 
-    private function generateGenreRatings(Collection $reviews): Collection
+    /**
+     * ジャンル別評価傾向TOP5を計算する
+     *
+     * flatMap()で多対多リレーションを展開し、groupBy()で集計する
+     *
+     * @return Collection<int, array{id: int, name: string, count: int, average_rating: float}>
+     */
+    private function calculateGenreRatings(Collection $reviews): Collection
     {
         return $reviews
-            ->flatMap(fn (Review $review): Collection => $review->book->genres->map(
-                fn ($genre) => [
-                    "id" => $genre->id,
-                    "name" => $genre->name,
-                    "rating" => $review->rating,
-                ]
-            ))
-            ->groupBy("name")
-            ->map(function (Collection $genreReviews, string $genreName): array {
-                return [
-                    "id" => $genreReviews->first()["id"],
-                    "name" => $genreName,
-                    "count" => $genreReviews->count(),
-                    "average_rating" => round($genreReviews->avg("rating"), 1),
-                ];
-            })
-            ->sortByDesc("average_rating")
+            // flatMap: 1レビュー → 複数ジャンルに展開（多対多の扱い）
+            ->flatMap(fn ($review) => $review->book->genres->map(fn ($genre) => [
+                'genre_id' => $genre->id,
+                'genre_name' => $genre->name,
+                'rating' => $review->rating,
+            ]))
+            // groupBy + map: ジャンルごとに集計
+            ->groupBy('genre_id')
+            ->map(fn ($items) => [
+                'id' => $items->first()['genre_id'],
+                'name' => $items->first()['genre_name'],
+                'count' => $items->count(),
+                'average_rating' => round($items->avg('rating'), 1),
+            ])
+            ->sortByDesc('average_rating')
             ->take(5)
             ->values();
     }
@@ -172,7 +180,7 @@ class ReportController extends Controller
 
 ## 5. コードの詳細解説
 
-このコントローラーは、まさに「Collection使いこなし塾」です。`index`メソッド自体はシンプルですが、実際の複雑な処理は、意味のある単位で分割されたプライベートメソッド群が担当しています。
+このコントローラーは、まさに「Collection使いこなし塾」です。`index`メソッド自体はシンプルで、`$stats`配列の組み立てと各`calculate*`メソッドの呼び出しだけを行っています。実際の複雑な処理は、意味のある単位で分割されたプライベートメソッド群が担当しています。
 
 ### `index()` メソッド
 
@@ -180,138 +188,129 @@ class ReportController extends Controller
 public function index(): View
 {
     $user = Auth::user();
+    $reviews = $user->reviews()->with('book.genres')->get();
 
-    $reviews = Review::with(["book.genres"])
-        ->where("user_id", $user->id)
-        ->get();
+    $stats = [
+        'summary' => $this->calculateSummary($reviews),
+        'rating_distribution' => $this->calculateRatingDistribution($reviews),
+        'top_rated_books' => $this->calculateTopRatedBooks($reviews),
+        'genre_ratings' => $this->calculateGenreRatings($reviews),
+    ];
 
-    $stats = $this->generateStats($reviews);
-
-    return view("reports.index", compact("stats"));
+    return view('reports.index', compact('stats'));
 }
 ```
 
 1.  **`Auth::user()`**: 現在ログインしている認証済みユーザーのモデルインスタンスを取得します。
-2.  **`Review::with(["book.genres"])`**: Reviewモデルのクエリを開始し、`with()`メソッドでリレーションをEager Loading（先行読み込み）しています。`book`リレーションと、さらに`book`に紐づく`genres`リレーションをあらかじめ一括で読み込むことで、N+1問題を回避し、パフォーマンスを向上させます。
-3.  **`->where("user_id", $user->id)`**: 取得するレビューを、ログインユーザーのものだけに絞り込みます。
-4.  **`->get()`**: 設定されたクエリを実行し、結果を`Illuminate\Support\Collection`のインスタンスとして取得します。
-5.  **`$this->generateStats($reviews)`**: 取得したレビューのコレクションを、後述するプライベートメソッドに渡し、各種統計データを生成させます。
-6.  **`view("reports.index", compact("stats"))`**: `reports.index`というBladeビューを返します。`compact("stats")`は、`["stats" => $stats]`という配列を作成するのと同じ意味で、ビュー内で`$stats`変数を使えるようにします。
+2.  **`$user->reviews()->with('book.genres')->get()`**: ユーザーモデルの`reviews()`リレーションメソッドを経由してレビューを取得しています。`Review::where('user_id', ...)`と書く代わりに、Eloquentのリレーションを活用することで、より宣言的で読みやすいコードになっています。`with('book.genres')`でEager Loading（先行読み込み）を行い、N+1問題を回避しています。
+3.  **`$stats = [...]`**: 各種統計データを直接`index`メソッド内で組み立てています。中間の`generateStats`メソッドを経由せず、`$stats`配列のキーと各`calculate*`メソッドの対応関係が一目でわかるシンプルな構造です。
+4.  **`view('reports.index', compact('stats'))`**: `reports.index`というBladeビューを返します。`compact('stats')`は、`['stats' => $stats]`という配列を作成するのと同じ意味で、ビュー内で`$stats`変数を使えるようにします。
 
-### `generateSummary()` メソッド：基本統計
+### `calculateSummary()` メソッド：基本統計
 
 ```php
-private function generateSummary(Collection $reviews): array
+private function calculateSummary(Collection $reviews): array
 {
     return [
-        "total_reviews" => $reviews->count(),
-        "books_read" => $reviews->pluck("book_id")->unique()->count(),
-        "average_rating" => round($reviews->avg("rating") ?? 0, 1),
+        'total_reviews' => $reviews->count(),
+        'books_read' => $reviews->pluck('book_id')->unique()->count(),
+        'average_rating' => $reviews->avg('rating') ?? 0,
     ];
 }
 ```
 
 1.  **`$reviews->count()`**: コレクションに含まれるレビューの総数を返します。
-2.  **`$reviews->pluck("book_id")`**: コレクション内の各レビューから`book_id`の値だけを抽出した、新しいコレクションを生成します。
+2.  **`$reviews->pluck('book_id')`**: コレクション内の各レビューから`book_id`の値だけを抽出した、新しいコレクションを生成します。
 3.  **`->unique()`**: `pluck`で作成したコレクションから、重複する`book_id`を取り除きます。
 4.  **`->count()`**: `unique`で重複を除外した後のコレクションの要素数を数えることで、レビューしたユニークな書籍の総数を取得します。
-5.  **`$reviews->avg("rating")`**: コレクション内の全レビューの`rating`カラムの平均値を計算します。レビューが0件の場合は`null`を返します。
+5.  **`$reviews->avg('rating')`**: コレクション内の全レビューの`rating`カラムの平均値を計算します。レビューが0件の場合は`null`を返します。
 6.  **`?? 0`**: Null合体演算子。`avg()`が`null`を返した場合（レビューが0件の場合）に、代わりに`0`を使用します。これにより、エラーを防ぎます。
-7.  **`round(..., 1)`**: 計算した平均評価を、小数点以下1桁に丸めます。
 
-### `generateRatingDistribution()` メソッド：評価の分布
+### `calculateRatingDistribution()` メソッド：評価の分布
 
 ```php
-private function generateRatingDistribution(Collection $reviews): array
+private function calculateRatingDistribution(Collection $reviews): Collection
 {
-    $distribution = $reviews
-        ->groupBy("rating")
-        ->map(fn (Collection $group): int => $group->count());
+    $grouped = $reviews->groupBy('rating');
 
     return collect(range(1, 5))
-        ->mapWithKeys(fn (int $rating): array => [$rating - 1 => $distribution->get($rating, 0)])
-        ->toArray();
+        ->map(fn ($rating) => $grouped->has($rating) ? $grouped[$rating]->count() : 0);
 }
 ```
 
-1.  **`$reviews->groupBy("rating")`**: レビューのコレクションを、`rating`の値（1〜5）に基づいてグループ化します。結果は `[1 => Collection, 2 => Collection, ...]` のような、評価値をキーとするコレクションのコレクションになります。
-2.  **`->map(...)`**: グループ化されたコレクションの各要素（各評価のレビューコレクション）に対して処理を行い、その要素数を`count()`で数えます。これにより、評価ごとの件数が `[1 => 5, 3 => 10, ...]` のように集計されます。
-3.  **`collect(range(1, 5))`**: PHPの`range(1, 5)`関数で `[1, 2, 3, 4, 5]` という配列を作成し、それをLaravelのコレクションに変換します。これは、レビューが存在しない評価も結果に含めるための土台となります。
-4.  **`->mapWithKeys(...)`**: 1〜5のコレクションを元に、新しいキーと値を持つコレクションを作成します。`[$rating - 1 => ...]` の部分で、ビューのグラフが0から始まるインデックスを期待しているため、キーを調整しています。`$distribution->get($rating, 0)`の部分で、`map`で集計した結果から対応する評価の件数を取得します。もし件数が存在しない場合（レビューが0件の評価）は、デフォルト値として`0`を返します。
-5.  **`->toArray()`**: 最終的に作成されたコレクションを、単純なPHPの配列に変換して返します。
+1.  **`$reviews->groupBy('rating')`**: レビューのコレクションを、`rating`の値（1〜5）に基づいてグループ化します。結果は `[1 => Collection, 2 => Collection, ...]` のような、評価値をキーとするコレクションのコレクションになります。
+2.  **`collect(range(1, 5))`**: PHPの`range(1, 5)`関数で `[1, 2, 3, 4, 5]` という配列を作成し、それをLaravelのコレクションに変換します。これは、レビューが存在しない評価も結果に含めるための土台となります。
+3.  **`->map(fn ($rating) => ...)`**: 1〜5の各評価について、`$grouped->has($rating)`でその評価のグループが存在するかを確認します。存在する場合はその件数を`count()`で取得し、存在しない場合は`0`を返します。
+4.  **戻り値が`Collection`**: 配列に変換せず`Collection`のまま返している点に注目してください。Bladeテンプレートでは`Collection`も配列と同様にインデックスでアクセスできるため、`toArray()`は不要です。
 
-### `getTopRatedBooks()` メソッド：高評価書籍ランキング
+### `calculateTopRatedBooks()` メソッド：高評価書籍ランキング
 
 ```php
-private function getTopRatedBooks(Collection $reviews): Collection
+private function calculateTopRatedBooks(Collection $reviews): Collection
 {
     return $reviews
-        ->filter(fn (Review $review): bool => $review->rating >= 4)
-        ->sortByDesc("rating")
+        ->filter(fn ($review) => $review->rating >= 4)
+        ->sortByDesc('rating')
         ->take(5)
-        ->map(fn (Review $review): array => [
-            "id" => $review->book->id,
-            "title" => $review->book->title,
-            "author" => $review->book->author,
-            "rating" => $review->rating,
+        ->map(fn ($review) => [
+            'id' => $review->book->id,
+            'title' => $review->book->title,
+            'author' => $review->book->author,
+            'rating' => $review->rating,
         ])
         ->values();
 }
 ```
 
-1.  **`->filter(...)`**: コレクション内の各レビューをチェックし、`rating`が4以上のレビューだけを残した新しいコレクションを返します。
-2.  **`->sortByDesc("rating")`**: フィルタリングされたコレクションを、`rating`の値に基づいて降順（高い順）に並べ替えます。
+1.  **`->filter(...)`**: コレクション内の各レビューをチェックし、`rating`が4以上のレビューだけを残した新しいコレクションを返します。クロージャの引数に型宣言（`Review $review`）を付けず`$review`だけにすることで、シンプルに記述しています。
+2.  **`->sortByDesc('rating')`**: フィルタリングされたコレクションを、`rating`の値に基づいて降順（高い順）に並べ替えます。
 3.  **`->take(5)`**: 並べ替えたコレクションの先頭から5件を取得します。
 4.  **`->map(...)`**: 上位5件のレビューコレクションを元に、ビューで表示するために必要な情報（書籍のid, title, author, そしてレビューのrating）だけを抽出した新しいコレクションを生成します。
 5.  **`->values()`**: コレクションのキーをリセットし、`0`, `1`, `2`...という連番に振り直します。これにより、Blade側でインデックスを使った順位表示などが容易になります。
 
-### `generateGenreRatings()` メソッド：ジャンル別評価傾向
+### `calculateGenreRatings()` メソッド：ジャンル別評価傾向
 
 ```php
-private function generateGenreRatings(Collection $reviews): Collection
+private function calculateGenreRatings(Collection $reviews): Collection
 {
     return $reviews
-        ->flatMap(fn (Review $review): Collection => $review->book->genres->map(
-            fn ($genre) => [
-                "id" => $genre->id,
-                "name" => $genre->name,
-                "rating" => $review->rating,
-            ]
-        ))
-        ->groupBy("name")
-        ->map(function (Collection $genreReviews, string $genreName): array {
-            return [
-                "id" => $genreReviews->first()["id"],
-                "name" => $genreName,
-                "count" => $genreReviews->count(),
-                "average_rating" => round($genreReviews->avg("rating"), 1),
-            ];
-        })
-        ->sortByDesc("average_rating")
+        // flatMap: 1レビュー → 複数ジャンルに展開（多対多の扱い）
+        ->flatMap(fn ($review) => $review->book->genres->map(fn ($genre) => [
+            'genre_id' => $genre->id,
+            'genre_name' => $genre->name,
+            'rating' => $review->rating,
+        ]))
+        // groupBy + map: ジャンルごとに集計
+        ->groupBy('genre_id')
+        ->map(fn ($items) => [
+            'id' => $items->first()['genre_id'],
+            'name' => $items->first()['genre_name'],
+            'count' => $items->count(),
+            'average_rating' => round($items->avg('rating'), 1),
+        ])
+        ->sortByDesc('average_rating')
         ->take(5)
         ->values();
 }
 ```
 
-1.  **`->flatMap(...)`**: ここでの最重要メソッドです。`map`と似ていますが、`flatMap`は多次元のコレクションを一次元のフラットなコレクションに展開します。ここでは、各レビューについて、その書籍が持つ全ジャンルを展開し、`["id" => ..., "name" => ..., "rating" => ...]` という配列のフラットなコレクションを生成します。
-2.  **`->groupBy("name")`**: フラット化されたコレクションを、ジャンル名でグループ化します。
-3.  **`->map(...)`**: 各ジャンルグループについて、レビュー数（`count`）と平均評価（`average_rating`）を計算した新しいコレクションを生成します。
-4.  **`->sortByDesc("average_rating")`**: 平均評価の高い順にソートします。
+1.  **`->flatMap(...)`**: ここでの最重要メソッドです。`map`と似ていますが、`flatMap`は多次元のコレクションを一次元のフラットなコレクションに展開します。ここでは、各レビューについて、その書籍が持つ全ジャンルを展開し、`['genre_id' => ..., 'genre_name' => ..., 'rating' => ...]` という配列のフラットなコレクションを生成します。キーを`genre_id`/`genre_name`としているのは、後の`groupBy`でジャンルIDを使い、集計結果にも正しいキー名で値を取り出せるようにするためです。
+2.  **`->groupBy('genre_id')`**: フラット化されたコレクションを、ジャンルIDでグループ化します。ジャンル名ではなくIDでグループ化することで、同名の異なるジャンルが混同されるのを防ぎます。
+3.  **`->map(...)`**: 各ジャンルグループについて、`$items->first()['genre_id']`と`$items->first()['genre_name']`でジャンル情報を取得し、レビュー数（`count`）と平均評価（`average_rating`）を計算した新しいコレクションを生成します。
+4.  **`->sortByDesc('average_rating')`**: 平均評価の高い順にソートします。
 5.  **`->take(5)`**: 上位5件を取得し、`values()`でキーをリセットして返します。
 
 ### **構文解説：アロー関数とメソッドチェーン**
 
-`generateGenreRatings`メソッドのコードは、アロー関数とメソッドチェーンが多用されており、初学者には複雑に見えるかもしれません。少し分解して見ていきましょう。
+`calculateGenreRatings`メソッドのコードは、アロー関数とメソッドチェーンが多用されており、初学者には複雑に見えるかもしれません。少し分解して見ていきましょう。
 
 ```php
 // ...
-->flatMap(fn (Review $review): Collection => $review->book->genres->map(
-    fn ($genre) => [
-        'id' => $genre->id,
-        'name' => $genre->name,
-        'rating' => $review->rating,
-    ]
-))
+->flatMap(fn ($review) => $review->book->genres->map(fn ($genre) => [
+    'genre_id' => $genre->id,
+    'genre_name' => $genre->name,
+    'rating' => $review->rating,
+]))
 // ...
 ```
 
@@ -319,26 +318,26 @@ private function generateGenreRatings(Collection $reviews): Collection
 
 これは、PHP 7.4から導入された短い無名関数（クロージャ）の書き方で、「アロー関数」と呼ばれます。
 
-例えば、`fn (Review $review): Collection => ...` の部分は、従来の書き方では以下のようになります。
+例えば、`fn ($review) => ...` の部分は、従来の書き方では以下のようになります。
 
 ```php
-function (Review $review): Collection {
+function ($review) {
     return ...;
 }
 ```
 
-アロー関数を使うと、より簡潔に処理を記述できます。`map`や`filter`のような、コールバック関数を引数に取るメソッドで特によく使われます。
+アロー関数を使うと、より簡潔に処理を記述できます。`map`や`filter`のような、コールバック関数を引数に取るメソッドで特によく使われます。なお、型宣言（`Review $review`や`: Collection`など）を省略することで、さらに簡潔に書けます。
 
 #### **メソッドチェーン `->method1()->method2()`**
 
 `->` で繋がれた一連の処理は「メソッドチェーン」と呼ばれます。これは、前のメソッドが返した**コレクションオブジェクト**に対して、次のメソッドを呼び出しています。
 
-`generateGenreRatings`の処理の流れを日本語にすると、以下のようになります。
+`calculateGenreRatings`の処理の流れを日本語にすると、以下のようになります。
 
 1.  `$reviews` というレビューのコレクションに対して…
 2.  `flatMap` を使って、各レビューからジャンル情報を取り出し、一つの大きなコレクションに平坦化しなさい。
 3.  その平坦化されたコレクションに対して…
-4.  `groupBy('name')` を使って、ジャンル名でグループ分けしなさい。
+4.  `groupBy('genre_id')` を使って、ジャンルIDでグループ分けしなさい。
 5.  そのグループ分けされたコレクションに対して…
 6.  `map` を使って、各ジャンルのレビュー数と平均評価を計算しなさい。
 7.  その計算結果のコレクションに対して…
