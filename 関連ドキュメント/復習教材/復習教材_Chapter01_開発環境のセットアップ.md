@@ -1,17 +1,20 @@
-# Chapter 1: 開発環境のセットアップ
+# Chapter 01: 「完璧なキッチン」 - 開発環境のセットアップ
 
-## 🎯 このセクションで学ぶこと
+## 🎯 このChapterの目標
 
-このセクションでは、書籍レビューアプリ「BookShelf」を開発するための環境をゼロから構築します。具体的には、以下の技術要素を学び、セットアップします。
+このChapterでは、書籍レビューアプリ「BookShelf」を開発するための環境をゼロから構築します。いわば**「開発という料理を作るための、完璧なキッチンを準備する」**工程です。最高のキッチンがあれば、後の調理（コーディング）がスムーズに進みます。
 
-- **DockerとLaravel Sail**: なぜDockerを使うのか、そしてLaravel Sailがいかに開発環境構築を簡単にするのかを理解します。
-- **Laravel 10.xプロジェクトの作成**: 特定のバージョンのLaravelプロジェクトを作成する方法を学びます。
-- **フロントエンドのセットアップ**: ViteとTailwind CSSを導入し、モダンなフロントエンド開発の準備をします。
-- **phpMyAdminの導入**: データベースを視覚的に操作するツールを導入します。
+| このChapterで学ぶこと | 解説 |
+|:---|:---|
+| DockerとLaravel Sail | なぜDockerを使うのか、Laravel Sailがいかに開発環境構築を簡単にするのかを理解 |
+| Laravel 10.xプロジェクトの作成 | 特定のバージョンのLaravelプロジェクトを作成する方法 |
+| フロントエンドのセットアップ | Alpine.js を導入し、フロントエンドの準備を完了 |
+| 日本語バリデーションメッセージ | `lang/ja/` ファイルを配置し、エラーメッセージを日本語化 |
+| phpMyAdminの導入 | データベースを視覚的に操作するツールの導入 |
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：なぜDockerから始めるのか？
+## 📖 背景知識：なぜDockerから始めるのか？
 
 実務では、開発を始める前にまず「全員が同じ環境で動くこと」を保証する必要があります。もし、AさんのPCでは動くけど、BさんのPCでは動かない、という状況が発生すると、その原因調査だけで膨大な時間が溶けてしまいます。これを「環境差異」と呼び、開発チームの生産性を著しく下げる要因となります。
 
@@ -21,18 +24,15 @@
 | Dockerのコマンドは複雑で覚えるのが大変 | **Laravel Sail**を使い、Docker操作をシンプルにする | Laravelプロジェクト専用のツール。Dockerの学習コストを下げ、すぐに開発に着手できる。 |
 | プロジェクトごとに必要なツールが異なる | `compose.yaml`でphpMyAdminなどの追加ツールを定義する | データベースの中身を視覚的に確認できるツールはデバッグに必須。最初に入れておくと効率が上がる。 |
 
-このChapterは、いわば**「開発という料理を作るための、完璧なキッチンを準備する」**工程です。最高のキッチンがあれば、後の調理（コーディング）がスムーズに進みます。
-
 ---
 
-## 1.1. Laravelプロジェクトの作成 (Laravel 10.x)
+## 📋 実装の手順
+
+### 1.1. Laravelプロジェクトの作成 (Laravel 10.x)
 
 まずは、このプロジェクトの土台となるLaravelの骨組みを作成します。
 
-### 1.1.1. コマンドの実行
-
 ```bash
-# Laravel 10.x を指定してプロジェクトを作成
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
@@ -42,35 +42,13 @@ docker run --rm \
     composer create-project laravel/laravel:^10.0 book-review-app
 ```
 
-### 1.1.2. コードリーディング：`docker run`コマンドの分解
-
-この一見複雑なコマンドも、一つ一つのオプションに分解すれば理解できます。
-
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `docker run` | 新しいコンテナを起動するコマンド | (コンテナの実行結果) | Dockerの最も基本的なコマンドです。 |
-| `--rm` | コンテナ停止時に自動的にコンテナを削除する | なし | 一時的なコマンド実行に便利。不要なコンテナが残りません。 |
-| `-u "$(id -u):$(id -g)"` | 現在のユーザーのIDとグループIDでコンテナを実行する | なし | ✅ これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。 |
-| `-v "$(pwd):/var/www/html"` | 現在のディレクトリをコンテナの`/var/www/html`にマウントする | なし | ローカルのファイルをコンテナ内で直接編集できるようになります。 |
-| `-w /var/www/html` | コンテナ内の作業ディレクトリを指定する | なし | この後のコマンドが、このディレクトリで実行されます。 |
-| `laravelsail/php82-composer:latest` | 使用するDockerイメージを指定 | なし | PHP 8.2とComposerがプリインストールされたLaravel Sail公式イメージです。 |
-| `composer create-project ...` | Composerを使ってLaravelプロジェクトを作成するコマンド | (プロジェクトファイル) | `laravel/laravel:^10.0`でバージョン10を指定しています。 |
-
-❌ **よくある間違い**: `composer create-project laravel/laravel book-review-app` のようにローカル環境で実行しようとすると、ローカルのPHPやComposerのバージョンに依存してしまい、環境差異の原因になります。
-
----
-
-## 1.2. Laravel Sailのインストール
+### 1.2. Laravel Sailのインストール
 
 次に、Docker操作を簡単にするためのツール「Laravel Sail」をプロジェクトに導入します。
 
-### 1.2.1. コマンドの実行
-
 ```bash
-# プロジェクトディレクトリに移動
 cd book-review-app
 
-# Laravel Sailをインストール
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
@@ -79,7 +57,6 @@ docker run --rm \
     laravelsail/php82-composer:latest \
     composer require laravel/sail --dev
 
-# Sailの設定ファイルをパブリッシュ（MySQLを選択）
 docker run --rm \
     -u "$(id -u):$(id -g)" \
     -v "$(pwd):/var/www/html" \
@@ -89,20 +66,9 @@ docker run --rm \
     php artisan sail:install --with=mysql
 ```
 
-### 1.2.2. コードリーディング：`sail:install`コマンド
+### 1.3. .env ファイルの設定
 
-| 部分 | 説明 | 戻り値 | 💡 ポイント |
-|:---|:---|:---|:---|
-| `php artisan sail:install` | Laravel SailをプロジェクトにセットアップするArtisanコマンド | (設定ファイル) | `compose.yaml`というDockerの設定ファイルを生成します。 |
-| `--with=mysql` | 使用するサービスとしてMySQLを選択するオプション | なし | 他にも`redis`や`pgsql`などを選択できます。 |
-
-このコマンドを実行すると、プロジェクトのルートに`compose.yaml`ファイルが作成されます。これが、私たちの「開発環境の設計図」となります。
-
----
-
-## 1.3. .env ファイルの設定
-
-`.env` ファイルを開き、データベース接続情報が以下と一致していることを確認します。
+`.env` ファイルのデータベース接続情報を確認・修正します。
 
 ```dotenv
 DB_CONNECTION=mysql
@@ -115,121 +81,311 @@ DB_PASSWORD=password
 
 **重要:** `DB_HOST` は `localhost` や `127.0.0.1` ではなく、Dockerコンテナ名である `mysql` を指定します。
 
----
+末尾に Google Books API キーを追加します（応用機能 ISBN検索で使用）。
 
-## 1.4. フロントエンドとツールのセットアップ
-
-ここでは、コンテナを起動し、開発を効率化するための周辺ツールを導入します。
-
-### 1.4.1. Sailの起動とエイリアス設定
-
-まず、Dockerコンテナを起動し、以降のコマンドを短く打てるように設定します。
-
-**1. Sailの起動**
-
-以下のコマンドで、compose.yamlの設計図を元にコンテナをバックグラウンドで起動します。
-
-```bash
-./vendor/bin/sail up -d
+```dotenv
+GOOGLE_BOOKS_API_KEY=
 ```
 
-**2. エイリアスの設定**
+### 1.4. compose.yaml の設定
 
-長いコマンドを sail という短いエイリアスで実行できるように設定します。
-
-```bash
-echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
-source ~/.zshrc
-```
-
-### 1.4.2. フロントエンドのセットアップ (Vite & Tailwind CSS)
-
-**1. NPM依存パッケージのインストール**
-
-```bash
-sail npm install
-```
-
-**2. Tailwind CSSのインストール**
-
-```bash
-sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer
-```
-
-**3. 設定ファイルの生成**
-
-```bash
-sail npx tailwindcss init -p
-```
-
-**4. Tailwind CSSのテンプレートパス設定**
-
-`tailwind.config.js` を開き、TailwindがCSSを適用するテンプレートファイル（Bladeファイルなど）のパスを指定します。
-
-**`tailwind.config.js`**
-```javascript
-/** @type {import(\'tailwindcss\').Config} */
-export default {
-  content: [
-    "./resources/**/*.blade.php",
-    "./resources/**/*.js",
-    "./resources/**/*.vue",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-```
-
-**5. bladeファイルの挿入**  
-本プロジェクトのresourseファイルを[Preparedblade-mockcase-BookShelf](https://github.com/coachtech-material/Preparedblade-mockcase-BookShelf) リポジトリのbasicブランチにあるresourseファイルと入れ替えてください。  
-openコマンドを利用してcloneしてきたファイルをGUIで移動する、もしくはmvコマンドを活用して入れ替えるのが最も早い方法です。
-
-**6. Vite開発サーバーの起動**
-
-```bash
-# 新しいターミナルを開いて実行
-sail npm run dev
-```
-
-### 1.4.3. phpMyAdminの追加
-
-`compose.yaml` を開き、`mysql` サービスの後に以下の設定を追加してください。
-
-**`compose.yaml` に追加する内容:**
+phpMyAdminを追加する場合、`compose.yaml` の `services:` 配下に以下を追加します。
 
 ```yaml
     phpmyadmin:
-        image: 'phpmyadmin:latest'
+        image: phpmyadmin/phpmyadmin
         ports:
-            - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
+            - '8080:80'
         environment:
             PMA_HOST: mysql
-            PMA_USER: '${DB_USERNAME}'
-            PMA_PASSWORD: '${DB_PASSWORD}'
+            PMA_USER: sail
+            PMA_PASSWORD: password
         networks:
             - sail
         depends_on:
             - mysql
 ```
 
-### 1.4.4. Sailの起動とエイリアス設定
+### 1.5. Sailの起動とAPP_KEY生成
 
-以下のコマンドで、`compose.yaml`の設計図を元に、定義された全てのコンテナ（Webサーバー、MySQL、phpMyAdmin）をバックグラウンドで起動します。
 ```bash
 ./vendor/bin/sail up -d
-```
-
-以下のコマンドで、長いコマンドを`sail`という短いエイリアスで実行できるように設定します。これにより、以降は`sail artisan migrate`のようにシンプルにコマンドを実行できます。
-```bash
-echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
-```
-
-これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。
-
-### 1.4.5. アプリケーションキーの生成
-以下のコマンドで、Laravel がアプリを安全に動かすために必要な「暗号化の元になる秘密鍵（APP_KEY）」 を .env に入れておきます。
-```php
 sail artisan key:generate
 ```
+
+エイリアスの設定（長いコマンドを `sail` で実行できるようにする）:
+
+```bash
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 1.6. フロントエンドのセットアップ
+
+```bash
+sail npm install
+sail npm install alpinejs
+```
+
+> **重要:** Alpine.js は `resources/js/app.js` で使用するため、ここで必ずインストールしてください。
+
+**`tailwind.config.js`:**
+
+```js
+import defaultTheme from 'tailwindcss/defaultTheme';
+import forms from '@tailwindcss/forms';
+
+/** @type {import('tailwindcss').Config} */
+export default {
+    content: [
+        './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
+        './storage/framework/views/*.php',
+        './resources/views/**/*.blade.php',
+    ],
+
+    theme: {
+        extend: {
+            fontFamily: {
+                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+            },
+        },
+    },
+
+    plugins: [forms],
+};
+```
+
+**`postcss.config.js`:**
+
+```js
+export default {
+    plugins: {
+        tailwindcss: {},
+        autoprefixer: {},
+    },
+};
+```
+
+**`resources/css/app.css`:**
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+**`vite.config.js`:**
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/app.js'],
+            refresh: true,
+        }),
+    ],
+});
+```
+
+**`resources/js/app.js`:**
+
+```js
+import './bootstrap';
+
+import Alpine from 'alpinejs';
+
+window.Alpine = Alpine;
+
+Alpine.start();
+```
+
+> **重要:** この `app.js` は Alpine.js をインポートし起動しています。Bladeテンプレート内の `x-data` や `@click` といったAlpine.jsディレクティブが動作するために必須です。
+
+Bladeファイルの配置後、フロントエンドをビルドします。
+
+```bash
+sail npm run build
+```
+
+### 1.7. 日本語バリデーションメッセージの準備
+
+`config/app.php` で `'locale' => 'ja'` に変更します。
+
+`lang/ja/` ディレクトリを作成し、以下3ファイルを配置します。
+
+```bash
+mkdir -p lang/ja
+```
+
+**`lang/ja/validation.php`:**
+
+```php
+<?php
+
+return [
+    'min' => [
+        'string' => ':attributeは:min文字以上で入力してください。',
+    ],
+
+    'attributes' => [
+        'name' => 'お名前',
+        'email' => 'メールアドレス',
+        'password' => 'パスワード',
+    ],
+];
+```
+
+**`lang/ja/auth.php`:**
+
+```php
+<?php
+
+return [
+    'failed' => 'ログイン情報が登録されていません。',
+    'password' => '入力されたパスワードが正しくありません。',
+    'throttle' => 'ログインの試行回数が多すぎます。:seconds 秒後にお試しください。',
+];
+```
+
+**`lang/ja/passwords.php`:**
+
+```php
+<?php
+
+return [
+    'reset' => 'パスワードをリセットしました。',
+    'sent' => 'パスワードリセット用のリンクをメールで送信しました。',
+    'throttled' => '時間をおいてから再度お試しください。',
+    'token' => 'このパスワードリセットトークンは無効です。',
+    'user' => 'このメールアドレスに一致するユーザーが見つかりません。',
+];
+```
+
+---
+
+## 💭 なぜこう作るのか？
+
+### docker run コマンドの分解
+
+この一見複雑なコマンドも、一つ一つのオプションに分解すれば理解できます。
+
+| 部分 | 説明 | ポイント |
+|:---|:---|:---|
+| `docker run` | 新しいコンテナを起動するコマンド | Dockerの最も基本的なコマンドです。 |
+| `--rm` | コンテナ停止時に自動的にコンテナを削除する | 一時的なコマンド実行に便利。不要なコンテナが残りません。 |
+| `-u "$(id -u):$(id -g)"` | 現在のユーザーのIDとグループIDでコンテナを実行する | これにより、コンテナ内で作成されたファイルの所有者が現在のユーザーになり、パーミッションの問題を防ぎます。 |
+| `-v "$(pwd):/var/www/html"` | 現在のディレクトリをコンテナの`/var/www/html`にマウントする | ローカルのファイルをコンテナ内で直接編集できるようになります。 |
+| `-w /var/www/html` | コンテナ内の作業ディレクトリを指定する | この後のコマンドが、このディレクトリで実行されます。 |
+| `laravelsail/php82-composer:latest` | 使用するDockerイメージを指定 | PHP 8.2とComposerがプリインストールされたLaravel Sail公式イメージです。 |
+| `composer create-project ...` | Composerを使ってLaravelプロジェクトを作成するコマンド | `laravel/laravel:^10.0`でバージョン10を指定しています。 |
+
+よくある間違い: `composer create-project laravel/laravel book-review-app` のようにローカル環境で実行しようとすると、ローカルのPHPやComposerのバージョンに依存してしまい、環境差異の原因になります。
+
+### sail:install コマンド
+
+| 部分 | 説明 | ポイント |
+|:---|:---|:---|
+| `php artisan sail:install` | Laravel SailをプロジェクトにセットアップするArtisanコマンド | `compose.yaml`というDockerの設定ファイルを生成します。 |
+| `--with=mysql` | 使用するサービスとしてMySQLを選択するオプション | 他にも`redis`や`pgsql`などを選択できます。 |
+
+### Alpine.js の役割
+
+Alpine.js は、Bladeテンプレート内で `x-data`、`@click`、`x-show` などのディレクティブを使って、JavaScript をHTMLに直接記述するための軽量フレームワークです。お気に入りのトグルボタンやドロップダウンメニューなど、ちょっとしたインタラクションに使用します。
+
+---
+
+## 🚀 コードの実装
+
+このChapterで作成・編集するファイルの一覧です。
+
+| ファイル | 操作 | 説明 |
+|:---|:---|:---|
+| `book-review-app/` | 新規作成 | Laravel 10.xプロジェクト一式 |
+| `.env` | 編集 | DB接続情報 + Google Books APIキー |
+| `compose.yaml` | 編集 | phpMyAdmin追加 |
+| `tailwind.config.js` | 編集 | テンプレートパス設定 |
+| `postcss.config.js` | 確認 | PostCSS設定 |
+| `vite.config.js` | 確認 | Vite設定 |
+| `resources/css/app.css` | 編集 | Tailwindディレクティブ |
+| `resources/js/app.js` | 編集 | Alpine.js インポート |
+| `config/app.php` | 編集 | `locale` を `ja` に変更 |
+| `lang/ja/validation.php` | 新規作成 | 日本語バリデーションメッセージ |
+| `lang/ja/auth.php` | 新規作成 | 日本語認証メッセージ |
+| `lang/ja/passwords.php` | 新規作成 | 日本語パスワードメッセージ |
+
+---
+
+## 🔍 コードリーディング
+
+### resources/js/app.js
+
+```js
+import './bootstrap';
+
+import Alpine from 'alpinejs';
+
+window.Alpine = Alpine;
+
+Alpine.start();
+```
+
+| コード | 解説 |
+|:---|:---|
+| `import './bootstrap'` | Laravel標準の `bootstrap.js`（axios設定など）を読み込みます。 |
+| `import Alpine from 'alpinejs'` | `npm install alpinejs` でインストールした Alpine.js パッケージをインポートします。 |
+| `window.Alpine = Alpine` | グローバルオブジェクトに Alpine を設定し、Blade テンプレートからアクセス可能にします。 |
+| `Alpine.start()` | Alpine.js を起動し、HTML内の `x-data` などのディレクティブを処理開始します。 |
+
+### lang/ja/validation.php
+
+| キー | 解説 |
+|:---|:---|
+| `'min.string'` | パスワードなどの最小文字数バリデーション失敗時のメッセージ。`:attribute` と `:min` はLaravelが自動置換します。 |
+| `'attributes'` | フォームフィールド名を日本語に変換するマッピング。`name` → `お名前` のように、エラーメッセージ中のフィールド名が日本語表示されます。 |
+
+---
+
+## 🧐 調べ方のヒント
+
+分からないことがあった時、AIに聞くプロンプト例を紹介します。
+
+| 疑問 | プロンプト例 |
+|:---|:---|
+| Docker のコマンドが分からない | 「docker run の -v オプションと -w オプションの違いを教えてください。」 |
+| Sail のコマンド体系 | 「Laravel Sail でよく使うコマンドの一覧と、それぞれの用途を教えてください。」 |
+| Alpine.js の基本 | 「Alpine.js の x-data, @click, x-show の基本的な使い方を、具体的なHTML例で教えてください。」 |
+| バリデーションの日本語化 | 「Laravel でバリデーションメッセージを日本語にする方法を教えてください。lang/ja/ ファイルの構造も含めて。」 |
+| Vite と Tailwind の設定 | 「Laravel 10 で Vite と Tailwind CSS を使うための最小限の設定ファイルの構成を教えてください。」 |
+
+---
+
+## ✅ 動作確認
+
+環境構築が正しく完了したか、以下のポイントを確認しましょう。
+
+| 確認項目 | 確認方法 |
+|:---|:---|
+| コンテナの起動 | `sail ps` で `laravel.test`、`mysql`、`phpmyadmin` が `running` であること |
+| Laravelの初期画面 | ブラウザで `http://localhost` にアクセスし、Laravelのウェルカムページが表示されること |
+| phpMyAdmin | ブラウザで `http://localhost:8080` にアクセスし、phpMyAdminの画面が表示されること |
+| APP_KEY | `.env` ファイルに `APP_KEY=base64:...` が設定されていること |
+
+---
+
+## ✨ このChapterのまとめ
+
+このChapterでは、開発環境を構成する全てのピースを組み立てました。
+
+| 構成要素 | 役割 |
+|:---|:---|
+| Docker + Laravel Sail | チーム全員が同一の実行環境を共有 |
+| `.env` | データベース接続情報とAPIキーの管理 |
+| compose.yaml | phpMyAdmin等の追加サービス定義 |
+| Alpine.js (`resources/js/app.js`) | Blade内のインタラクティブUIの基盤 |
+| `lang/ja/*.php` | バリデーション・認証エラーメッセージの日本語化 |
+| Vite + Tailwind CSS | モダンなフロントエンドビルド環境 |
+
+これで、開発を始めるための環境がすべて整いました。次のChapterでは、この環境を使ってデータベースの設計図である「マイグレーション」を作成していきます。

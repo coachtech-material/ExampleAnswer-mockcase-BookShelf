@@ -4,372 +4,55 @@
 
 ## 🎯 このセクションで学ぶこと
 
-- **応用機能**（検索、CSVエクスポート、ISBN検索、読書レポート）のFeatureテスト
+- **応用機能**（検索・ソート、ISBN検索、読書レポート、Sanctum認証API）のFeatureテスト
 - **コントローラーのメソッドを直接呼び出す**テスト手法
 - レスポンスとして返される**Viewオブジェクトの中身を検証する**方法
 - `Http::fake()`を使った**外部API連携のテスト**
-- `assertSeeInOrder`, `assertHeader`, `streamedContent`など、応用的なアサーションメソッド
+- `Sanctum::actingAs()`を使った**API認証テスト**
+- `assertSeeInOrder`, `assertJsonPath`, `assertExactJson`など、応用的なアサーションメソッド
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス
+## 📖 先輩エンジニアの思考プロセス
 
 ### なぜ応用機能のテストも必要なのか？
 
-Chapter 13では、基本的なCRUD操作や認証・認可のテストを行いました。しかし、実務で開発するアプリケーションには、検索、外部連携、データエクスポートなど、より複雑な「応用機能」が数多く存在します。これらの機能は、複数の条件分岐や特殊なデータ処理を含むことが多く、手動でのテストには限界があります。
-
-例えば、**検索機能**では、「キーワードとジャンルの両方を指定した場合」「並び替え順を変更した場合」など、組み合わせパターンが爆発的に増加します。**外部API連携**では、「APIが正常にレスポンスを返さなかった場合」「APIキーが正しいか」など、正常系以外のケースも考慮しなければなりません。
-
-応用機能のテストを書くことで、これらの複雑なロジックが仕様通りに動作することを保証し、将来の変更にも強い、堅牢なアプリケーションを構築することができます。
+Chapter 14では、基本的なCRUD操作や認証・認可のテストを行いました。しかし、実務で開発するアプリケーションには、検索、外部連携、API認証など、より複雑な「応用機能」が数多く存在します。これらの機能は、複数の条件分岐や特殊なデータ処理を含むことが多く、手動でのテストには限界があります。
 
 ### どうやってテストの「観点」を見つけるか？
 
-テストを書く際、「何をテストすればいいのか？」と迷うことがあります。基本的な考え方は、「**ユーザーの操作**」と「**システムの振る舞い**」を分解し、それぞれの重要なポイントを検証することです。
-
 | 機能 | ユーザーの操作 / システムのイベント | システムの振る舞い（テストの観点） |
 |:---|:---|:---|
-| **検索機能** | キーワードを入力して検索ボタンを押す | - 検索結果が正しく表示されるか？ (`assertSee`)
-- 関係ないデータは表示されていないか？ (`assertDontSee`)
-- 並び替え順は正しいか？ (`assertSeeInOrder`) |
-| **CSVエクスポート** | エクスポートボタンを押す | - CSVファイルがダウンロードされるか？ (`assertOk`, `assertHeader`)
-- ファイル名は正しいか？ (`assertHeader`)
-- 検索条件がCSVの内容に反映されているか？ (`streamedContent`) |
-| **ISBN検索** | ISBNを入力して検索ボタンを押す | - 正常に書籍情報が返ってくるか？ (`assertOk`, `assertJson`)
-- APIキーは正しく送信されているか？ (`Http::fake`)
-- バリデーションは機能しているか？ (`assertStatus(400)`)
-- APIエラー時に適切なレスポンスを返すか？ (`assertStatus(500)`) |
-| **読書レポート** | レポートページにアクセスする | - 各種統計情報が正しく計算されているか？ (`assertViewHas`, `assertSame`)
-- レビューがないユーザーの場合、ゼロ件として表示されるか？ (`assertTrue($stats[...]->isEmpty())`) |
+| **検索機能** | キーワードを入力して検索する | 検索結果が正しいか？ 関係ないデータは表示されていないか？ 並び替え順は正しいか？ |
+| **ISBN検索** | ISBNを入力して検索する | 正常に書籍情報が返ってくるか？ バリデーションは機能しているか？ APIエラー時に適切なレスポンスを返すか？ |
+| **読書レポート** | レポートページにアクセスする | 各種統計情報が正しく計算されているか？ レビューがないユーザーでもエラーにならないか？ |
+| **Sanctum認証API** | 認証あり/なしでAPIにアクセスする | 未認証時に401が返るか？ 認証済みで正常に動作するか？ 他人のデータを変更できないか？ |
 
-### テスト手法をどう使い分けるか？
+### 外部API連携のテスト
 
-Chapter 13では、主にHTTPリクエストを送信するFeatureテストを学びました。しかし、テストには様々なアプローチがあります。
+- **`Http::fake()`**: 実際の外部APIにリクエストを送信する代わりに、偽のレスポンスを返すように設定します。これにより、APIの障害やネットワークの問題に影響されず、安定して高速にテストを実行できます。
 
-- **HTTPリクエスト vs コントローラー直接呼び出し**
-  - **HTTPリクエスト**: ユーザー操作全体の流れを検証したい場合に最適です。ルーティングやミドルウェアも含めた総合的なテストになります。
-  - **コントローラー直接呼び出し**: ルーティングなどを介さず、コントローラーの特定のメソッドが返す「データ」そのものを検証したい場合に有効です。例えば、「`edit`メソッドが、Viewに正しい書籍データとジャンル一覧を渡しているか」を直接確認できます。
+### Sanctum認証のテスト
 
-- **外部API連携のテスト**
-  - **`Http::fake()`**: 実際の外部APIにリクエストを送信する代わりに、偽のレスポンスを返すように設定します。これにより、APIの障害やネットワークの問題に影響されず、安定して高速にテストを実行できます。また、「APIがエラーを返した場合」など、意図的に異常系の状況を作り出すことも容易になります。
-
-> **💡 テスト戦略**
-> 完璧なテスト戦略というものはなく、プロジェクトの特性やチームの方針によって様々です。重要なのは、それぞれのテスト手法のメリット・デメリットを理解し、「何を保証したいのか」という目的に合わせて、最適な手法を選択することです。
+- **`Sanctum::actingAs($user, ['*'])`**: テスト中にSanctumトークン認証をシミュレートします。Web画面の`actingAs()`と同様の役割ですが、API認証（Bearerトークン）をシミュレートする点が異なります。
 
 ---
 
-## 19.1. 応用機能のテストコード
+## 📋 テストファイルの構成
 
-このセクションでは、応用機能（高度な検索、CSVエクスポート、ISBN検索、読書レポート）に対するテストコードを実装します。
+| テストファイル | テスト対象 |
+|:---|:---|
+| `tests/Feature/BookControllerTest.php` | 検索・ソート・ISBN検索・書籍編集認可 |
+| `tests/Feature/ReportTest.php` | マイ読書レポートの統計データ |
+| `tests/Feature/Api/V1/BookApiTest.php` | 公開API + Sanctum認証テスト |
 
-### BookTest.php への追記・編集
+---
 
-Chapter 13で作成した`tests/Feature/BookTest.php`に、以下のメソッドを追記・編集してください。
+## 🚀 テストコード
 
-```php
-// ========== Chapter 19: 応用機能のテスト ========== 
+### 19.1. BookControllerTest の完全版
 
-/** @test */
-public function test_book_index_with_search_query_displays_results(): void
-{
-    Book::factory()->create(["title" => "Laravel Testing Guide"]);
-    Book::factory()->create(["title" => "Another Book"]);
-
-    $this->get(route("books.index", ["keyword" => "Laravel"]))
-        ->assertOk()
-        ->assertSee("Laravel Testing Guide")
-        ->assertDontSee("Another Book");
-}
-
-/** @test */
-public function test_book_index_with_genre_filter_displays_results(): void
-{
-    $genre = Genre::factory()->create();
-    $bookInGenre = Book::factory()->create();
-    $bookInGenre->genres()->attach($genre);
-    $bookNotInGenre = Book::factory()->create();
-
-    $this->get(route("books.index", ["genre" => $genre->id]))
-        ->assertOk()
-        ->assertSee($bookInGenre->title)
-        ->assertDontSee($bookNotInGenre->title);
-}
-
-/** @test */
-public function test_book_index_is_ordered_correctly(): void
-{
-    $latestBook = Book::factory()->create(["created_at" => now()]);
-    $oldestBook = Book::factory()->create(["created_at" => now()->subDay()]);
-
-    // 新着順（デフォルト）
-    $this->get(route("books.index", ["sort" => "newest"]))
-        ->assertOk()
-        ->assertSeeInOrder([$latestBook->title, $oldestBook->title]);
-
-    // 古い順
-    $this->get(route("books.index", ["sort" => "oldest"]))
-        ->assertOk()
-        ->assertSeeInOrder([$oldestBook->title, $latestBook->title]);
-}
-
-/** @test */
-public function test_book_index_can_sort_by_title(): void
-{
-    $bookZ = Book::factory()->create(["title" => "Zeta Title"]);
-    $bookA = Book::factory()->create(["title" => "Alpha Title"]);
-
-    $response = $this->get(route("books.index", ["sort" => "title"]));
-
-    $response->assertOk();
-
-    $titles = collect($response->viewData("books")->items())->pluck("title")->all();
-
-    $this->assertSame(
-        [$bookA->title, $bookZ->title],
-        $titles
-    );
-}
-
-/** @test */
-public function test_book_index_can_sort_by_average_rating(): void
-{
-    $highRatedBook = Book::factory()->create(["title" => "High Rated"]);
-    Review::factory()->for($highRatedBook)->create(["rating" => 5]);
-    Review::factory()->for($highRatedBook)->create(["rating" => 4]);
-
-    $lowRatedBook = Book::factory()->create(["title" => "Low Rated"]);
-    Review::factory()->for($lowRatedBook)->create(["rating" => 2]);
-
-    $response = $this->get(route("books.index", ["sort" => "rating"]));
-
-    $response->assertOk();
-
-    $titles = collect($response->viewData("books")->items())->pluck("title")->all();
-
-    $this->assertSame(
-        [$highRatedBook->title, $lowRatedBook->title],
-        $titles
-    );
-}
-
-/** @test */
-public function test_authenticated_user_can_export_csv(): void
-{
-    $user = User::factory()->create();
-    Book::factory()->count(3)->create();
-
-    $response = $this->actingAs($user)->get(route("books.export"));
-
-    $response->assertOk();
-    $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-    $this->assertStringContainsString(
-        "attachment; filename=",
-        $response->headers->get("Content-Disposition")
-    );
-    $this->assertStringContainsString(
-        ".csv",
-        $response->headers->get("Content-Disposition")
-    );
-}
-
-/** @test */
-public function test_csv_export_with_search_filters(): void
-{
-    $user = User::factory()->create();
-    Book::factory()->create(["title" => "Laravel Book"]);
-    Book::factory()->create(["title" => "PHP Book"]);
-
-    $response = $this->actingAs($user)->get(route("books.export", ["keyword" => "Laravel"]));
-
-    $response->assertOk();
-    $this->assertStringContainsString("Laravel Book", $response->streamedContent());
-    $this->assertStringNotContainsString("PHP Book", $response->streamedContent());
-}
-
-/** @test */
-public function test_guest_cannot_export_csv(): void
-{
-    $this->get(route("books.export"))
-        ->assertRedirect(route("login"));
-}
-
-/** @test */
-public function test_export_csv_can_sort_by_oldest(): void
-{
-    $user = User::factory()->create();
-    $oldestBook = Book::factory()->create([
-        "title" => "Oldest Book",
-        "created_at" => now()->subDays(5),
-    ]);
-    $newestBook = Book::factory()->create([
-        "title" => "Newest Book",
-        "created_at" => now(),
-    ]);
-
-    $response = $this->actingAs($user)->get(route("books.export", ["sort" => "oldest"]));
-
-    $response->assertOk();
-
-    $content = $response->streamedContent();
-
-    $this->assertTrue(strpos($content, $oldestBook->title) < strpos($content, $newestBook->title));
-}
-
-/** @test */
-public function test_export_csv_can_sort_by_title(): void
-{
-    $user = User::factory()->create();
-    $bookZ = Book::factory()->create(["title" => "Zeta Book"]);
-    $bookA = Book::factory()->create(["title" => "Alpha Book"]);
-
-    $response = $this->actingAs($user)->get(route("books.export", ["sort" => "title"]));
-
-    $response->assertOk();
-
-    $content = $response->streamedContent();
-
-    $this->assertTrue(strpos($content, $bookA->title) < strpos($content, $bookZ->title));
-}
-
-/** @test */
-public function test_export_csv_can_sort_by_average_rating(): void
-{
-    $user = User::factory()->create();
-    $topRatedBook = Book::factory()->create(["title" => "Top Rated Book"]);
-    Review::factory()->for($topRatedBook)->create(["rating" => 5]);
-    Review::factory()->for($topRatedBook)->create(["rating" => 4]);
-
-    $lowRatedBook = Book::factory()->create(["title" => "Low Rated Book"]);
-    Review::factory()->for($lowRatedBook)->create(["rating" => 2]);
-
-    $response = $this->actingAs($user)->get(route("books.export", ["sort" => "rating"]));
-
-    $response->assertOk();
-
-    $content = $response->streamedContent();
-
-    $this->assertTrue(strpos($content, $topRatedBook->title) < strpos($content, $lowRatedBook->title));
-}
-
-/** @test */
-public function test_only_owner_can_view_edit_form(): void
-{
-    $owner = User::factory()->create();
-    $book = Book::factory()
-        ->for($owner)
-        ->create(["published_date" => "2024-01-01"]);
-    $otherUser = User::factory()->create();
-
-    $this->assertTrue($owner->can("update", $book));
-
-    $this->actingAs($otherUser)
-        ->get(route("books.edit", $book))
-        ->assertForbidden();
-}
-
-/** @test */
-public function test_owner_receives_edit_view_with_genres(): void
-{
-    $owner = User::factory()->create();
-    $book = Book::factory()->for($owner)->create(["published_date" => "2024-01-01"]);
-    $genres = Genre::factory()->count(2)->create();
-
-    $this->actingAs($owner);
-
-    $response = app(BookController::class)->edit($book);
-
-    $this->assertInstanceOf(View::class, $response);
-    $this->assertSame("books.edit", $response->name());
-
-    $data = $response->getData();
-    $this->assertSame($book->id, $data["book"]->id);
-    $this->assertCount($genres->count(), $data["genres"]);
-}
-
-/** @test */
-public function test_search_by_isbn_returns_book_information(): void
-{
-    $isbn = "9781234567890";
-    config(["services.google.books_api_key" => "fake-key"]);
-    Http::fake(function ($request) use ($isbn) {
-        $this->assertStringContainsString("isbn:{$isbn}", $request->url());
-        $this->assertStringContainsString("fake-key", $request->url());
-
-        return Http::response([
-            "items" => [
-                [
-                    "volumeInfo" => [
-                        "title" => "API Title",
-                        "authors" => ["John Doe"],
-                        "publishedDate" => "2020-01-01",
-                        "description" => "Fetched description",
-                        "imageLinks" => [
-                            "thumbnail" => "https://example.com/image.jpg",
-                        ],
-                    ],
-                ],
-            ],
-        ], 200);
-    });
-
-    $this->get(route("books.searchByIsbn", ["isbn" => $isbn]))
-        ->assertOk()
-        ->assertJson([
-            "title" => "API Title",
-            "author" => "John Doe",
-            "published_date" => "2020-01-01",
-            "description" => "Fetched description",
-            "image_url" => "https://example.com/image.jpg",
-        ]);
-}
-
-/** @test */
-public function test_search_by_isbn_requires_13_digit_value(): void
-{
-    $this->get(route("books.searchByIsbn", ["isbn" => "123"]))
-        ->assertStatus(400)
-        ->assertJson(["error" => "ISBNは13桁で入力してください。"]);
-}
-
-/** @test */
-public function test_search_by_isbn_returns_404_when_results_empty(): void
-{
-    $isbn = "9781234567890";
-
-    Http::fake(function () {
-        return Http::response(["items" => []], 200);
-    });
-
-    $this->get(route("books.searchByIsbn", ["isbn" => $isbn]))
-        ->assertStatus(404)
-        ->assertJson(["error" => "書籍が見つかりませんでした。"]);
-}
-
-/** @test */
-public function test_search_by_isbn_handles_http_exception(): void
-{
-    $isbn = "9781234567890";
-
-    Http::fake(function (): void {
-        throw new \Exception("API failure");
-    });
-
-    $this->get(route("books.searchByIsbn", ["isbn" => $isbn]))
-        ->assertStatus(500)
-        ->assertJson(["error" => "API通信エラーが発生しました。"]);
-}
-```
-
-### ReportTest.php（新規作成）
-
-読書レポート機能のテストを`tests/Feature/ReportTest.php`として新規に作成します。
-
-まず、以下のArtisanコマンドでテストファイルを作成してください。
-
-```bash
-sail artisan make:test ReportTest
-```
-
-このコマンドを実行すると、`tests/Feature/ReportTest.php`が自動生成されます。生成されたファイルの内容を、以下のコードに置き換えてください。
+Chapter 14 で作成した基本テストに加え、検索・ソート・ISBN検索・書籍編集認可のテストを追加します。以下が **完全な** `tests/Feature/BookControllerTest.php` です。
 
 ```php
 <?php
@@ -381,352 +64,1000 @@ use App\Models\Genre;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class BookControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    // ===== 基本機能（basic と同一） =====
+
+    public function test_book_index_page_can_be_rendered(): void
+    {
+        Book::factory()->count(2)->create();
+
+        $this->get(route('books.index'))
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_view_create_form(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('books.create'))
+            ->assertOk();
+    }
+
+    public function test_guest_cannot_view_create_form(): void
+    {
+        $this->get(route('books.create'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_authenticated_user_can_create_book(): void
+    {
+        $user = User::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
+
+        $payload = $this->validBookData([
+            'title' => 'My Test Book',
+            'isbn' => '1111111111111',
+            'genres' => $genres->pluck('id')->toArray(),
+        ]);
+
+        $response = $this->actingAs($user)->post(route('books.store'), $payload);
+
+        $book = Book::where('title', 'My Test Book')->first();
+        $this->assertNotNull($book);
+
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'user_id' => $user->id,
+            'title' => 'My Test Book',
+        ]);
+
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+    }
+
+    public function test_book_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => '',
+            'author' => '',
+            'isbn' => '123',
+            'published_date' => 'invalid-date',
+            'genres' => [],
+        ]);
+
+        $response->assertSessionHasErrors(['title', 'isbn', 'genres']);
+        $this->assertDatabaseCount('books', 0);
+    }
+
+    public function test_book_show_page_can_be_rendered(): void
+    {
+        $book = Book::factory()->create(['title' => 'Detail Book']);
+
+        $this->get(route('books.show', $book))
+            ->assertOk()
+            ->assertSee('Detail Book');
+    }
+
+    public function test_authenticated_user_can_update_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $originalGenre = Genre::factory()->create();
+        $book->genres()->attach($originalGenre);
+        $newGenres = Genre::factory()->count(2)->create();
+
+        $payload = $this->validBookData([
+            'title' => 'Updated Title',
+            'isbn' => '9876543210123',
+            'genres' => $newGenres->pluck('id')->toArray(),
+        ]);
+
+        $response = $this->actingAs($user)->put(route('books.update', $book), $payload);
+
+        $response->assertRedirect(route('books.show', $book));
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => 'Updated Title',
+            'isbn' => '9876543210123',
+        ]);
+
+        foreach ($newGenres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+
+        $this->assertDatabaseMissing('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $originalGenre->id,
+        ]);
+    }
+
+    public function test_authenticated_user_can_delete_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $this->actingAs($user)
+            ->delete(route('books.destroy', $book))
+            ->assertRedirect(route('books.index'));
+
+        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+    }
+
+    public function test_only_owner_can_view_edit_form(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($owner)
+            ->get(route('books.edit', $book))
+            ->assertOk();
+
+        $this->actingAs($otherUser)
+            ->get(route('books.edit', $book))
+            ->assertForbidden();
+    }
+
+    // ===== 検索・フィルタ（応用機能） =====
+
+    public function test_book_index_with_search_query_displays_results(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $hit = Book::factory()->create(['user_id' => $user->id, 'title' => 'Laravel入門']);
+        $miss = Book::factory()->create(['user_id' => $user->id, 'title' => 'PHP基礎']);
+        $hit->genres()->attach($genre->id);
+        $miss->genres()->attach($genre->id);
+
+        $response = $this->get(route('books.index', ['keyword' => 'Laravel']));
+
+        $response->assertOk();
+        $response->assertSee('Laravel入門');
+        $response->assertDontSee('PHP基礎');
+    }
+
+    public function test_book_index_can_filter_by_genre(): void
+    {
+        $user = User::factory()->create();
+        $genreA = Genre::factory()->create(['name' => 'GenreA']);
+        $genreB = Genre::factory()->create(['name' => 'GenreB']);
+
+        $bookA = Book::factory()->create(['user_id' => $user->id, 'title' => 'BookA-Title']);
+        $bookB = Book::factory()->create(['user_id' => $user->id, 'title' => 'BookB-Title']);
+        $bookA->genres()->attach($genreA->id);
+        $bookB->genres()->attach($genreB->id);
+
+        $response = $this->get(route('books.index', ['genre' => $genreA->id]));
+
+        $response->assertOk();
+        $response->assertSee('BookA-Title');
+        $response->assertDontSee('BookB-Title');
+    }
+
+    // ===== ソート（応用機能） =====
+
+    public function test_book_index_default_sort_is_newest(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $oldBook = Book::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Old Book',
+            'created_at' => now()->subDays(5),
+        ]);
+        $newBook = Book::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'New Book',
+            'created_at' => now(),
+        ]);
+        $oldBook->genres()->attach($genre->id);
+        $newBook->genres()->attach($genre->id);
+
+        $response = $this->get(route('books.index'));
+
+        $response->assertOk();
+        $response->assertSeeInOrder(['New Book', 'Old Book']);
+    }
+
+    public function test_book_index_can_sort_by_oldest(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $oldBook = Book::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Old Book',
+            'created_at' => now()->subDays(5),
+        ]);
+        $newBook = Book::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'New Book',
+            'created_at' => now(),
+        ]);
+        $oldBook->genres()->attach($genre->id);
+        $newBook->genres()->attach($genre->id);
+
+        $response = $this->get(route('books.index', ['sort' => 'oldest']));
+
+        $response->assertOk();
+        $response->assertSeeInOrder(['Old Book', 'New Book']);
+    }
+
+    public function test_book_index_can_sort_by_title(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $bookB = Book::factory()->create(['user_id' => $user->id, 'title' => 'B Book']);
+        $bookA = Book::factory()->create(['user_id' => $user->id, 'title' => 'A Book']);
+        $bookB->genres()->attach($genre->id);
+        $bookA->genres()->attach($genre->id);
+
+        $response = $this->get(route('books.index', ['sort' => 'title']));
+
+        $response->assertOk();
+        $books = $response->viewData('books');
+        $titles = $books->pluck('title')->all();
+
+        $this->assertSame(['A Book', 'B Book'], $titles);
+    }
+
+    public function test_book_index_can_sort_by_rating(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $highBook = Book::factory()->create(['user_id' => $user->id, 'title' => 'High Rated']);
+        $lowBook = Book::factory()->create(['user_id' => $user->id, 'title' => 'Low Rated']);
+        $highBook->genres()->attach($genre->id);
+        $lowBook->genres()->attach($genre->id);
+
+        Review::factory()->for($highBook)->for($user)->create(['rating' => 5]);
+        Review::factory()->for($lowBook)->for($user)->create(['rating' => 1]);
+
+        $response = $this->get(route('books.index', ['sort' => 'rating']));
+
+        $response->assertOk();
+        $books = $response->viewData('books');
+        $titles = $books->pluck('title')->all();
+
+        $this->assertSame('High Rated', $titles[0]);
+        $this->assertSame('Low Rated', $titles[1]);
+    }
+
+    // ===== 書籍編集認可（応用機能 - BookPolicy + View 検証） =====
+
+    public function test_owner_receives_edit_view_with_genres(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->create(['user_id' => $owner->id]);
+        Genre::factory()->count(3)->create();
+
+        $this->assertTrue($owner->can('update', $book));
+
+        $response = $this->actingAs($owner)->get(route('books.edit', $book));
+
+        $response->assertOk();
+        $view = $response->viewData('book');
+        $this->assertInstanceOf(Book::class, $view);
+        $this->assertSame($book->id, $view->id);
+
+        $genres = $response->viewData('genres');
+        $this->assertCount(3, $genres);
+    }
+
+    // ===== ISBN検索（応用機能 - Http::fake モック） =====
+
+    public function test_search_by_isbn_returns_book_information(): void
+    {
+        Http::fake([
+            'googleapis.com/*' => Http::response([
+                'items' => [
+                    [
+                        'volumeInfo' => [
+                            'title' => 'モックされた本',
+                            'authors' => ['著者A', '著者B'],
+                            'publishedDate' => '2024-06-01',
+                            'description' => 'これはモック説明文',
+                            'imageLinks' => [
+                                'thumbnail' => 'https://example.com/thumb.jpg',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->getJson(route('books.searchByIsbn', ['isbn' => '9784000000000']));
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'title' => 'モックされた本',
+            'author' => '著者A, 著者B',
+            'published_date' => '2024-06-01',
+            'description' => 'これはモック説明文',
+            'image_url' => 'https://example.com/thumb.jpg',
+        ]);
+    }
+
+    public function test_search_by_isbn_returns_400_for_non_13_digit(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->getJson(route('books.searchByIsbn', ['isbn' => '12345']));
+
+        $response->assertStatus(400);
+        $response->assertJson(['error' => 'ISBNは13桁で入力してください。']);
+    }
+
+    public function test_search_by_isbn_returns_404_when_no_results(): void
+    {
+        Http::fake([
+            'googleapis.com/*' => Http::response(['totalItems' => 0], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->getJson(route('books.searchByIsbn', ['isbn' => '9784000000000']));
+
+        $response->assertStatus(404);
+        $response->assertJson(['error' => '書籍が��つかりませんでした。']);
+    }
+
+    public function test_search_by_isbn_returns_500_on_api_exception(): void
+    {
+        Http::fake(function (): void {
+            throw new \Exception('Network error');
+        });
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->getJson(route('books.searchByIsbn', ['isbn' => '9784000000000']));
+
+        $response->assertStatus(500);
+        $response->assertJson(['error' => 'API通信エラーが発生���ました。']);
+    }
+
+    private function validBookData(array $overrides = []): array
+    {
+        $genres = $overrides['genres'] ?? Genre::factory()->count(2)->create()->pluck('id')->toArray();
+
+        return array_merge([
+            'title' => 'Sample Book',
+            'author' => 'Sample Author',
+            'isbn' => '1234567890123',
+            'published_date' => '2024-01-01',
+            'description' => 'Sample description',
+            'image_url' => 'https://example.com/image.jpg',
+            'genres' => $genres,
+        ], $overrides);
+    }
+}
+```
+
+### 19.2. ReportTest
+
+マイ読書レポートの統計データが正しく計算されるかを検証するテストです。
+
+#### `tests/Feature/ReportTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 class ReportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_is_redirected_from_reports_index(): void
+    public function test_guest_is_redirected_to_login(): void
     {
-        $this->get(route("reports.index"))
-            ->assertRedirect(route("login"));
+        $this->get(route('reports.index'))
+            ->assertRedirect(route('login'));
     }
 
-    public function test_reports_index_displays_stats_for_authenticated_user(): void
-    {
-        $user = User::factory()->create();
-
-        $bookOne = Book::factory()->create(["title" => "First Book", "author" => "Author A"]);
-        $bookTwo = Book::factory()->create(["title" => "Second Book", "author" => "Author B"]);
-        $bookThree = Book::factory()->create(["title" => "Third Book", "author" => "Author C"]);
-
-        $genreA = Genre::factory()->create(["name" => "Fantasy"]);
-        $genreB = Genre::factory()->create(["name" => "Sci-Fi"]);
-
-        $bookOne->genres()->attach($genreA);
-        $bookTwo->genres()->attach([$genreA->id, $genreB->id]);
-        $bookThree->genres()->attach($genreB);
-
-        Review::factory()->for($user)->for($bookOne)->create(["rating" => 5]);
-        Review::factory()->for($user)->for($bookTwo)->create(["rating" => 4]);
-        Review::factory()->for($user)->for($bookThree)->create(["rating" => 3]);
-
-        // 他のユーザーのレビュー（集計対象外）
-        Review::factory()->create(["rating" => 1]);
-
-        $response = $this->actingAs($user)->get(route("reports.index"));
-
-        $response->assertOk()
-            ->assertViewIs("reports.index")
-            ->assertViewHas("stats");
-
-        $stats = $response->viewData("stats");
-
-        // 基本統計の検証
-        $this->assertSame(3, $stats["summary"]["total_reviews"]);
-        $this->assertSame(3, $stats["summary"]["books_read"]);
-        $this->assertSame(4.0, $stats["summary"]["average_rating"]);
-
-        // 評価の分布の検証
-        $this->assertSame([0, 0, 1, 1, 1], $stats["rating_distribution"]);
-
-        // 高評価書籍ランキングの検証
-        $this->assertSame(
-            [
-                [
-                    "id" => $bookOne->id,
-                    "title" => $bookOne->title,
-                    "author" => $bookOne->author,
-                    "rating" => 5,
-                ],
-                [
-                    "id" => $bookTwo->id,
-                    "title" => $bookTwo->title,
-                    "author" => $bookTwo->author,
-                    "rating" => 4,
-                ],
-            ],
-            $stats["top_rated_books"]->toArray()
-        );
-
-        // ジャンル別評価傾向の検証
-        $this->assertSame(
-            [
-                [
-                    "id" => $genreA->id,
-                    "name" => $genreA->name,
-                    "count" => 2,
-                    "average_rating" => 4.5,
-                ],
-                [
-                    "id" => $genreB->id,
-                    "name" => $genreB->name,
-                    "count" => 2,
-                    "average_rating" => 3.5,
-                ],
-            ],
-            $stats["genre_ratings"]->toArray()
-        );
-    }
-
-    public function test_reports_index_handles_user_without_reviews(): void
+    public function test_authenticated_user_can_view_report_page(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route("reports.index"));
+        $this->actingAs($user)
+            ->get(route('reports.index'))
+            ->assertOk()
+            ->assertSee('マイ読書レポート');
+    }
 
-        $response->assertOk()
-            ->assertViewHas("stats");
+    public function test_summary_statistics_are_calculated_correctly(): void
+    {
+        $user = User::factory()->create();
+        $bookA = Book::factory()->create();
+        $bookB = Book::factory()->create();
 
-        $stats = $response->viewData("stats");
+        Review::factory()->for($user)->for($bookA)->create(['rating' => 5]);
+        Review::factory()->for($user)->for($bookB)->create(['rating' => 3]);
 
-        // 基本統計（空の状態）の検証
-        $this->assertSame(0, $stats["summary"]["total_reviews"]);
-        $this->assertSame(0, $stats["summary"]["books_read"]);
-        $this->assertSame(0.0, $stats["summary"]["average_rating"]);
+        $response = $this->actingAs($user)->get(route('reports.index'));
 
-        // 評価の分布（空の状態）の検証
-        $this->assertSame([0, 0, 0, 0, 0], $stats["rating_distribution"]);
-        
-        // ランキング・ジャンル別評価（空の状態）の検証
-        $this->assertTrue($stats["top_rated_books"]->isEmpty());
-        $this->assertTrue($stats["genre_ratings"]->isEmpty());
+        $stats = $response->viewData('stats');
+        $summary = $stats['summary'];
+
+        $this->assertSame(2, $summary['total_reviews']);
+        $this->assertSame(2, $summary['books_read']);
+        $this->assertEqualsWithDelta(4.0, $summary['average_rating'], 0.001);
+    }
+
+    public function test_rating_distribution_counts_each_star_rating(): void
+    {
+        $user = User::factory()->create();
+
+        Review::factory()->for($user)->count(2)->create(['rating' => 5]);
+        Review::factory()->for($user)->count(1)->create(['rating' => 4]);
+        Review::factory()->for($user)->count(3)->create(['rating' => 3]);
+
+        $response = $this->actingAs($user)->get(route('reports.index'));
+
+        $distribution = $response->viewData('stats')['rating_distribution'];
+
+        $this->assertInstanceOf(Collection::class, $distribution);
+        // インデックス 0..4 が rating 1..5 に対応
+        $this->assertSame([0, 0, 3, 1, 2], $distribution->values()->all());
+    }
+
+    public function test_top_rated_books_includes_only_4_stars_or_higher(): void
+    {
+        $user = User::factory()->create();
+        $highBook = Book::factory()->create(['title' => 'High Rated Book']);
+        $midBook = Book::factory()->create(['title' => 'Mid Rated Book']);
+
+        Review::factory()->for($user)->for($highBook)->create(['rating' => 5]);
+        Review::factory()->for($user)->for($midBook)->create(['rating' => 3]);
+
+        $response = $this->actingAs($user)->get(route('reports.index'));
+
+        $top = $response->viewData('stats')['top_rated_books'];
+
+        $this->assertInstanceOf(Collection::class, $top);
+        $this->assertCount(1, $top);
+        $this->assertSame('High Rated Book', $top->first()['title']);
+        $this->assertSame(5, $top->first()['rating']);
+    }
+
+    public function test_genre_ratings_aggregates_by_genre(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'テストジャンル']);
+        $book = Book::factory()->create();
+        $book->genres()->attach($genre);
+
+        Review::factory()->for($user)->for($book)->create(['rating' => 4]);
+
+        $response = $this->actingAs($user)->get(route('reports.index'));
+
+        $genreRatings = $response->viewData('stats')['genre_ratings'];
+
+        $this->assertInstanceOf(Collection::class, $genreRatings);
+        $this->assertCount(1, $genreRatings);
+        $this->assertSame('テストジャンル', $genreRatings->first()['name']);
+        $this->assertSame(1, $genreRatings->first()['count']);
+        $this->assertEqualsWithDelta(4.0, $genreRatings->first()['average_rating'], 0.001);
+    }
+
+    public function test_user_with_no_reviews_sees_empty_safe_stats(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('reports.index'));
+
+        $response->assertOk();
+        $stats = $response->viewData('stats');
+
+        $this->assertSame(0, $stats['summary']['total_reviews']);
+        $this->assertSame(0, $stats['summary']['books_read']);
+        $this->assertSame(0, $stats['summary']['average_rating']);
+        $this->assertCount(0, $stats['top_rated_books']);
+        $this->assertCount(0, $stats['genre_ratings']);
+        $this->assertSame([0, 0, 0, 0, 0], $stats['rating_distribution']->values()->all());
+    }
+}
+```
+
+### 19.3. BookApiTest（Sanctum認証テスト含む）
+
+公開APIの読み取り系テストに加え、Sanctum認証が必要な書き込み系のテストを実装します。
+
+#### `tests/Feature/Api/V1/BookApiTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature\Api\V1;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class BookApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    // ===== GET /api/v1/books =====
+
+    public function test_index_returns_data_and_meta_structure(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        Book::factory()->count(3)->for($user)->create()->each(function ($book) use ($genre): void {
+            $book->genres()->attach($genre);
+        });
+
+        $response = $this->getJson('/api/v1/books');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                '*' => [
+                    'id', 'title', 'author', 'isbn', 'published_date',
+                    'description', 'image_url', 'genres',
+                    'average_rating', 'review_count',
+                ],
+            ],
+            'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        ]);
+        // 一覧では reviews フィールドは含まれない（whenLoaded のため）
+        $response->assertJsonMissing(['reviews' => []]);
+    }
+
+    public function test_index_filters_by_keyword(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $hit = Book::factory()->for($user)->create(['title' => 'Laravel���門']);
+        $miss = Book::factory()->for($user)->create(['title' => 'PHP基礎']);
+        $hit->genres()->attach($genre);
+        $miss->genres()->attach($genre);
+
+        $response = $this->getJson('/api/v1/books?keyword=Laravel');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'Laravel入門');
+    }
+
+    public function test_index_filters_by_genre_id(): void
+    {
+        $user = User::factory()->create();
+        $genreA = Genre::factory()->create();
+        $genreB = Genre::factory()->create();
+        $bookA = Book::factory()->for($user)->create(['title' => 'BookA']);
+        $bookB = Book::factory()->for($user)->create(['title' => 'BookB']);
+        $bookA->genres()->attach($genreA);
+        $bookB->genres()->attach($genreB);
+
+        $response = $this->getJson("/api/v1/books?genre_id={$genreA->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'BookA');
+    }
+
+    public function test_index_pagination_per_page(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        Book::factory()->count(5)->for($user)->create()->each(function ($book) use ($genre): void {
+            $book->genres()->attach($genre);
+        });
+
+        $response = $this->getJson('/api/v1/books?per_page=2');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('meta.per_page', 2);
+        $response->assertJsonPath('meta.last_page', 3);
+        $response->assertJsonPath('meta.total', 5);
+    }
+
+    public function test_index_returns_422_when_per_page_exceeds_max(): void
+    {
+        $response = $this->getJson('/api/v1/books?per_page=200');
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['per_page']);
+    }
+
+    // ===== GET /api/v1/books/{book} =====
+
+    public function test_show_returns_book_with_reviews(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $book->genres()->attach($genre);
+        Review::factory()->for($book)->for($user)->create();
+
+        $response = $this->getJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                'id', 'title', 'author', 'isbn', 'published_date',
+                'description', 'image_url', 'genres',
+                'average_rating', 'review_count',
+                'reviews' => [
+                    '*' => ['id', 'user_name', 'rating', 'comment', 'created_at'],
+                ],
+            ],
+        ]);
+        $response->assertJsonPath('data.id', $book->id);
+    }
+
+    public function test_show_returns_custom_404_json_when_not_found(): void
+    {
+        $response = $this->getJson('/api/v1/books/99999');
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでし��。']);
+    }
+
+    // ===== POST /api/v1/books (Sanctum 必須) =====
+
+    public function test_store_returns_401_when_unauthenticated(): void
+    {
+        $genre = Genre::factory()->create();
+
+        $response = $this->postJson('/api/v1/books', [
+            'title' => 'New Book',
+            'author' => 'Author',
+            'isbn' => '9784000000000',
+            'published_date' => '2024-01-01',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_store_creates_book_for_authenticated_user(): void
+    {
+        $user = User::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
+
+        Sanctum::actingAs($user, ['*']);
+
+        $payload = [
+            'title' => 'New API Book',
+            'author' => 'API Author',
+            'isbn' => '9784000000000',
+            'published_date' => '2024-01-01',
+            'description' => 'desc',
+            'image_url' => 'https://example.com/image.jpg',
+            'genres' => $genres->pluck('id')->toArray(),
+        ];
+
+        $response = $this->postJson('/api/v1/books', $payload);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'New API Book');
+
+        $this->assertDatabaseHas('books', [
+            'user_id' => $user->id,
+            'title' => 'New API Book',
+            'isbn' => '9784000000000',
+        ]);
+
+        $book = Book::where('isbn', '9784000000000')->first();
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+    }
+
+    public function test_store_returns_422_with_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->postJson('/api/v1/books', [
+            'title' => '',
+            'author' => '',
+            'isbn' => '123',
+            'genres' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['title', 'author', 'isbn', 'genres']);
+    }
+
+    // ===== PUT /api/v1/books/{book} (Sanctum + 所有者) =====
+
+    public function test_update_returns_401_when_unauthenticated(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $genre = Genre::factory()->create();
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", [
+            'title' => 'X',
+            'author' => 'Y',
+            'isbn' => '9784000000111',
+            'published_date' => '2024-01-01',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_owner_can_update_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create(['title' => 'Old Title']);
+        $oldGenre = Genre::factory()->create();
+        $newGenre = Genre::factory()->create();
+        $book->genres()->attach($oldGenre);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", [
+            'title' => 'Updated Title',
+            'author' => 'Updated Author',
+            'isbn' => '9784000000222',
+            'published_date' => '2024-02-02',
+            'description' => null,
+            'image_url' => null,
+            'genres' => [$newGenre->id],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated Title');
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => 'Updated Title',
+            'isbn' => '9784000000222',
+        ]);
+        $this->assertDatabaseHas('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $newGenre->id,
+        ]);
+        $this->assertDatabaseMissing('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $oldGenre->id,
+        ]);
+    }
+
+    public function test_other_user_cannot_update_book_returns_403_json(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $genre = Genre::factory()->create();
+
+        Sanctum::actingAs($other, ['*']);
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", [
+            'title' => 'Hacked',
+            'author' => 'Hacker',
+            'isbn' => '9784000000333',
+            'published_date' => '2024-01-01',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertStatus(403);
+        $response->assertExactJson(['error' => 'この操作を実行する権��がありません。']);
+    }
+
+    public function test_update_returns_404_for_unknown_book(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->putJson('/api/v1/books/99999', [
+            'title' => 'X',
+            'author' => 'Y',
+            'isbn' => '9784000000444',
+            'published_date' => '2024-01-01',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
+    }
+
+    public function test_update_returns_422_with_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", [
+            'title' => '',
+            'author' => '',
+            'isbn' => 'short',
+            'genres' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['title', 'author', 'isbn', 'genres']);
+    }
+
+    // ===== DELETE /api/v1/books/{book} (Sanctum + 所有者) =====
+
+    public function test_destroy_returns_401_when_unauthenticated(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $response = $this->deleteJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(401);
+    }
+
+    public function test_owner_can_destroy_book(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->deleteJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+    }
+
+    public function test_other_user_cannot_destroy_book_returns_403_json(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        Sanctum::actingAs($other, ['*']);
+
+        $response = $this->deleteJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(403);
+        $response->assertExactJson(['error' => 'この操作を実行する権限���ありません。']);
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+    }
+
+    public function test_destroy_returns_404_for_unknown_book(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->deleteJson('/api/v1/books/99999');
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
     }
 }
 ```
 
 ---
 
-## 19.2. テストコードの詳細解説と実装のポイント
+## 🔍 テストコードの詳細解説
 
-### はじめに：良いテストコードを書くための「AAA」パターン
-
-テストコードは、ただ動けば良いというものではありません。他の開発者が読んでも「何を検証したいのか」がすぐに理解でき、将来的に仕様変更があってもメンテナンスしやすいコードであることが理想です。そのための普遍的なデザインパターンとして**「AAA（Arrange, Act, Assert）」**があります。
-
-- **Arrange（準備）**: テストに必要な前提条件（データや状態）を準備します。`factory`を使ってユーザーや書籍データを作成する部分がこれにあたります。
-- **Act（実行）**: テスト対象のコード（機能）を実行します。`$this->get(...)`や`$this->post(...)`で特定のルートにHTTPリクエストを送信する部分です。
-- **Assert（検証）**: 実行結果が期待通りであったかを検証（アサート）します。`assertOk()`や`assertSee()`などのアサーションメソッドを呼び出す部分です。
-
-この3つのステップを意識してテストコードを記述することで、テストの目的が明確になり、構造的で理解しやすいコードになります。この後の解説も、このAAAパターンを念頭に置いて読んでみてください。
-
-### 1. 検索・並び替え機能のテスト (`BookTest`)
-
-このテストグループの目的は、ユーザーが指定した様々な条件（キーワード、ジャンル、並び順）に応じて、**正しいデータが、正しい順序で**表示されることを保証することです。
-
-#### `test_book_index_with_search_query_displays_results`
+### Sanctum::actingAs() の使い方
 
 ```php
-/** @test */
-public function test_book_index_with_search_query_displays_results(): void
-{
-    // Arrange: 検索キーワードにヒットする書籍と、しない書籍を用意
-    Book::factory()->create(["title" => "Laravel Testing Guide"]);
-    Book::factory()->create(["title" => "Another Book"]);
+Sanctum::actingAs($user, ['*']);
 
-    // Act: `keyword` パラメータ付きで一覧ページにアクセス
-    $this->get(route("books.index", ["keyword" => "Laravel"]))
-        // Assert: ヒットする書籍が表示され、しない書籍が表示されないことを検証
-        ->assertOk()
-        ->assertSee("Laravel Testing Guide")
-        ->assertDontSee("Another Book");
+$response = $this->postJson('/api/v1/books', $payload);
+```
+
+- **`Sanctum::actingAs($user, ['*'])`**: `$user`がSanctumトークンで認証されている状態をシミュレートします。第2引数の`['*']`は、全てのアビリティ（権限）を持つトークンを意味します。
+- Web画面テストの`$this->actingAs($user)`とは異なり、APIトークン認証をシミュレートするため、`auth:sanctum`ミドルウェアを通過できます。
+
+### 認証なしのテスト（401の確認）
+
+```php
+public function test_store_returns_401_when_unauthenticated(): void
+{
+    $response = $this->postJson('/api/v1/books', [...]);
+    $response->assertStatus(401);
 }
 ```
 
-- **テストのポイント**: 最も基本的な検索機能のテストです。`assertSee`（指定した文字列がレスポンスに含まれる）と`assertDontSee`（含まれない）を組み合わせることで、「意図したものが表示され、意図しないものが表示されていない」ことを同時に検証するのが重要です。
+- `Sanctum::actingAs()`を呼ばずにリクエストを送信すると、`auth:sanctum`ミドルウェアが401を返します。
+- 認証が正しく機能していることを確認する、非常に重要なテストです。
 
-#### `test_book_index_can_sort_by_title`
+### 認可のテスト（403の確認）
 
 ```php
-/** @test */
-public function test_book_index_can_sort_by_title(): void
+public function test_other_user_cannot_update_book_returns_403_json(): void
 {
-    // Arrange: 意図的に逆のアルファベット順の書籍を用意
-    $bookZ = Book::factory()->create(["title" => "Zeta Title"]);
-    $bookA = Book::factory()->create(["title" => "Alpha Title"]);
+    Sanctum::actingAs($other, ['*']);  // 他人として認証
 
-    // Act: `sort=title` を指定してアクセス
-    $response = $this->get(route("books.index", ["sort" => "title"]));
+    $response = $this->putJson("/api/v1/books/{$book->id}", [...]);
 
-    // Assert: Viewに渡されたデータそのものの順序を検証
-    $response->assertOk();
-    $titles = collect($response->viewData("books")->items())->pluck("title")->all();
-    $this->assertSame([$bookA->title, $bookZ->title], $titles);
+    $response->assertStatus(403);
+    $response->assertExactJson(['error' => 'この操作を実行する権限がありません。']);
 }
 ```
 
-- **テストのポイント**: `assertSeeInOrder`はHTML全体の出現順を見るため、レイアウトの変更に弱いという側面があります。ここでは`$response->viewData("books")`を使って、コントローラーからViewに渡された**データそのもの**を取得しています。これにより、HTMLの構造に依存しない、より堅牢なテストになります。
-- **`assertSame` vs `assertEquals`**: `assertSame`は値だけでなく**型と順序**も厳密に比較します。データの並び順を検証する際には、`assertSame`を使うことで、意図通りの順序でデータが渡されていることを正確に保証できます。
-
-### 2. CSVエクスポート機能のテスト (`BookTest`)
-
-このテストグループの目的は、CSVファイルが正しくダウンロードされること、そしてその**内容**が検索条件や並び替え順を反映していることを保証することです。
-
-#### `test_authenticated_user_can_export_csv`
-
-```php
-/** @test */
-public function test_authenticated_user_can_export_csv(): void
-{
-    // ... (Arrange, Act)
-
-    // Assert: レスポンスヘッダーを検証
-    $response->assertOk();
-    $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-    $this->assertStringContainsString("attachment; filename=", $response->headers->get("Content-Disposition"));
-    $this->assertStringContainsString(".csv", $response->headers->get("Content-Disposition"));
-}
-```
-
-- **テストのポイント**: CSVエクスポート機能は`StreamedResponse`を返すため、`assertHeaderContains`のような一部のアサーションが使えません。そこで、`$response->headers->get("Content-Disposition")`でヘッダーの値（文字列）を直接取得し、PHPUnitの`assertStringContainsString`を使ってファイル名が含まれているかを検証しています。これにより、タイムスタンプ付きの動的なファイル名にも対応できます。
-
-#### `test_export_csv_can_sort_by_title`
-
-```php
-/** @test */
-public function test_export_csv_can_sort_by_title(): void
-{
-    // ... (Arrange, Act)
-
-    // Assert: CSVコンテンツ内の文字列の出現位置を比較
-    $content = $response->streamedContent();
-    $this->assertTrue(strpos($content, $bookA->title) < strpos($content, $bookZ->title));
-}
-```
-
-- **テストのポイント**: CSVは単なる文字列なので、`assertSeeInOrder`は使えません。ここではPHPの標準関数`strpos()`を利用します。`strpos()`は文字列内で特定の単語が**最初に出現した位置（インデックス）**を返すため、`strpos(A) < strpos(Z)`を検証することで、「AがZより先に出現する」＝「アルファベット順にソートされている」ことを保証できます。これは非常に実践的なテクニックです。
-
-### 3. 外部API連携（ISBN検索）のテスト (`BookTest`)
-
-このテストグループの目的は、外部APIとの連携部分を、**実際のAPI通信に依存せずに**テストすることです。正常系だけでなく、バリデーションエラーやAPI障害などの異常系も網羅します。
-
-#### `test_search_by_isbn_returns_book_information`
-
-```php
-/** @test */
-public function test_search_by_isbn_returns_book_information(): void
-{
-    // Arrange: APIキーをテスト用に設定し、HTTPクライアントを偽装
-    config(["services.google.books_api_key" => "fake-key"]);
-    Http::fake(function ($request) use ($isbn) {
-        // リクエストURLにISBNとAPIキーが含まれているか検証
-        $this->assertStringContainsString("isbn:{$isbn}", $request->url());
-        $this->assertStringContainsString("fake-key", $request->url());
-
-        // 偽の成功レスポンスを返す
-        return Http::response([...], 200);
-    });
-
-    // Act & Assert
-    $this->get(route("books.searchByIsbn", ["isbn" => $isbn]))
-        ->assertOk()
-        ->assertJson([...]);
-}
-```
-
-- **テストのポイント**: `Http::fake()`がこのテストの核心です。これにより、テスト実行時に実際のGoogle Books APIへリクエストが飛ぶのを防ぎます。代わりに、クロージャ内で「送信されるはずだったリクエスト」を検証し、「偽のレスポンス」を返します。これにより、外部APIの稼働状況やネットワーク環境に左右されない、**安定・高速・再現可能**なテストが実現します。
-
-#### `test_search_by_isbn_handles_http_exception`
-
-```php
-/** @test */
-public function test_search_by_isbn_handles_http_exception(): void
-{
-    // Arrange: HTTPクライアントが例外をスローするように偽装
-    Http::fake(function (): void {
-        throw new \Exception("API failure");
-    });
-
-    // Act & Assert: 500エラーとエラーメッセージを検証
-    $this->get(route("books.searchByIsbn", ["isbn" => "9781234567890"]))
-        ->assertStatus(500)
-        ->assertJson(["error" => "API通信エラーが発生しました。"]);
-}
-```
-
-- **テストのポイント**: `Http::fake()`を使えば、「APIがダウンしている」といった異常系の状況も簡単にシミュレートできます。クロージャ内で意図的に例外を`throw`させることで、コントローラーの`try...catch`ブロックが正しく機能し、ユーザーフレンドリーな500エラーを返せているかを検証できます。
-
-### 4. 読書レポート機能のテスト (`ReportTest`)
-
-このテストグループの目的は、複数のCollectionメソッドを駆使して計算された複雑な統計情報が、**期待値と完全に一致する**ことを保証することです。また、データが存在しない「空の状態（エッジケース）」も検証します。
-
-#### `test_reports_index_displays_stats_for_authenticated_user`
-
-```php
-/** @test */
-public function test_reports_index_displays_stats_for_authenticated_user(): void
-{
-    // Arrange: 複数の書籍、ジャンル、レビューを複雑に組み合わせて用意
-    // ...
-
-    // Act
-    $response = $this->actingAs($user)->get(route("reports.index"));
-
-    // Assert: Viewに渡された`stats`配列の中身を厳密に検証
-    $stats = $response->viewData("stats");
-    $this->assertSame(3, $stats["summary"]["total_reviews"]);
-    $this->assertSame(4.0, $stats["summary"]["average_rating"]);
-    $this->assertSame([0, 0, 1, 1, 1], $stats["rating_distribution"]);
-    $this->assertSame([...], $stats["top_rated_books"]->toArray());
-    $this->assertSame([...], $stats["genre_ratings"]->toArray());
-}
-```
-
-- **テストのポイント**: このテストは、まさに「動く仕様書」です。`viewData()`でコントローラーから渡された`stats`配列をまるごと取得し、その中の各キーの値（`total_reviews`や`average_rating`など）が、手計算した期待値と`assertSame`で完全に一致することを検証します。これにより、複雑な集計ロジックの正しさを強力に保証します。
-
-#### `test_reports_index_handles_user_without_reviews`
-
-```php
-/** @test */
-public function test_reports_index_handles_user_without_reviews(): void
-{
-    // Arrange: レビューを持たないユーザーを用意
-    $user = User::factory()->create();
-
-    // Act & Assert
-    // ...
-    $this->assertSame(0.0, $stats["summary"]["average_rating"]);
-    $this->assertTrue($stats["top_rated_books"]->isEmpty());
-}
-```
-
-- **テストのポイント**: 「データが1件もない」という状態は、`0`での割り算エラー（ゼロ除算）や`null`アクセスによるエラーを引き起こしやすい、典型的なエッジケースです。このテストでは、レビューが0件の場合でもプログラムがエラーを起こさず、各種統計情報が`0`や空のコレクションとして安全に処理されることを保証しています。
+- 認証は通るが、BookPolicyによる認可で弾かれるケースをテストしています。
+- `assertExactJson()`は、レスポンスのJSONが指定した内容と**完全に一致する**ことを確認します。
 
 ---
 
-## 19.3. How to: この実装にたどり着くための調べ方
+## 🧐 テスト実行
 
-応用的なテスト手法は、公式ドキュメントのどこを読めば良いか分かりにくいことがあります。以下のような検索経路を辿ることで、必要な情報にたどり着くことができます。
+```bash
+# 全テストを実行
+sail artisan test
 
-### Step 1: 「外部APIを使う機能をテストしたい」
+# 特定のテストファイルを実行
+sail artisan test tests/Feature/BookControllerTest.php
+sail artisan test tests/Feature/ReportTest.php
+sail artisan test tests/Feature/Api/V1/BookApiTest.php
+```
 
-- **最初の検索**: `Laravel test external api` / `Laravel テスト API連携`
-- **検索結果から得られる情報**: `Http::fake()`という機能があることを知る。「モック」という概念に触れる。
-- **次の疑問と検索**: `Http::fake()`の具体的な使い方が知りたい → `Laravel Http fake example`
-- **最終的にたどり着く答え**: 公式ドキュメントの「HTTPクライアント > テスト」のセクションにたどり着き、リクエストの検証方法や、成功・失敗レスポンスを返す方法を学ぶ。
-
-### Step 2: 「Viewに渡した『データそのもの』をテストしたい」
-
-- **最初の検索**: `Laravel test view data` / `Laravel テスト ビュー データ`
-- **検索結果から得られる情報**: `assertViewHas`や`assertViewIs`といったメソッドの存在を知る。
-- **次の疑問と検索**: Viewに渡された配列やオブジェクトの中身を、もっと詳しく検証したい → `Laravel test view data contents`
-- **最終的にたどり着く答え**: `TestResponse`オブジェクトの`viewData()`メソッドを使うと、Viewに渡されたデータを直接取得できることを知る。あとはPHPUnitの`assertSame`や`assertCount`などを使って自由に検証できると理解する。
-
-### Step 3: 「CSVの中身の『並び順』をテストしたい」
-
-- **最初の検索**: `Laravel test csv content order` / `Laravel テスト CSV 並び順`
-- **検索結果から得られる情報**: `assertSeeInOrder`はHTML向けで、CSVのようなプレーンテキストには使えないことが分かる。
-- **次の疑問と検索**: 文字列の中で、ある単語が別の単語より前に出現するかを調べたい → `php check if string appears before another`
-- **最終的にたどり着く答え**: PHPの標準関数である`strpos()`を使って各単語の位置を取得し、そのインデックスを比較すれば良い、というロジックにたどり着く。
+全テストがパスすることを確認してください。
 
 ---
 
-## 19.4. まとめ
+## ✅ テスト結果の確認ポイント
 
-このChapterでは、応用機能に対するテスト手法を学びました。
+| テスト観点 | 確認内容 |
+|:---|:---|
+| **検索・ソート** | キーワード/ジャンル絞り込み、各ソート順が正しい |
+| **ISBN検索** | Http::fake()でモック、正常系/400/404/500 |
+| **読書レポート** | 基本統計、評価分布、ランキング、ジャンル別、ゼロ件 |
+| **API認証（401）** | 未認証での書き込み系アクセスが拒否される |
+| **API認可（403）** | 他人の書籍の更新・削除が拒否される |
+| **API正常系** | 認証済みユーザーがCRUD操作できる |
+| **APIバリデーション（422）** | 不正なデータで適切なエラーが返る |
 
-- **検索・並び替え・CSVのテスト**: `viewData()`や`strpos()`を使い、HTMLの見た目だけでなく、データそのものやコンテンツの順序を厳密に検証しました。
-- **外部API連携のテスト**: `Http::fake()`を使い、外部APIに依存しない、安定・高速なテストを実装しました。
-- **読書レポートのテスト**: `viewData()`でコントローラーから渡された集計結果を取得し、その内容が期待値と完全に一致するかを検証しました。
+---
 
-テストは、書けば書くほど「こういう場合はどうやって検証しよう？」という新しい疑問が生まれます。その疑問をトリガーに、公式ドキュメントやWeb上の記事を調べることで、より多様なアサーションメソッドやテスト手法を身につけることができます。これにより、アプリケーションの品質と開発効率をさらに高めることができるでしょう。
+## ✨ まとめ
+
+このChapterでは、応用機能に対する包括的なテストを実装しました。
+
+| 学んだこと | 内容 |
+|:---|:---|
+| **Http::fake()** | 外部API連携を安定してテストするためのモック機能 |
+| **Sanctum::actingAs()** | APIトークン認証をシミュレートするテスト手法 |
+| **viewData()** | コントローラーがビューに渡すデータを直接検証する方法 |
+| **assertExactJson()** | APIレスポンスの完全一致を確認する厳密なアサーション |
+| **認証・認可テスト** | 401/403の両方をカバーするセキュリティテスト |
+
+テストに裏付けされた堅牢な応用機能が完成しました。次のChapter 20で最終確認を行います。

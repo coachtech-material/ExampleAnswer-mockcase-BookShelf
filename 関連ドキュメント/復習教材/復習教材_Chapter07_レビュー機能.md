@@ -1,57 +1,131 @@
-# Chapter 7: レビュー機能の実装
+# Chapter 07: 親子の絆 - レビュー機能を実装する
 
 ## 🎯 このセクションで学ぶこと
 
-このセクションでは、書籍に対するレビュー（評価とコメント）を投稿・編集・削除する機能を実装します。
+このチャプターでは、書籍に対するレビュー（評価とコメント）を投稿・編集・削除する機能を実装します。書籍（Book）に紐づくレビュー（Review）という親子関係のあるリソースを、FormRequest・Policy・リレーション経由のデータ作成という3つの仕組みを組み合わせて構築します。
 
-- **ネストしたリソース**: 書籍（`Book`）に紐づくレビュー（`Review`）という、親子関係のあるリソースの扱い方を学びます。
-- **リレーションを活用したデータ作成**: `$book->reviews()->create([...])`のように、リレーションを通じてデータを作成する方法を学びます。
-- **ポリシーによる認可**: 自分が投稿したレビューのみ編集・削除できるように制御します。
-- **型定義の活用**: コントローラーやフォームリクエストに引数と戻り値の型を追加し、コードの可読性と堅牢性を向上させます。
+- **ネストしたリソース**: 書籍（`Book`）に紐づくレビュー（`Review`）という、親子関係のあるリソースの扱い方を学びます
+- **リレーションを活用したデータ作成**: `$book->reviews()->create([...])`のように、リレーションを通じてデータを作成する方法を学びます
+- **ポリシーによる認可**: 自分が投稿したレビューのみ編集・削除できるように制御します
+- **フォームリクエストによるバリデーション**: `StoreReviewRequest` / `UpdateReviewRequest` に入力チェックを分離します
 
----
+## 1. はじめに 📖
 
-## 🧠 先輩エンジニアの思考プロセス：なぜこの手順で実装するのか？
+### ネストしたリソースとは？
 
-レビュー機能の実装は、書籍管理機能（Chapter 6）と似ていますが、一つ大きな違いがあります。それは「**親子関係**」です。レビューは必ず特定の「書籍」に紐づきます。この関係性をどう設計し、実装に落とし込むかがこのChapterの鍵となります。
+Chapter 06では書籍という「独立したリソース」のCRUDを実装しました。このチャプターでは、レビューという「書籍に従属するリソース」を扱います。
 
-| 設計・実装のポイント | 思考プロセス |
-|:---|:---|
-| **1. ルート設計** | レビューは単独では存在せず、必ず書籍に属する。ならばURLも`books/1/reviews`のように親子関係を表現すべき。→ **ネストしたリソースルート**を採用しよう。 |
-| **2. データ作成** | レビューを作成する際、どの書籍に対するレビューなのかを`book_id`で示す必要がある。手動で`book_id`をセットするのは面倒だし、間違いのもと。→ **リレーション（`$book->reviews()`）経由で作成**すれば、Laravelが自動で`book_id`をセットしてくれるので安全で楽だ。 |
-| **3. バリデーション** | レビュー投稿・更新時の入力値チェックは必須。毎回コントローラーに書くのは冗長。→ **フォームリクエスト**にバリデーションロジックを分離して、コントローラーをスリムに保とう。 |
-| **4. 認可（権限管理）** | 「自分のレビューは自分で編集・削除できるが、他人のレビューは触れない」というルールは必須。`if`文でコントローラーに書くこともできるが、認可ロジックが散らばってしまう。→ **ポリシー**に認可ロジックを集約し、コントローラーからは`$this->authorize()`の一言で呼び出すだけにしよう。 |
-| **5. 型定義** | 各メソッドが何を受け取り、何を返すのかを明確にしたい。→ **引数と戻り値に型定義**を追加して、コードの意図を明確にし、予期せぬエラーを防ごう。 |
+レビューは単独では存在できません。必ず「どの書籍に対するレビューか」という親子関係があります。このような関係をWebアプリケーションで表現する際、URLにも親子関係を反映させるのが一般的です:
 
-このように、一つ一つの機能を「**どう実装するのが最もLaravelらしく、安全で、メンテナンスしやすいか**」と考えながら、適切な道具（リソースルート、リレーション、フォームリクエスト、ポリシーなど）を選択していくのが、良い設計への近道です。
+- `POST /books/{book}/reviews` — 書籍に対するレビューを投稿
+- `GET /reviews/{review}/edit` — レビューを編集
+- `PUT /reviews/{review}` — レビューを更新
+- `DELETE /reviews/{review}` — レビューを削除
 
----
+投稿時は「どの書籍か」が必要なのでURLに `{book}` を含みますが、編集・更新・削除はレビュー自体のIDで特定できるため `{review}` のみで十分です。
 
-## 7.1. フォームリクエストの作成と実装
+### このチャプターで扱う範囲
 
-まずは、レビューの投稿（`store`）と更新（`update`）で利用するフォームリクエストを作成し、バリデーションルールを定義します。
+- `ReviewController`（store / edit / update / destroy）
+- `StoreReviewRequest` / `UpdateReviewRequest`（バリデーション）
+- `ReviewPolicy`（認可 — Chapter 06で作成済み、ここで活用します）
+
+## 2. 要件の確認 📋
+
+### 画面・操作一覧
+
+| 操作 | HTTPメソッド | URI | コントローラー@メソッド | 認証 | 認可 |
+|:---|:---|:---|:---|:---|:---|
+| レビュー投稿 | POST | `/books/{book}/reviews` | ReviewController@store | 必要 | — |
+| レビュー編集フォーム | GET | `/reviews/{review}/edit` | ReviewController@edit | 必要 | ReviewPolicy@update（投稿者のみ） |
+| レビュー更新処理 | PUT | `/reviews/{review}` | ReviewController@update | 必要 | ReviewPolicy@update（投稿者のみ） |
+| レビュー削除処理 | DELETE | `/reviews/{review}` | ReviewController@destroy | 必要 | ReviewPolicy@delete（投稿者のみ） |
+
+### バリデーションルール
+
+| 項目 | ルール | エラーメッセージ |
+|:---|:---|:---|
+| rating | required / integer / min:1 / max:5 | 評価は必須です。/ 評価は1〜5の整数で入力してください。 |
+| comment | nullable / string / max:1000 | コメントは1000文字以内で入力してください。 |
+
+### 認可ルール（ReviewPolicy）
+
+| 操作 | 条件 | 違反時 |
+|:---|:---|:---|
+| レビュー編集（update） | `$user->id === $review->user_id`（投稿者本人のみ） | 403 Forbidden |
+| レビュー削除（delete） | `$user->id === $review->user_id`（投稿者本人のみ） | 403 Forbidden |
+
+## 3. 先輩エンジニアの思考プロセス 💭
+
+レビュー機能の実装は、書籍管理機能（Chapter 06）と似ていますが、一つ大きな違いがあります。それは「**親子関係**」です。レビューは必ず特定の「書籍」に紐づきます。この関係性をどう設計し、実装に落とし込むかがこのChapterの鍵となります。
+
+### Point 1: ルート設計 — URLで親子関係を表現する
+
+レビューは単独では存在せず、必ず書籍に属します。投稿時のURLは `POST /books/{book}/reviews` のように親子関係を表現します。一方、編集・更新・削除はレビューのIDだけで特定できるため、`/reviews/{review}` とシンプルにします。
+
+### Point 2: リレーション経由でデータを作成する
+
+レビューを作成する際、`book_id` を手動でセットするのは面倒で間違いのもとです。`$book->reviews()->create([...])` を使えば、Laravelが自動で `book_id` をセットしてくれます。
+
+```php
+// ❌ 手動で book_id をセット
+Review::create([
+    'book_id' => $book->id,
+    'user_id' => Auth::id(),
+    ...
+]);
+
+// ✅ リレーション経由で作成（book_id は自動セット）
+$book->reviews()->create([
+    'user_id' => Auth::id(),
+    ...
+]);
+```
+
+### Point 3: Policyで認可を一元管理する
+
+「自分のレビューは自分で編集・削除できるが、他人のレビューは触れない」というルールは、Chapter 06 で作成した `ReviewPolicy` に既に定義されています。コントローラーからは `$this->authorize('update', $review)` の一行で呼び出すだけです。
+
+### Point 4: 削除前にリレーション先を退避する
+
+`destroy` メソッドでは、レビュー削除後に書籍詳細ページにリダイレクトする必要があります。しかし、`$review->delete()` した後では `$review->book` にアクセスできなくなります。そのため、削除前に `$book = $review->book;` で退避しておきます。
+
+## 4. 実装 🚀
+
+### 4.1. FormRequestの作成
+
+レビューの投稿と更新で利用するフォームリクエストを作成します。
 
 ```bash
 sail artisan make:request StoreReviewRequest
 sail artisan make:request UpdateReviewRequest
 ```
 
-`app/Http/Requests/StoreReviewRequest.php`
+#### `app/Http/Requests/StoreReviewRequest.php`
 
 ```php
 <?php
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReviewRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
     public function rules(): array
     {
         return [
@@ -59,25 +133,51 @@ class StoreReviewRequest extends FormRequest
             'comment' => ['nullable', 'string', 'max:1000'],
         ];
     }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'rating.required' => '評価は必須です。',
+            'rating.integer' => '評価は整数で入力してください。',
+            'rating.min' => '評価は1〜5の整数で入力してください。',
+            'rating.max' => '評価は1〜5の整数で入力してください。',
+            'comment.string' => 'コメントは文字列で入力してください。',
+            'comment.max' => 'コメントは1000文字以内で入力してください。',
+        ];
+    }
 }
 ```
 
-`app/Http/Requests/UpdateReviewRequest.php`
+#### `app/Http/Requests/UpdateReviewRequest.php`
 
 ```php
 <?php
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateReviewRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
     public function rules(): array
     {
         return [
@@ -85,47 +185,50 @@ class UpdateReviewRequest extends FormRequest
             'comment' => ['nullable', 'string', 'max:1000'],
         ];
     }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'rating.required' => '評価は必須です。',
+            'rating.integer' => '評価は整数で入力してください。',
+            'rating.min' => '評価は1〜5の整数で入力してください。',
+            'rating.max' => '評価は1〜5の整数で入力してください。',
+            'comment.string' => 'コメントは文字列で入力してください。',
+            'comment.max' => 'コメントは1000文字以内で入力してください。',
+        ];
+    }
 }
 ```
 
-#### 📖 コードリーディング：FormRequest
+### 4.2. ReviewControllerの実装
 
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `public function authorize(): bool` | このリクエストの実行を許可するかどうかを決定します。`: bool`は戻り値が真偽値であることを示します。 | `FormRequest`の機能の一つ。現時点では誰でもリクエストできるように`true`を返しますが、将来的には特定の条件下でのみ`true`を返すようにロジックを組むことも可能です。 |
-| `public function rules(): array` | このリクエストで受け取るデータに対するバリデーションルールを定義します。`: array`は戻り値が配列であることを示します。 | このメソッドが返す配列に従って、Laravelが自動でバリデーションを実行してくれます。 |
-| `'rating' => [...]` | `rating`（評価）フィールドに対するルール。 | 5段階評価を想定しています。 |
-| `'required'` | この値は必須項目であることを示します。 | 評価点は必ず入力してもらう必要があります。 |
-| `'integer'` | この値は整数でなければならないことを示します。 | 評価は「3.5」のような小数は許可しません。 |
-| `'min:1', 'max:5'` | この値は1から5までの範囲でなければならないことを示します。 | 1未満や6以上の不正な値が送られてくるのを防ぎます。 |
-| `'comment' => [...]` | `comment`（コメント）フィールドに対するルール。 | レビューコメントを想定しています。 |
-| `'nullable'` | この値は空（`null`）でも良いことを示します。 | コメントは任意入力とし、評価だけでも投稿できるようにします。 |
-| `'string'` | この値は文字列でなければならないことを示します。 | - |
-| `'max:1000'` | この値は最大1000文字までであることを示します。 | データベースの負荷やUIの表示崩れを防ぐため、長すぎるコメントを制限します。 |
+`ReviewController` は Chapter 06 の「ルート定義とコントローラーの準備」で既に作成済みです。中身を実装していきましょう。
 
----
-
-## 7.2. ReviewControllerの実装
-
-次に、`ReviewController`にレビューの投稿・編集・更新・削除のロジックを実装します。
-
-`app/Http/Controllers/ReviewController.php`
+#### `app/Http/Controllers/ReviewController.php`
 
 ```php
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
-use App\Models\Review;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use App\Models\Book;
+use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ReviewController extends Controller
 {
+    /**
+     * レビューを投稿
+     */
     public function store(StoreReviewRequest $request, Book $book): RedirectResponse
     {
         $book->reviews()->create([
@@ -137,15 +240,23 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
 
+    /**
+     * レビュー編集フォームを表示
+     */
     public function edit(Review $review): View
     {
         $this->authorize('update', $review);
+
         return view('reviews.edit', compact('review'));
     }
 
+    /**
+     * レビューを更新
+     */
     public function update(UpdateReviewRequest $request, Review $review): RedirectResponse
     {
         $this->authorize('update', $review);
+
         $review->update([
             'rating' => $request->rating,
             'comment' => $request->comment,
@@ -154,9 +265,13 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
     }
 
+    /**
+     * レビューを削除
+     */
     public function destroy(Review $review): RedirectResponse
     {
         $this->authorize('delete', $review);
+
         $book = $review->book;
         $review->delete();
 
@@ -165,39 +280,11 @@ class ReviewController extends Controller
 }
 ```
 
-#### 📖 コードリーディング：ReviewController
+### 4.3. ReviewPolicy（Chapter 06で作成済み）
 
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `public function store(StoreReviewRequest $request, Book $book): RedirectResponse` | 新しいレビューを保存するメソッド。`: RedirectResponse`は、処理後に別のページへリダイレクトすることを示します。 | `POST /books/{book}/reviews`というルートに対応します。引数の型ヒントによる**DI（依存性の注入）**が機能し、Laravelが自動で`StoreReviewRequest`と`Book`のインスタンスを生成し、メソッドに渡してくれます。 |
-| `$book->reviews()->create([...])` | **リレーション経由でのデータ作成**。 | `Book`モデルと`Review`モデルのリレーションを利用して、新しいレビューを作成します。`book_id`が自動でセットされるため、コードが簡潔になります。 |
-| `'user_id' => Auth::id()` | レビューの投稿者として、現在ログインしているユーザーのIDをセットします。 | `Auth::id()`は、`Auth::user()->id`のショートカットです。 |
-| `return redirect()->route(...)` | 処理完了後、指定した名前付きルートにリダイレクトさせます。 | ユーザーを投稿後の書籍詳細ページに戻します。 |
-| `->with('success', '...')` | **セッションへのフラッシュメッセージ**を保存します。 | リダイレクト先のページで一度だけ表示される「レビューを投稿しました。」というメッセージを設定します。 |
-| `public function edit(Review $review): View` | レビュー編集画面を表示するメソッド。`: View`は、このメソッドが`View`オブジェクト（HTMLページ）を返すことを示します。 | `GET /reviews/{review}/edit`というルートに対応します。ここでもルートモデルバインディングが機能しています。 |
-| `return view('reviews.edit', compact('review'))` | `reviews.edit`ビューを表示し、`review`変数を渡します。 | `compact('review')`は`['review' => $review]`と同じ意味のPHPの関数です。 |
-| `public function update(UpdateReviewRequest $request, Review $review): RedirectResponse` | 既存のレビューを更新するメソッド。`: RedirectResponse`でリダイレクトすることを示します。 | `PUT /reviews/{review}`というルートに対応します。`UpdateReviewRequest`でバリデーションを行い、対象の`Review`モデルを更新します。 |
-| `$review->update([...])` | 渡されたデータでモデルの属性を更新し、データベースに保存します。 | マスアサインメントを利用しています。`$fillable`に設定された属性のみが更新対象となります。 |
-| `public function destroy(Review $review): RedirectResponse` | レビューを削除するメソッド。`: RedirectResponse`でリダイレクトすることを示します。 | `DELETE /reviews/{review}`というルートに対応します。 |
-| `$book = $review->book;` | **削除前に**リダイレクト先となる書籍モデルを取得します。 | レビューを削除すると`$review->book`リレーションにアクセスできなくなるため、先に変数に保持しておく必要があります。 |
-| `$review->delete()` | 該当するレビューをデータベースから削除します。 | - |
+`ReviewPolicy` は Chapter 06 の「Policyの作成」で既に作成・登録済みです。参考として内容を再掲します。
 
-> **✅ 動作確認**
-> この時点で、レビューの投稿、編集、削除が動作することを確認しましょう。ただし、まだポリシーを有効にしていないため、他人のレビューも操作できてしまいます。
-
----
-
-## 7.3. ポリシーの作成と適用
-
-最後に、セキュリティ（認可）を実装して、自分のレビューしか操作できないようにします。
-
-### 7.3.1. ポリシーの作成
-
-```bash
-sail artisan make:policy ReviewPolicy --model=Review
-```
-
-`app/Policies/ReviewPolicy.php`
+#### `app/Policies/ReviewPolicy.php`
 
 ```php
 <?php
@@ -209,11 +296,17 @@ use App\Models\User;
 
 class ReviewPolicy
 {
+    /**
+     * Determine whether the user can update the review.
+     */
     public function update(User $user, Review $review): bool
     {
         return $user->id === $review->user_id;
     }
 
+    /**
+     * Determine whether the user can delete the review.
+     */
     public function delete(User $user, Review $review): bool
     {
         return $user->id === $review->user_id;
@@ -221,47 +314,123 @@ class ReviewPolicy
 }
 ```
 
-#### 📖 コードリーディング：ReviewPolicy
+## 5. コードの詳細解説 🔍
 
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `public function update(User $user, Review $review): bool` | `update`アクションに対する認可ロジック。戻り値の型`: bool`は、このメソッドが必ず真偽値を返すことを保証します。 | メソッド名はコントローラーのメソッド名や`$this->authorize()`の第一引数に対応します。第一引数には必ず現在の認証済みユーザーが、第二引数以降には関連するモデルが渡されます。 |
-| `return $user->id === $review->user_id;` | **認可の核心ロジック**。 | ログインしているユーザーのIDと、レビューを投稿したユーザーのIDが一致するかを比較します。`true`なら許可、`false`なら拒否（403エラー）となります。`===`は型まで比較する厳密な比較演算子です。 |
+### FormRequest の解説
 
-### 7.3.2. ポリシーの登録
+| コード / 構文 | 解説 |
+|:---|:---|
+| `use Illuminate\Contracts\Validation\ValidationRule` | バリデーションルールの型を示すインターフェース。PHPDocの `@return` 型で使用されています。 |
+| `public function authorize(): bool` | このリクエストの実行を許可するかどうかを決定します。`true` を返すことで誰でもリクエスト可能にしています。 |
+| `public function rules(): array` | バリデーションルールを配列で返します。Laravelが自動でバリデーションを実行します。 |
+| `'rating' => ['required', 'integer', 'min:1', 'max:5']` | 評価は必須・整数・1〜5の範囲。5段階評価を想定しています。 |
+| `'comment' => ['nullable', 'string', 'max:1000']` | コメントは任意入力。空でも可、文字列で最大1000文字。 |
+| `public function messages(): array` | バリデーションエラー時のカスタムメッセージを日本語で定義します。 |
 
-`app/Providers/AuthServiceProvider.php`に`ReviewPolicy`を登録します。
+### ReviewController の解説
 
-```php
-// ...
-use App\Models\Review;
-use App\Policies\ReviewPolicy;
+| コード / 構文 | 解説 |
+|:---|:---|
+| `store(StoreReviewRequest $request, Book $book): RedirectResponse` | レビュー投稿メソッド。`StoreReviewRequest` でバリデーション済みのデータと、ルートモデルバインディングで取得した `Book` を受け取ります。 |
+| `$book->reviews()->create([...])` | **リレーション経由でのデータ作成**。`Book` モデルの `reviews()` リレーションを通じてレビューを作成します。`book_id` が自動セットされます。 |
+| `'user_id' => Auth::id()` | レビューの投稿者として、現在ログインしているユーザーのIDをセットします。`Auth::id()` は `Auth::user()->id` のショートカットです。 |
+| `return redirect()->route('books.show', $book)->with('success', '...')` | 書籍詳細ページにリダイレクトし、セッションにフラッシュメッセージを保存します。 |
+| `$this->authorize('update', $review)` | `ReviewPolicy` の `update` メソッドを呼び出します。認可が下りない場合、403 Forbidden エラーが自動的に返されます。 |
+| `$review->update([...])` | 渡されたデータでモデルの属性を更新し、データベースに保存します。`$fillable` に設定された属性のみが更新対象です。 |
+| `$book = $review->book;` | **削除前に**リダイレクト先の書籍モデルを退避します。`$review->delete()` 後は `$review->book` にアクセスできなくなるためです。 |
+| `$review->delete()` | 該当するレビューをデータベースから削除します。 |
 
-class AuthServiceProvider extends ServiceProvider
-{
-    protected $policies = [
-        Book::class => BookPolicy::class,
-        Review::class => ReviewPolicy::class, // 追加
-    ];
-// ...
+### ReviewPolicy の解説
+
+| コード / 構文 | 解説 |
+|:---|:---|
+| `update(User $user, Review $review): bool` | 第一引数には現在の認証済みユーザーが、第二引数には対象のレビューが自動で渡されます。 |
+| `return $user->id === $review->user_id;` | ログインユーザーのIDとレビュー投稿者のIDが一致するかを厳密比較（`===`）します。`true` なら許可、`false` なら403エラーです。 |
+
+## 6. この実装にたどり着くための調べ方 🧐
+
+### Step 1: 公式ドキュメントを読みやすくまとめる
+
+**プロンプト例**
+```
+以下はLaravelのEloquentリレーションに関する公式ドキュメントの一部です。
+特に「リレーション経由でのデータ作成（create, save）」に焦点を当てて
+分かりやすくまとめてください。
+
+出力してほしい内容：
+- 重要ポイント（10行以内）
+- create() と save() の違い
+- 親子関係のあるデータ作成でよくある落とし穴
+- 最小で動かすための手順
+
+--- ここから ---
+（ここにLaravelのEloquent Relationshipsに関する公式ドキュメントを貼り付ける）
+--- ここまで ---
 ```
 
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `protected $policies = [...]` | モデルとポリシーのマッピングを定義するプロパティ。 | ここに登録することで、Laravelは`Review`モデルに対する認可リクエストがあった際に、自動的に`ReviewPolicy`を使用するようになります。 |
-| `Review::class => ReviewPolicy::class` | `Review`モデルが対象の場合、`ReviewPolicy`クラスの認可ロジックを適用するという宣言。 | `::class`は、クラスの完全修飾名を文字列として取得するPHPの機能です。 |
+### Step 2: 「なぜそうなる？」をはっきりさせる
 
-### 7.3.3. コントローラーへの権限チェック追加
+**プロンプト例**
+```
+LaravelでネストしたリソースのCRUDを実装しようとしています。
+私の理解はこうです：
+「レビューは書籍に従属するので、投稿時は $book->reviews()->create() で
+book_id を自動セットする。認可は ReviewPolicy で投稿者チェックを行い、
+コントローラーからは $this->authorize() で呼び出す。」
 
-`ReviewController`の`edit`, `update`, `destroy`メソッドに`$this->authorize()`を追加します。（上記`ReviewController`のコードには既に追加済みです）
+お願い：
+1) 正しいかチェックして、間違いがあれば反例で教えてください
+2) $book->reviews()->create() の内部で何が起きているか説明してください
+3) authorize() が失敗した場合の処理フローを教えてください
+4) destroy メソッドで削除前に $book = $review->book; とする理由を教えてください
+```
 
-| コード | 解説 |
-|:---|:---|
-| `$this->authorize('update', $review);` | `ReviewPolicy`の`update`メソッドを呼び出します。認可が下りない場合、Laravelは自動的に**403 Forbidden**エラーを返します。 |
-| `$this->authorize('delete', $review);` | `ReviewPolicy`の`delete`メソッドを呼び出します。 | `edit`と`update`で同じ`update`ポリシーを共有しているのは、「レビューを更新できる人は、編集画面も開けるべき」という自然な権限設定に基づいています。 |
+### Step 3: 設計レビュー
 
-> **✅ 最終動作確認**
-> - 自分が投稿したレビューの編集・削除ができること。
-> - 他人が投稿したレビューの編集・削除ボタンが表示されず、直接URLにアクセスすると403エラーになること。
-> 
-> 上記を確認できれば、レビュー機能の実装は完了です。
+**プロンプト例**
+```
+以下のReviewControllerの設計をレビューしてください。
+
+- 目的：書籍に対するレビューのCRUD（投稿者のみ編集・削除可能）
+- 制約：Laravel 10, PHP 8.2, Blade使用
+- 設計案：
+（ここにReviewController.phpのコードを貼り付ける）
+
+見てほしい観点：
+- store で book_id が正しくセットされるか
+- authorize の呼び出し位置は適切か
+- destroy でのリダイレクト先は正しいか
+```
+
+## 7. 動作確認 ✅
+
+以下の項目を確認してください。
+
+1. **レビュー投稿**
+   - ログイン後、書籍詳細ページからレビューを投稿できる
+   - 投稿後「レビューを投稿しました。」が表示される
+   - 評価を空欄で投稿すると「評価は必須です。」が表示される
+
+2. **レビュー編集**
+   - 自分が投稿したレビューの編集ボタンが表示される
+   - 編集フォームに既存の値がセットされている
+   - 更新後「レビューを更新しました。」が表示される
+
+3. **レビュー削除**
+   - 自分が投稿したレビューの削除ボタンが表示される
+   - 削除後「レビューを削除しました。」が表示される
+
+4. **認可チェック**
+   - 他人のレビューの編集・削除ボタンが表示されない
+   - 他人のレビューの編集URLに直接アクセスすると403エラーが表示される
+
+## 8. まとめ ✨
+
+このチャプターでは、書籍に紐づくレビュー機能を実装しました。
+
+- **リレーション経由のデータ作成**: `$book->reviews()->create([...])` で `book_id` を自動セットし、安全かつ簡潔にレビューを作成しました
+- **FormRequestによるバリデーション分離**: `StoreReviewRequest` / `UpdateReviewRequest` にバリデーションルールとエラーメッセージを集約しました
+- **Policyによる認可**: `ReviewPolicy` で「投稿者のみ編集・削除可能」というルールを定義し、`$this->authorize()` で一元的に呼び出しました
+- **削除前のリレーション退避**: `$book = $review->book;` で削除後のリダイレクト先を確保するパターンを学びました
+
+次の Chapter 08 では、書籍に対する**お気に入り機能**を実装します。多対多リレーションの `toggle()` メソッドを使った効率的な登録・解除の切り替えを学びます。
