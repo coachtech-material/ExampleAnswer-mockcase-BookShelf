@@ -1,66 +1,78 @@
-# Chapter 4: 認証機能の実装
+# Chapter 04: 「エンジンとボディ」 - 認証機能の実装
 
-## 🎯 このセクションで学ぶこと
+## 🎯 このChapterの目標
 
-このセクションでは、アプリケーションの「入り口」となる認証機能を実装します。Laravelが提供する柔軟な認証バックエンド「Fortify」を利用して、ログイン・ログアウト・新規登録といった基本的な機能を構築します。
+このChapterでは、アプリケーションの「入り口」となる認証機能を実装します。Fortifyは認証機能の「エンジン」部分だけを提供してくれるパッケージです。車のボディ（UI）は自分たちで自由にデザインし、そこに強力なエンジン（Fortify）を搭載する、というイメージで進めます。
 
-- **Laravel Fortifyの役割**: なぜBreezeやJetstreamのようなUI付きのパッケージではなく、バックエンド処理に特化したFortifyを使うのかを理解します。
-- **認証ルートの構築と分割**: ログイン、登録などの認証関連ルートを`auth.php`に分離する理由と、そのメリットを学びます。
-- **Fortifyのカスタマイズ**: 設定ファイルやサービスプロバイダを調整し、自作のビューを使って認証機能を提供する方法を学びます。
-- **RouteServiceProviderの役割**: 分離したルートファイルをアプリケーションに認識させる「配線役」の重要性を理解します。
+| このChapterで学ぶこと | 解説 |
+|:---|:---|
+| Laravel Fortifyの役割 | なぜUI付きパッケージ（Breeze等）ではなく、バックエンド特化のFortifyを使うのか |
+| 認証ルートの構築と分割 | ログイン・登録のルートを `auth.php` に分離する「関心の分離」 |
+| Fortifyのカスタマイズ | 設定ファイルやサービスプロバイダの調整方法 |
+| RouteServiceProviderの役割 | 分離したルートファイルをアプリケーションに認識させる「配線役」 |
+| CreateNewUser のカスタマイズ | 日本語バリデーションメッセージの追加 |
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：なぜUI付きパッケージを使わないのか？
+## 📖 背景知識：なぜUI付きパッケージを使わないのか？
 
-LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を一瞬で実装できる便利なパッケージがあります。しかし、実務では必ずしもそれらの提供するUIが要件に合うとは限りません。むしろ、デザイナーが作成した独自のUIに、Laravelの認証機能を「接続する」場面の方が圧倒的に多いのです。
+LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を一瞬で実装できる便利なパッケージがあります。しかし、実務では必ずしもそれらの提供するUIが要件に合うとは限りません。
 
 | 課題 | 解決策 | なぜこのChapterでやるのか？ |
 |:---|:---|:---|
-| Breeze等が提供するUIは、今回のデザインと異なる | **Laravel Fortify**を使い、認証のバックエンド処理のみを導入する | UI（Bladeファイル）は自前で用意したもの（`Preparedblade-mockcase-BookShelf`）を使い、機能だけをLaravelに任せることで、要件通りの画面と機能を両立できる。 |
-| 認証の仕組みがブラックボックス化しやすい | 認証ルートや設定を**手動で構築**する | ログイン画面がどう表示され、ログイン処理がどう実行されるのか、一連の流れをコードレベルで追うことで、認証の仕組みを深く理解できる。 |
-| ログイン後の遷移先などを柔軟に変更したい | **ServiceProvider**や設定ファイルをカスタマイズする | アプリケーションの仕様に合わせて、認証に関する様々な動作を自由に変更できるようになる。 |
-
-Fortifyは、認証機能の「エンジン」部分だけを提供してくれるパッケージです。車のボディ（UI）は自分たちで自由にデザインし、そこに強力なエンジン（Fortify）を搭載する、というイメージを持つと分かりやすいでしょう。
+| Breeze等が提供するUIは、今回のデザインと異なる | **Laravel Fortify**を使い、認証のバックエンド処理のみを導入する | UI（Bladeファイル）は自前で用意したものを使い、機能だけをLaravelに任せる。 |
+| 認証の仕組みがブラックボックス化しやすい | 認証ルートや設定を**手動で構築**する | 一連の流れをコードレベルで追うことで理解が深まる。 |
+| ログイン後の遷移先などを柔軟に変更したい | **ServiceProvider**や設定ファイルをカスタマイズする | アプリケーションの仕様に合わせて、認証に関する動作を自由に変更できる。 |
 
 ---
 
-## 4.1. Laravel Fortifyのインストール
+## 📋 実装の手順
 
-まず、Composerを使ってLaravel Fortifyをプロジェクトにインストールします。その後、`vendor:publish`コマンドで設定ファイルをプロジェクト内にコピーします。
+### 4.1. Laravel Fortifyのインストール
 
 ```bash
-# Laravel Fortifyをインストール
 sail composer require laravel/fortify
-
-# Fortifyのサービスプロバイダと設定ファイルを公開
 sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 ```
 
-このコマンドにより、`config/fortify.php`という設定ファイルと、`app/Providers/FortifyServiceProvider.php`が作成されます。
+### 4.2. config/fortify.php の設定
+
+```php
+// config/fortify.php
+'home' => '/',
+```
+
+### 4.3. FortifyServiceProvider を config/app.php に登録
+
+```php
+// config/app.php
+'providers' => ServiceProvider::defaultProviders()->merge([
+    App\Providers\RouteServiceProvider::class,
+    App\Providers\FortifyServiceProvider::class,
+])->toArray(),
+```
 
 ---
 
-## 4.2. 認証ルートの作成と分離
+## 💭 なぜこう作るのか？
 
-次に、ログイン、新規登録、ログアウトなどの認証関連のルートを定義します。今回は`routes/web.php`が煩雑になるのを避けるため、`routes/auth.php`というファイルを新規に作成して、そこに認証ルートをまとめて記述します。
-
-### なぜ`auth.php`に分離するのか？ - 関心の分離という考え方
-
-なぜ、すべてのルートを`web.php`にまとめず、わざわざ`auth.php`という別のファイルを作成するのでしょうか？これは、ソフトウェア設計における非常に重要な原則である「**関心の分離 (Separation of Concerns)**」に基づいています。
+### なぜ auth.php に分離するのか？
 
 | 目的 | 解説 |
 |:---|:---|
-| **可読性の向上** | `web.php`にはアプリケーションの主要機能（書籍、レビュー、検索など）のルートが、`auth.php`には認証関連のルートだけが存在することになります。これにより、ファイルの見通しが良くなり、「認証のルートを変更したい」と思ったときに、迷わず`auth.php`を開くことができます。 |
-| **メンテナンス性の向上** | アプリケーションが大規模になると、`web.php`は数百行、数千行に膨れ上がる可能性があります。機能ごとにファイルが適切に分割されていれば、コードの修正や追加が容易になり、修正による影響範囲も特定しやすくなります。これは、バグの発生を防ぎ、将来の機能拡張をスムーズに進める上で不可欠です。 |
-| **責務の明確化** | `web.php`は「アプリケーションの通常機能の交通整理」、`auth.php`は「ユーザーの出入りを管理する受付」というように、それぞれのファイルが持つ役割（責務）が明確になります。 |
-| **Laravelの標準への準拠** | Laravelの標準的なスターターキットであるBreezeなどでも、認証ルートは`auth.php`に分離されています。この「お作法」に従うことで、チームに新しい開発者が加わった際にも、コードの構造をすぐに理解してもらえます。 |
+| **可読性の向上** | `web.php`には主要機能のルートが、`auth.php`には認証関連のルートだけが存在し、見通しが良くなります。 |
+| **メンテナンス性の向上** | 機能ごとにファイルが分割されていれば、修正による影響範囲を特定しやすくなります。 |
+| **責務の明確化** | `web.php`は「アプリの通常機能の交通整理」、`auth.php`は「ユーザーの出入りを管理する受付」。 |
 
-料理に例えるなら、`web.php`が「メインディッシュのレシピブック」、`auth.php`が「ドリンクメニュー」です。両方を一つのノートに書いても機能しますが、別々にまとめておいた方が、探しやすく、管理しやすいのは明らかでしょう。
+### RouteServiceProvider の HOME 定数
 
-### `auth.php`の作成
+`public const HOME = '/'` は、ログイン成功後のリダイレクト先を定義します。
 
-それでは、`routes/auth.php`を新規に作成し、以下の内容を記述します。
+---
+
+## 🚀 コードの実装
+
+### 4.4. `routes/auth.php`（新規作成）
 
 ```php
 <?php
@@ -68,141 +80,102 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
-// 未ログインユーザー向けのルート
-Route::middleware("guest")->group(function () {
-    // ログイン画面表示
-    Route::get("/login", function () {
-        return view("auth.login");
-    })->name("login");
+Route::middleware('guest')->group(function () {
+    Route::get('/login', function () {
+        return view('auth.login');
+    })->name('login');
 
-    // 新規登録画面表示
-    Route::get("/register", function () {
-        return view("auth.register");
-    })->name("register");
+    Route::get('/register', function () {
+        return view('auth.register');
+    })->name('register');
 });
 
-// ログイン済みユーザー向けのルート
-Route::middleware("auth")->group(function () {
-    // ログアウト処理
-    Route::post("/logout", [AuthenticatedSessionController::class, "destroy"])
-        ->name("logout");
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
+        ->name('logout');
 });
 ```
 
-> **💡 ポイント**
-> この`auth.php`ファイルは、このままではアプリケーションに認識されません。次のステップで`RouteServiceProvider`から読み込む設定を追加します。この時点ではファイルを作成するだけで問題ありません。
-
----
-
-## 4.3. Fortifyの設定
-
-インストールしたFortifyが、私たちが用意したビューやルート定義を使うように設定を調整していきます。
-
-### 4.3.1. Fortifyのデフォルトビューを無効化
-
-Fortifyはデフォルトで自身の持つビューを使おうとします。今回は自前のビューを使うため、この機能を無効化します。
-
-`config/fortify.php` を開き、`views`の値を`false`に修正してください。
+### 4.5. `app/Providers/FortifyServiceProvider.php`
 
 ```php
-// config/fortify.php
+<?php
 
-// 変更前
-// 'views' => true,
-// 変更後
-'views' => false,
-```
+namespace App\Providers;
 
-### 4.3.2. ログイン後のリダイレクト先を設定
-
-ログインに成功した後の遷移先を、この後設定する `RouteServiceProvider` の定義と同期させます。
-
-`config/fortify.php` を開き、ファイルの冒頭で `RouteServiceProvider` をインポート（use）した上で、`home` の値を書き換えます。
-
-```php
-// config/fortify.php
-
-// ファイルの先頭付近（他のuse文が並んでいる場所）に追記
-use App\Providers\RouteServiceProvider;
-
-// ...
-
-// 修正箇所
-'home' => RouteServiceProvider::HOME,
-```
-
-### 4.3.3. Fortifyのサービスプロバイダを登録
-
-Fortifyをアプリケーションに正式に登録するため、`config/app.php`の`providers`配列に`FortifyServiceProvider`を追加します。
-
-```php
-// config/app.php
-
-'providers' => ServiceProvider::defaultProviders()->merge([
-    // ...
-    App\Providers\RouteServiceProvider::class,
-    App\Providers\FortifyServiceProvider::class, // ← これを追加
-])->toArray(),
-```
-
-### 4.3.4. Fortifyが使用するビューの指定
-
-`app/Providers/FortifyServiceProvider.php` を開き、`boot` メソッド内で、Fortifyがログイン画面や新規登録画面としてどのBladeファイルを呼び出すべきかを明示的に指定します。
-
-```php
-// app/Providers/FortifyServiceProvider.php
-
+use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\ResetUserPassword;
+use App\Actions\Fortify\UpdateUserPassword;
+use App\Actions\Fortify\UpdateUserProfileInformation;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Fortify;
 
-// ...
-
-public function boot(): void
+class FortifyServiceProvider extends ServiceProvider
 {
-    // Fortifyに、ログイン画面として `auth.login` ビューを使うよう指示
-    Fortify::loginView(fn () => view("auth.login"));
+    public function register(): void
+    {
+        //
+    }
 
-    // Fortifyに、新規登録画面として `auth.register` ビューを使うよう指示
-    Fortify::registerView(fn () => view("auth.register"));
+    public function boot(): void
+    {
+        Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
+        Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
+        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+        Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
+        Fortify::loginView(fn () => view('auth.login'));
+        Fortify::registerView(fn () => view('auth.register'));
+
+        RateLimiter::for('login', function (Request $request) {
+            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+
+            return Limit::perMinute(5)->by($throttleKey);
+        });
+
+        RateLimiter::for('two-factor', function (Request $request) {
+            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        });
+    }
 }
 ```
 
----
-
-## 4.4. RouteServiceProviderの設定 - ルートファイルの「配線」
-
-最後に、ここまで準備してきた`auth.php`をアプリケーションに正式に認識させるための「配線作業」を行います。また、ユーザーがログインした後にどこへ遷移するかの設定もここで行います。
-
-### RouteServiceProviderの役割とは？
-
-`app/Providers/RouteServiceProvider.php`は、Laravelアプリケーションの「**ルートの司令塔**」です。どのルートファイルを読み込み、それらにどのような共通設定（ミドルウェアやプレフィックスなど）を適用するかを一元管理する役割を担っています。
-
-先ほど`auth.php`を作成しましたが、これはただファイルを作っただけではLaravelに認識されません。`RouteServiceProvider`に「`routes/auth.php`というファイルもルート定義として読み込んでください」と明示的に指示してあげる必要があります。
-
-### 設定の解説
-
-`app/Providers/RouteServiceProvider.php`を開き、以下の2点を修正・追記します。
+### 4.6. `app/Providers/RouteServiceProvider.php`
 
 ```php
-// app/Providers/RouteServiceProvider.php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 
 class RouteServiceProvider extends ServiceProvider
 {
-    /**
-     * ログイン後のリダイレクト先
-     */
-    public const HOME = '/'; // ① ログイン後の遷移先をルートパスに変更
+    public const HOME = '/';
 
-    /**
-     * ルートの定義
-     */
     public function boot(): void
     {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         $this->routes(function () {
-            // ... web.phpの読み込み設定 ...
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api.php'));
+
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
 
-            // ② auth.phpを読み込む処理を追記
             Route::middleware('web')
                 ->group(base_path('routes/auth.php'));
         });
@@ -210,11 +183,103 @@ class RouteServiceProvider extends ServiceProvider
 }
 ```
 
-| 番号 | コード | 解説 |
+### 4.7. `app/Actions/Fortify/CreateNewUser.php`
+
+```php
+<?php
+
+namespace App\Actions\Fortify;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Laravel\Fortify\Contracts\CreatesNewUsers;
+
+class CreateNewUser implements CreatesNewUsers
+{
+    use PasswordValidationRules;
+
+    public function create(array $input): User
+    {
+        Validator::make($input, [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique(User::class),
+            ],
+            'password' => $this->passwordRules(),
+        ], [
+            'name.required' => 'お名前を入力してください。',
+            'email.required' => 'メールアドレスを入力してください。',
+            'email.email' => 'メールアドレスはメール形式で入力してください。',
+            'email.unique' => 'このメールアドレスは既に使用されています。',
+            'password.required' => 'パスワードを入力してください。',
+            'password.confirmed' => 'パスワードと一致しません。',
+        ])->validate();
+
+        return User::create([
+            'name' => $input['name'],
+            'email' => $input['email'],
+            'password' => Hash::make($input['password']),
+        ]);
+    }
+}
+```
+
+---
+
+## 🔍 コードリーディング
+
+### routes/auth.php
+
+| コード | 解説 |
+|:---|:---|
+| `Route::middleware('guest')->group(...)` | 未ログインユーザーのみがアクセスできるルートグループ。 |
+| `Route::middleware('auth')->group(...)` | ログイン済みユーザーのみがアクセスできるルートグループ。 |
+| `[AuthenticatedSessionController::class, 'destroy']` | Fortifyが提供するログアウト処理。 |
+
+### RouteServiceProvider
+
+| コード | 解説 |
+|:---|:---|
+| `public const HOME = '/'` | ログイン成功後のリダイレクト先。 |
+| `Route::middleware('web')->group(base_path('routes/auth.php'))` | `auth.php` を読み込み、`web` ミドルウェアを適用。 |
+
+---
+
+## 🧐 調べ方のヒント
+
+| 疑問 | プロンプト例 |
+|:---|:---|
+| Fortify と Breeze の違い | 「Laravel Fortify と Laravel Breeze の違いを教えてください。」 |
+| ルートファイルの分離方法 | 「Laravel で routes/auth.php のようにルートファイルを分離する方法を教えてください。」 |
+| ミドルウェアの仕組み | 「Laravel の guest ミドルウェアと auth ミドルウェアの違いを教えてください。」 |
+
+---
+
+## ✅ 動作確認
+
+| 確認項目 | 確認方法 |
+|:---|:---|
+| ログイン画面の表示 | `http://localhost/login` でフォームが表示されること |
+| 新規登録画面の表示 | `http://localhost/register` でフォームが表示されること |
+| ログイン後のリダイレクト | ログイン成功後、`/`（トップページ）にリダイレクトされること |
+| バリデーションエラー | 空のフォームを送信し、日本語のエラーメッセージが表示されること |
+
+---
+
+## ✨ このChapterのまとめ
+
+| 構成要素 | ファイル | 役割 |
 |:---|:---|:---|
-| **①** | `public const HOME = '/';` | ユーザーがログインに成功した後のリダイレクト先を定義します。デフォルトの`/home`から、このアプリケーションのトップページである`/`に変更します。 |
-| **②** | `Route::middleware('web')->group(base_path('routes/auth.php'));` | これが「配線」の核心部分です。`routes/auth.php`ファイルを読み込み、そこに定義されているルート群に対して`web`ミドルウェアグループを適用するよう指示しています。`web`ミドルウェアには、セッション管理やCSRF保護など、Webアプリケーションに必須の機能が含まれています。 |
+| 認証ルート | `routes/auth.php` | ログイン・登録・ログアウトのURLを定義 |
+| Fortify設定 | `config/fortify.php` | `home => '/'` でログイン後の遷移先を設定 |
+| Fortifyプロバイダ | `app/Providers/FortifyServiceProvider.php` | ビュー指定・ユーザー作成ロジック・レート制限 |
+| ルートプロバイダ | `app/Providers/RouteServiceProvider.php` | `auth.php` の読み込み + HOME定数 |
+| ユーザー作成 | `app/Actions/Fortify/CreateNewUser.php` | 日本語バリデーション付きのユーザー登録処理 |
 
-この設定により、`auth.php`に書かれたルート（`/login`, `/register`, `/logout`）が`web.php`のルートと同様に扱われ、アプリケーション全体で有効になります。
-
-これで、認証機能のバックエンド側の設定は完了です。次のChapterでは、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。
+次のChapterでは、開発を効率化するための初期データ（マスタデータ）の準備を進めていきます。

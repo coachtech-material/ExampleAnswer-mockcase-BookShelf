@@ -1,56 +1,49 @@
-# Chapter 12: ジャンル管理機能（CRUD）
+# Chapter 12: もう一つのCRUD - ジャンル管理機能を実装する
 
-## 🎯 このセクションで学ぶこと
+## 🎯 このChapterの目標
 
-このセクションでは、ジャンルの登録・編集・削除機能を実装します。Chapter 6で学んだ書籍管理機能（CRUD）と同様のパターンを、別のリソースで再度実践します。
-
-- **CRUDパターンの再実践**: 書籍管理で学んだパターンを、ジャンル管理に適用します。
-- **学習の定着**: 同じパターンを繰り返し実装することで、理解を深めます。
-- **削除時の制約**: 書籍が紐付いているジャンルは削除できないようにする実装を学びます。
+このチャプターでは、ジャンルの一覧表示・登録・編集・削除機能を実装します。Chapter 06 で学んだ書籍CRUDと同じパターンを別のリソースで再実践し、さらにジャンル管理特有の「削除時の制約チェック」を学びます。
 
 ---
 
-## 🧠 先輩エンジニアの思考プロセス：ジャンル管理機能の設計
+## 📋 要件の確認
 
-ジャンル管理機能を設計する際、先輩エンジニアは以下のような思考プロセスを経ています。
+### バリデーションルール
 
-### 書籍管理との共通パターン
-
-書籍管理とジャンル管理は、技術的にはほぼ同じCRUDパターンです。
-
-| 機能 | 書籍管理 | ジャンル管理 |
+| 項目 | ルール（Store） | ルール（Update） |
 |:---|:---|:---|
-| 一覧表示 | `BookController@index` | `GenreController@index` |
-| 新規作成 | `BookController@create/store` | `GenreController@create/store` |
-| 編集 | `BookController@edit/update` | `GenreController@edit/update` |
-| 削除 | `BookController@destroy` | `GenreController@destroy` |
+| name | required / string / max:255 / unique:genres,name | required / string / max:255 / unique:genres（自分自身を除外） |
 
-### ジャンル管理特有の考慮点
+### 削除の制約
 
-| 考慮点 | 設計判断 | 理由 |
-|:---|:---|:---|
-| ジャンル名の一意性 | `unique`バリデーション | 同じ名前のジャンルが複数存在すると混乱を招く。 |
-| 書籍が紐付いているジャンルの削除 | 削除を禁止 | 書籍のジャンル情報が失われるのを防ぐ。 |
-| 一覧での書籍数表示 | `withCount`で取得 | 各ジャンルに何冊の書籍があるかを表示できる。 |
+| 条件 | 挙動 |
+|:---|:---|
+| 書籍が紐付いていない | 削除成功 |
+| 書籍が1件以上紐付いている | 削除拒否 + エラーメッセージ |
 
 ---
 
-## 12.1. フォームリクエストの作成
+## 💭 なぜこう作るのか？
 
-まず、バリデーションを行うフォームリクエストを作成します。
+### Point 1: `unique` バリデーションの更新時の落とし穴
 
-```bash
-sail artisan make:request StoreGenreRequest
-sail artisan make:request UpdateGenreRequest
-```
+更新時は `Rule::unique('genres')->ignore($this->genre)` で自分自身を除外します。
+
+### Point 2: 削除前の紐付きチェック
+
+`$genre->books()->count() > 0` で紐付きをチェックし、書籍が存在する場合は削除を禁止します。
+
+### Point 3: `withCount()` で書籍数を効率的に取得
+
+`Genre::withCount('books')` で `$genre->books_count` にアクセスでき、N+1問題も発生しません。
 
 ---
 
-## 12.2. フォームリクエストの実装
+## 🚀 コードの実装
 
-### StoreGenreRequest
+### FormRequest
 
-`app/Http/Requests/StoreGenreRequest.php`を開き、以下の内容を記述してください。
+#### `app/Http/Requests/StoreGenreRequest.php`
 
 ```php
 <?php
@@ -72,19 +65,19 @@ class StoreGenreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255', 'unique:genres,name'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'ジャンル名は必須です。',
+            'name.max' => 'ジャンル名は255文字以内で入力してください。',
+            'name.unique' => 'そのジャンル名は既に使用されています。',
+        ];
+    }
 }
 ```
 
-### 📖 コードリーディング：StoreGenreRequest
-
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `'name' => ['required', 'string', 'max:255', 'unique:genres,name']` | `name`フィールドのバリデーションルールを定義。 | 必須、文字列、最大255文字、`genres`テーブルの`name`カラムで一意であること。 |
-| `'unique:genres,name'` | `genres`テーブルの`name`カラムで重複がないかチェック。 | 同じ名前のジャンルは登録できない。 |
-
-### UpdateGenreRequest
-
-`app/Http/Requests/UpdateGenreRequest.php`を開き、以下の内容を記述してください。
+#### `app/Http/Requests/UpdateGenreRequest.php`
 
 ```php
 <?php
@@ -107,38 +100,37 @@ class UpdateGenreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255', Rule::unique('genres')->ignore($this->genre)],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'ジャンル名は必須です。',
+            'name.max' => 'ジャンル名は255文字以内で入力してください。',
+            'name.unique' => 'そのジャンル名は既に使用されています。',
+        ];
+    }
 }
 ```
 
-### 📖 コードリーディング：UpdateGenreRequest
+### GenreController の完全実装
 
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `use Illuminate\Validation\Rule;` | `Rule`クラスをインポート。 | 複雑なバリデーションルールを構築するために必要。 |
-| `Rule::unique('genres')->ignore($this->genre)` | `genres`テーブルで一意性をチェックするが、現在編集中のレコードは除外する。 | 名前を変更しない場合でも、自分自身と重複しているとエラーになるのを防ぐ。 |
-
----
-
-## 12.3. GenreController.php の完全実装
-
-Chapter 11で`show`メソッドを実装した`GenreController`に、CRUD機能を追加します。
-
-`app/Http/Controllers/GenreController.php`を開き、以下の内容に更新してください。
+`app/Http/Controllers/GenreController.php`
 
 ```php
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Genre;
 use App\Http\Requests\StoreGenreRequest;
 use App\Http\Requests\UpdateGenreRequest;
+use App\Models\Genre;
 
 class GenreController extends Controller
 {
     public function index()
     {
         $genres = Genre::withCount('books')->get();
+
         return view('genres.index', compact('genres'));
     }
 
@@ -150,12 +142,14 @@ class GenreController extends Controller
     public function store(StoreGenreRequest $request)
     {
         Genre::create($request->validated());
+
         return redirect()->route('genres.index')->with('success', 'ジャンルを作成しました。');
     }
 
     public function show(Genre $genre)
     {
         $books = $genre->books()->with('genres')->paginate(10);
+
         return view('genres.show', compact('genre', 'books'));
     }
 
@@ -167,6 +161,7 @@ class GenreController extends Controller
     public function update(UpdateGenreRequest $request, Genre $genre)
     {
         $genre->update($request->validated());
+
         return redirect()->route('genres.index')->with('success', 'ジャンルを更新しました。');
     }
 
@@ -176,50 +171,52 @@ class GenreController extends Controller
             return redirect()->route('genres.index')->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
         }
         $genre->delete();
+
         return redirect()->route('genres.index')->with('success', 'ジャンルを削除しました。');
     }
 }
 ```
 
-### 📖 コードリーディング：各メソッドの解説
+---
 
-| メソッド | 処理内容 | ポイント |
+## 🔍 コードリーディング
+
+| コード | 解説 |
+|:---|:---|
+| `Genre::withCount('books')->get()` | 各ジャンルの書籍数を効率的に取得。`$genre->books_count` でアクセス。 |
+| `Genre::create($request->validated())` | バリデーション済みデータで一括作成。ジャンルは `name` のみなので `except()` は不要。 |
+| `Rule::unique('genres')->ignore($this->genre)` | 更新時に自分自身のレコードを除外してユニークチェック。 |
+| `$genre->books()->count() > 0` | 紐付き書籍があるか確認。あれば削除を拒否。 |
+
+---
+
+## 🧐 調べ方のヒント
+
+| 疑問 | プロンプト例 |
+|:---|:---|
+| withCount の使い方 | 「Laravel の withCount() メソッドの使い方を教えてください。」 |
+| Rule::unique()->ignore() | 「Laravel の更新時に unique バリデーションで自分自身を除外する方法を教えてください。」 |
+
+---
+
+## ✅ 動作確認
+
+| 確認項目 | 確認方法 |
+|:---|:---|
+| ジャンル一覧 | ログイン後、ジャンル一覧が表示されること |
+| ジャンル登録 | 新しいジャンル名で登録できること |
+| 重複チェック | 既存のジャンル名で登録するとエラーが表示されること |
+| 削除制限 | 書籍が紐付いたジャンルを削除しようとするとエラーメッセージが表示されること |
+| 削除成功 | 書籍が紐付いていないジャンルは削除できること |
+
+---
+
+## ✨ このChapterのまとめ
+
+| 機能 | 書籍管理（Chapter 06） | ジャンル管理（Chapter 12） |
 |:---|:---|:---|
-| `index()` | ジャンル一覧を表示。`withCount('books')`で各ジャンルの書籍数も取得。 | 一覧画面で「このジャンルには○冊の書籍があります」と表示できる。 |
-| `create()` | ジャンル作成フォームを表示。 | シンプルにビューを返すだけ。 |
-| `store()` | フォームから送信されたデータでジャンルを作成。 | `$request->validated()`でバリデーション済みのデータのみを使用。 |
-| `show()` | 特定のジャンルに属する書籍一覧を表示。 | Chapter 11で実装済み。 |
-| `edit()` | ジャンル編集フォームを表示。 | 編集対象のジャンルをビューに渡す。 |
-| `update()` | フォームから送信されたデータでジャンルを更新。 | `$genre->update()`でモデルを更新。 |
-| `destroy()` | ジャンルを削除。ただし書籍が紐付いている場合は削除不可。 | データの整合性を保つための重要なチェック。 |
+| バリデーション | FormRequest（isbn unique） | FormRequest（name unique + ignore） |
+| 認可 | BookPolicy（作成者のみ） | なし（認証済みユーザーなら誰でもOK） |
+| 削除 | 無条件削除（cascadeで関連データ自動削除） | 条件付き削除（紐付き書籍チェック） |
 
-### 📖 コードリーディング：`destroy`メソッドの詳細
-
-> **💡 なぜ`destroy`メソッドだけ詳細な解説があるのか？**
->
-> 他のCRUDメソッド（`index`, `create`, `store`, `edit`, `update`）は、書籍管理機能（Chapter 6）で学んだパターンとほぼ同じです。しかし、`destroy`メソッドには**「書籍が紐付いている場合は削除を禁止する」という特別なロジック**が含まれています。
->
-> これは、データの整合性を保つための重要な実装パターンです。もし書籍が紐付いているジャンルを削除してしまうと、その書籍のジャンル情報が失われてしまいます。そのため、このメソッドだけは詳細な解説を追加しています。
-
-```php
-public function destroy(Genre $genre)
-{
-    if ($genre->books()->count() > 0) {
-        return redirect()->route('genres.index')->with('error', 'このジャンルには書籍が紐付いているため削除できません。');
-    }
-    $genre->delete();
-    return redirect()->route('genres.index')->with('success', 'ジャンルを削除しました。');
-}
-```
-
-| コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
-|:---|:---|:---|
-| `$genre->books()->count()` | このジャンルに紐付いている書籍の数を取得。 | `belongsToMany`リレーションの`count()`メソッドを使用。 |
-| `> 0` | 書籍が1冊以上紐付いているかをチェック。 | 紐付いている場合は削除を禁止する。 |
-| `->with('error', ...)` | セッションにエラーメッセージを保存。 | ビューで`session('error')`として取得できる。 |
-| `$genre->delete()` | ジャンルを削除。 | Eloquentの`delete()`メソッドでレコードを削除。 |
-
-> **📝 ルート定義について**
-> ジャンル管理機能のルート定義も、Chapter 6で既に定義済みです。そのため、`routes/web.php`を修正する必要はありません。
-
-これで、ジャンル管理機能（CRUD）の実装が完了しました。次のChapterでは、最終確認を行います。
+次の Chapter 13 では、**公開APIの実装**を行います。
