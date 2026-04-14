@@ -22,19 +22,19 @@ class BookController extends Controller
         $query = Book::with('genres');
 
         // キーワード検索（応用機能）
-        if ($keyword = $request->input('keyword')) {
-            $query->where(function ($q) use ($keyword): void {
+        $query->when($request->input('keyword'), function ($q, $keyword): void {
+            $q->where(function ($q) use ($keyword): void {
                 $q->where('title', 'like', "%{$keyword}%")
                     ->orWhere('author', 'like', "%{$keyword}%");
             });
-        }
+        });
 
         // ジャンル絞り込み（応用機能）
-        if ($genreId = $request->input('genre')) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
+        $query->when($request->input('genre'), function ($q, $genreId): void {
+            $q->whereHas('genres', function ($q) use ($genreId): void {
                 $q->where('genres.id', $genreId);
             });
-        }
+        });
 
         // 並び順（応用機能）
         switch ($request->input('sort')) {
@@ -52,7 +52,7 @@ class BookController extends Controller
                 break;
         }
 
-        $books = $query->paginate(10)->withQueryString();
+        $books = $query->paginate(10)->appends(request()->query());
         $genres = Genre::orderBy('name')->get();
 
         return view('books.index', compact('books', 'genres'));

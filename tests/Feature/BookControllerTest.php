@@ -160,6 +160,19 @@ class BookControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_non_owner_cannot_delete_book(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($otherUser)
+            ->delete(route('books.destroy', $book))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+    }
+
     // ===== 検索・フィルタ（応用機能） =====
 
     public function test_book_index_with_search_query_displays_results(): void

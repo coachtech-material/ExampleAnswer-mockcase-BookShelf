@@ -16,13 +16,13 @@
                     <form action="{{ route('reviews.update', $review) }}" method="POST">
                         @csrf
                         @method('PUT')
-                        
+
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-2">評価 <span class="text-red-500">*</span></label>
                             <div class="flex gap-2">
                                 @for($i = 1; $i <= 5; $i++)
                                     <label class="cursor-pointer">
-                                        <input type="radio" name="rating" value="{{ $i }}" class="sr-only peer" 
+                                        <input type="radio" name="rating" value="{{ $i }}" class="sr-only peer"
                                                {{ old('rating', $review->rating) == $i ? 'checked' : '' }} required>
                                         <span class="text-2xl peer-checked:text-yellow-400 text-gray-300 hover:text-yellow-400">★</span>
                                     </label>
@@ -35,7 +35,7 @@
 
                         <div class="mb-4">
                             <label for="comment" class="block text-sm font-medium text-gray-700 mb-2">コメント</label>
-                            <textarea name="comment" id="comment" rows="4" 
+                            <textarea name="comment" id="comment" rows="4"
                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('comment', $review->comment) }}</textarea>
                             @error('comment')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

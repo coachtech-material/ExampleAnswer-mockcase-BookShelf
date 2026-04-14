@@ -9,6 +9,8 @@
 
 ※ Windowsの場合はWSL2の利用を推奨します。
 
+※ Apple Silicon（M1/M2/M3）Mac をお使いの場合、`docker-compose.yml` のサービスに `platform: linux/amd64` の指定が必要になる場合があります。
+
 ## 環境構築手順
 
 1. **リポジトリをクローン**
@@ -85,8 +87,10 @@
 
    6. **設定キャッシュをクリア**
 
+      ※ `sail up -d` 実行後に行ってください
+
       ```bash
-      ./vendor/bin/sail artisan config:clear
+      sail artisan config:clear
       ```
 
    7. **動作確認**
@@ -127,7 +131,7 @@
    > 毎回 `./vendor/bin/sail` と入力するのは手間なので、エイリアスを設定すると便利です。
    > 
    > ```bash
-   > alias sail=\\\\'[ -f sail ] && bash sail || bash vendor/bin/sail\\\\'
+   > alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
    > ```
 
 6. **アプリケーションキーの生成**
@@ -136,7 +140,13 @@
    sail artisan key:generate
    ```
 
-7. **データベースのマイグレーションと初期データ投入**
+7. **ストレージのシンボリックリンク作成**
+
+   ```bash
+   sail artisan storage:link
+   ```
+
+8. **データベースのマイグレーションと初期データ投入**
 
    以下のコマンドでテーブルを作成し、ダミーデータを投入します。
 
@@ -144,7 +154,7 @@
    sail artisan migrate:fresh --seed
    ```
 
-8. **フロントエンドのビルド**
+9. **フロントエンドのビルド**
 
    ```bash
    sail npm install
@@ -153,7 +163,7 @@
 
    `npm run dev` は開発中は起動したままにしてください。
 
-9. **アプリケーションへのアクセス**
+10. **アプリケーションへのアクセス**
 
    ブラウザで [http://localhost](http://localhost) にアクセスします。
 
@@ -175,6 +185,30 @@
 - **ISBN検索**: Google Books APIを利用して書籍情報を自動入力
 - **マイ読書レポート**: ログインユーザーの読書統計を表示
 - **公開API の Sanctum 認証**: 書き込み系（POST/PUT/DELETE）にトークン認証を追加
+
+## テスト実行
+
+```bash
+sail artisan test
+```
+
+## Sanctum認証の導入（応用機能）
+
+```bash
+sail composer require laravel/sanctum
+sail artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+sail artisan migrate
+```
+
+## APIエンドポイント一覧
+
+| メソッド | URI | 説明 |
+|----------|-----|------|
+| GET | /api/v1/books | 書籍一覧取得 |
+| GET | /api/v1/books/{id} | 書籍詳細取得 |
+| POST | /api/v1/books | 書籍登録 |
+| PUT | /api/v1/books/{id} | 書籍更新 |
+| DELETE | /api/v1/books/{id} | 書籍削除 |
 
 ## 使用技術
 

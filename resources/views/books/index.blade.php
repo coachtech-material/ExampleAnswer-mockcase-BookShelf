@@ -60,11 +60,9 @@
                                     リセット
                                 </a>
                             </div>
-                            @auth
-                                <a href="{{ route('books.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                    新規登録
-                                </a>
-                            @endauth
+                            <a href="{{ route('books.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                                書籍を登録
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -121,7 +119,7 @@
                         </div>
 
                         <div class="mt-6">
-                            {{ $books->withQueryString()->links() }}
+                            {{ $books->links() }}
                         </div>
                     @endif
                 </div>

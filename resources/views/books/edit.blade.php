@@ -44,7 +44,7 @@
                                 キャンセル
                             </a>
                             <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
-                                更新する
+                                更新
                             </button>
                         </div>
                     </form>
