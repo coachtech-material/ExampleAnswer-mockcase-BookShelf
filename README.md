@@ -9,6 +9,8 @@
 
 ※ Windowsの場合はWSL2の利用を推奨します。
 
+> Apple Silicon (M1/M2) Mac をお使いの方は、`sail up -d` 実行時にプラットフォームエラーが発生する場合があります。その場合は compose.yaml の該当サービスに `platform: linux/amd64` を追加してください。
+
 ## 環境構築手順
 
 1. **リポジトリをクローン**
@@ -65,7 +67,7 @@
    > 毎回 `./vendor/bin/sail` と入力するのは手間なので、エイリアスを設定すると便利です。
    > 
    > ```bash
-   > alias sail=\'[ -f sail ] && bash sail || bash vendor/bin/sail\'
+   > alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
    > ```
 
 5. **アプリケーションキーの生成**
@@ -82,7 +84,13 @@
    sail artisan migrate:fresh --seed
    ```
 
-7. **フロントエンドのビルド**
+7. **ストレージのシンボリックリンク作成**
+
+   ```bash
+   sail artisan storage:link
+   ```
+
+8. **フロントエンドのビルド**
 
    ```bash
    sail npm install
@@ -91,9 +99,25 @@
 
    `npm run dev` は開発中は起動したままにしてください。
 
-8. **アプリケーションへのアクセス**
+9. **アプリケーションへのアクセス**
 
    ブラウザで [http://localhost](http://localhost) にアクセスします。
+
+## テスト実行
+
+```bash
+sail artisan test
+```
+
+## API エンドポイント一覧
+
+| メソッド | パス | 概要 |
+|----------|------|------|
+| GET | `/api/v1/books` | 書籍一覧取得 |
+| GET | `/api/v1/books/{id}` | 書籍詳細取得 |
+| POST | `/api/v1/books` | 書籍登録 |
+| PUT | `/api/v1/books/{id}` | 書籍更新 |
+| DELETE | `/api/v1/books/{id}` | 書籍削除 |
 
 ## 機能一覧
 

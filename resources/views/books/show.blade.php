@@ -27,7 +27,7 @@
                         <div class="md:w-2/3">
                             <div class="flex items-start justify-between mb-4">
                                 <h1 class="text-2xl font-bold">{{ $book->title }}</h1>
-                                
+
                                 <!-- お気に入りボタン -->
                                 @auth
                                     @if(Auth::user()->favoriteBooks->contains($book->id))
@@ -49,9 +49,15 @@
                                             </button>
                                         </form>
                                     @endif
+                                @else
+                                    <a href="{{ route('login') }}" class="text-gray-400 hover:text-red-500" title="お気に入りに追加するにはログインしてください">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                        </svg>
+                                    </a>
                                 @endauth
                             </div>
-                            
+
                             <p class="text-gray-600 mb-2"><strong>著者:</strong> {{ $book->author }}</p>
                             <p class="text-gray-600 mb-2"><strong>ISBN:</strong> {{ $book->isbn }}</p>
                             <p class="text-gray-600 mb-2"><strong>出版日:</strong> {{ $book->published_date }}</p>
@@ -63,7 +69,7 @@
                             </div>
                             @if($book->description)
                                 <div class="mb-4">
-                                    <strong>概要:</strong>
+                                    <strong>説明:</strong>
                                     <p class="mt-2 text-gray-700">{{ $book->description }}</p>
                                 </div>
                             @endif
@@ -88,7 +94,7 @@
                     <!-- レビューセクション -->
                     <div class="mt-8 pt-8 border-t border-gray-200">
                         <h2 class="text-xl font-bold mb-4">レビュー</h2>
-                        
+
                         @auth
                             <!-- レビュー投稿フォーム -->
                             <div class="mb-6 bg-gray-50 p-4 rounded-lg">
@@ -111,7 +117,7 @@
                                     </div>
                                     <div class="mb-4">
                                         <label for="comment" class="block text-sm font-medium text-gray-700 mb-1">コメント</label>
-                                        <textarea name="comment" id="comment" rows="3" 
+                                        <textarea name="comment" id="comment" rows="3"
                                             class="border-gray-300 rounded-md shadow-sm w-full"
                                             placeholder="この書籍の感想を書いてください">{{ old('comment') }}</textarea>
                                         @error('comment')
@@ -148,7 +154,7 @@
                                         @if($review->comment)
                                             <p class="text-gray-700">{{ $review->comment }}</p>
                                         @endif
-                                        
+
                                         <div class="mt-3 flex items-center justify-between">
                                             <!-- いいねボタン -->
                                             @auth
@@ -174,14 +180,14 @@
                                                     </form>
                                                 @endif
                                             @else
-                                                <span class="text-gray-500 text-sm flex items-center">
+                                                <a href="{{ route('login') }}" class="text-gray-500 hover:text-blue-500 text-sm flex items-center">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 20 20">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
                                                     </svg>
                                                     いいね ({{ $review->likedByUsers->count() }})
-                                                </span>
+                                                </a>
                                             @endauth
-                                            
+
                                             <!-- 編集・削除ボタン -->
                                             @can('update', $review)
                                                 <div class="flex gap-2">

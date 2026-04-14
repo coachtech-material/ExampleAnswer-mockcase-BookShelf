@@ -56,14 +56,14 @@
         @enderror
     </div>
 
-    <!-- 概要 -->
+    <!-- 説明 -->
     <div>
         <label for="description" class="block font-medium text-sm text-gray-700 mb-1">
-            概要
+            説明
         </label>
         <textarea name="description" id="description" rows="4"
             class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block w-full"
-            placeholder="書籍の概要を入力（任意）">{{ old('description', $book->description ?? '') }}</textarea>
+            placeholder="書籍の説明を入力（任意）">{{ old('description', $book->description ?? '') }}</textarea>
         @error('description')
             <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
         @enderror

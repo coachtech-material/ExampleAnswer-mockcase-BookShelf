@@ -141,6 +141,19 @@ class BookControllerTest extends TestCase
         $this->assertDatabaseMissing('books', ['id' => $book->id]);
     }
 
+    public function test_non_owner_cannot_delete_book(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($otherUser)
+            ->delete(route('books.destroy', $book))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+    }
+
     public function test_only_owner_can_view_edit_form(): void
     {
         $owner = User::factory()->create();

@@ -71,6 +71,16 @@ class ReviewLikeTest extends TestCase
             'user_id' => $user->id,
             'review_id' => $review->id,
         ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
     }
 
     public function test_guest_cannot_like_review(): void

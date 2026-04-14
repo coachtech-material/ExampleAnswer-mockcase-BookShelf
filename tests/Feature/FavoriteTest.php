@@ -71,6 +71,16 @@ class FavoriteTest extends TestCase
             'user_id' => $user->id,
             'book_id' => $book->id,
         ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
     }
 
     public function test_favorite_index_page_can_be_rendered(): void
