@@ -42,7 +42,27 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 'home' => '/',
 ```
 
-### 4.3. FortifyServiceProvider を config/app.php に登録
+### 4.3. ログアウト後のリダイレクト先を `/login` にする
+
+Fortifyのデフォルトでは、ログアウト後に `/` へリダイレクトされます。ログアウト後は `/login` に遷移させたいため、`FortifyServiceProvider` の `register()` メソッドでカスタム `LogoutResponse` を登録します。
+
+```php
+use Laravel\Fortify\Contracts\LogoutResponse;
+
+public function register(): void
+{
+    $this->app->instance(LogoutResponse::class, new class implements LogoutResponse {
+        public function toResponse($request)
+        {
+            return redirect('/login');
+        }
+    });
+}
+```
+
+> **ポイント:** `LogoutResponse` はFortifyが提供するコントラクト（インターフェース）です。サービスコンテナに独自の実装を登録することで、ログアウト時のレスポンスを自由にカスタマイズできます。
+
+### 4.4. FortifyServiceProvider を config/app.php に登録
 
 ```php
 // config/app.php
@@ -72,7 +92,7 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 
 ## 🚀 コードの実装
 
-### 4.4. `routes/auth.php`（新規作成）
+### 4.5. `routes/auth.php`（新規作成）
 
 ```php
 <?php
@@ -96,7 +116,7 @@ Route::middleware('auth')->group(function () {
 });
 ```
 
-### 4.5. `app/Providers/FortifyServiceProvider.php`
+### 4.6. `app/Providers/FortifyServiceProvider.php`
 
 ```php
 <?php
@@ -113,13 +133,19 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->instance(LogoutResponse::class, new class implements LogoutResponse {
+            public function toResponse($request)
+            {
+                return redirect('/login');
+            }
+        });
     }
 
     public function boot(): void
@@ -145,7 +171,7 @@ class FortifyServiceProvider extends ServiceProvider
 }
 ```
 
-### 4.6. `app/Providers/RouteServiceProvider.php`
+### 4.7. `app/Providers/RouteServiceProvider.php`
 
 ```php
 <?php
@@ -183,7 +209,7 @@ class RouteServiceProvider extends ServiceProvider
 }
 ```
 
-### 4.7. `app/Actions/Fortify/CreateNewUser.php`
+### 4.8. `app/Actions/Fortify/CreateNewUser.php`
 
 ```php
 <?php
@@ -268,6 +294,7 @@ class CreateNewUser implements CreatesNewUsers
 | ログイン画面の表示 | `http://localhost/login` でフォームが表示されること |
 | 新規登録画面の表示 | `http://localhost/register` でフォームが表示されること |
 | ログイン後のリダイレクト | ログイン成功後、`/`（トップページ）にリダイレクトされること |
+| ログアウト後のリダイレクト | ログアウト後、`/login`（ログイン画面）にリダイレクトされること |
 | バリデーションエラー | 空のフォームを送信し、日本語のエラーメッセージが表示されること |
 
 ---
@@ -278,7 +305,7 @@ class CreateNewUser implements CreatesNewUsers
 |:---|:---|:---|
 | 認証ルート | `routes/auth.php` | ログイン・登録・ログアウトのURLを定義 |
 | Fortify設定 | `config/fortify.php` | `home => '/'` でログイン後の遷移先を設定 |
-| Fortifyプロバイダ | `app/Providers/FortifyServiceProvider.php` | ビュー指定・ユーザー作成ロジック・レート制限 |
+| Fortifyプロバイダ | `app/Providers/FortifyServiceProvider.php` | ビュー指定・ユーザー作成ロジック・レート制限・ログアウト後リダイレクト |
 | ルートプロバイダ | `app/Providers/RouteServiceProvider.php` | `auth.php` の読み込み + HOME定数 |
 | ユーザー作成 | `app/Actions/Fortify/CreateNewUser.php` | 日本語バリデーション付きのユーザー登録処理 |
 
