@@ -20,7 +20,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784101010014',
                 'published_date' => '1905-01-01',
                 'description' => '中学校の英語教師である珍野苦沙弥の家に飼われている猫である「吾輩」の視点から、珍野一家や、そこに出入りする人々の様子を風刺的に描いた作品。',
-                'image_url' => 'https://cover.openbd.jp/9784101010014.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=1',
                 'genres' => ['小説'],
             ],
             [
@@ -29,7 +29,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784422100524',
                 'published_date' => '1936-10-01',
                 'description' => '人間関係の古典として、あらゆる自己啓発本の原点となったデール・カーネギーの名著。',
-                'image_url' => 'https://cover.openbd.jp/9784422100524.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=2',
                 'genres' => ['ビジネス', '自己啓発'],
             ],
             [
@@ -38,7 +38,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784873115658',
                 'published_date' => '2012-06-23',
                 'description' => 'より良いコードを書くためのシンプルで実践的なテクニックを紹介。',
-                'image_url' => 'https://cover.openbd.jp/9784873115658.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=3',
                 'genres' => ['技術書'],
             ],
             [
@@ -47,7 +47,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784863940246',
                 'published_date' => '2013-08-30',
                 'description' => '全世界3000万部、国内180万部を超えるベストセラー。人生を成功に導く7つの習慣を解説。',
-                'image_url' => 'https://cover.openbd.jp/9784863940246.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=4',
                 'genres' => ['ビジネス', '自己啓発'],
             ],
             [
@@ -56,7 +56,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784101010021',
                 'published_date' => '1906-04-01',
                 'description' => '東京の物理学校を卒業後、四国の中学校に数学教師として赴任した主人公「坊っちゃん」の物語。',
-                'image_url' => 'https://cover.openbd.jp/9784101010021.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=5',
                 'genres' => ['小説'],
             ],
             [
@@ -65,7 +65,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784309226712',
                 'published_date' => '2016-09-08',
                 'description' => 'なぜ人類だけが文明を築けたのか？ホモ・サピエンスの歴史を俯瞰する世界的ベストセラー。',
-                'image_url' => 'https://cover.openbd.jp/9784309226712.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=6',
                 'genres' => ['歴史', '科学'],
             ],
             [
@@ -74,7 +74,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784048930598',
                 'published_date' => '2017-12-18',
                 'description' => 'アジャイルソフトウェア開発の奥義として、クリーンなコードを書くための原則を解説。',
-                'image_url' => 'https://cover.openbd.jp/9784048930598.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=7',
                 'genres' => ['技術書'],
             ],
             [
@@ -83,7 +83,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784478025819',
                 'published_date' => '2013-12-13',
                 'description' => 'アドラー心理学を対話形式でわかりやすく解説した自己啓発書のベストセラー。',
-                'image_url' => 'https://cover.openbd.jp/9784478025819.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=8',
                 'genres' => ['自己啓発'],
             ],
             [
@@ -92,7 +92,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784163902302',
                 'published_date' => '2015-03-11',
                 'description' => '芥川賞受賞作。売れない芸人の青春を描いた純文学作品。',
-                'image_url' => 'https://cover.openbd.jp/9784163902302.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=9',
                 'genres' => ['小説'],
             ],
             [
@@ -101,7 +101,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784822289607',
                 'published_date' => '2019-01-11',
                 'description' => 'データを基に世界を正しく見る習慣を身につける。思い込みを乗り越え、世界を正しく見る方法。',
-                'image_url' => 'https://cover.openbd.jp/9784822289607.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=10',
                 'genres' => ['ビジネス', '科学'],
             ],
             [
@@ -110,7 +110,7 @@ class BookSeeder extends Seeder
                 'isbn' => '9784822251468',
                 'published_date' => '2007-01-18',
                 'description' => 'コンテナが世界を変えた。物流革命の歴史を描いたノンフィクション。',
-                'image_url' => 'https://cover.openbd.jp/9784822251468.jpg',
+                'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=11',
                 'genres' => ['ビジネス', '歴史'],
             ],
         ];
