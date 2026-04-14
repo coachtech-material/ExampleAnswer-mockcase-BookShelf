@@ -5,8 +5,8 @@
 このチャプターでは、レビューの平均評価に基づいて書籍をラ���キング表示する機能を実装します。SQLの集計関数（`AVG`, `COUNT`）をEloquentの `DB::raw()` と組み合わせ、JOINベースの効率的なクエリを構築する方法を学びます。
 
 - **SQLの集計クエリ**: `AVG()` や `COUNT()` を使い、関連データの平均値や件数を取得する方法を学びます
-- **`DB::raw()` の活用**: Eloquentだけでは表現しにくいSQLを、生のSQL式として埋め込む手法を学びます
-- **JOINベースのクエリ構築**: `join()` と `groupBy()` を組み合わせた集計パターンを学びます
+- **`withAvg()` / `withCount()`**: リレーション先の平均値や件数をサブクエリで取得する方法を学びます
+- **`has()` によるフィルタ**: リレーションが存在するレコードだけに絞り込む方法を学びます
 
 ## 1. はじめに 📖
 
@@ -20,8 +20,8 @@
 
 | アプローチ | 特徴 | 本チャプターでの採��� |
 |:---|:---|:---|
-| `withAvg` / `withCount`（サブクエリ） | 簡潔で読みやすい。N+1問題なし | - |
-| `join` + `DB::raw`（JOINベース） | SQLの集計を直接制御。複雑な条件にも対応可能 | **採用** |
+| `withAvg` / `withCount`（サブクエリ） | 簡潔で読みやすい。N+1問題なし | **採用** |
+| `join` + `DB::raw`（JOINベース） | SQLの集計を直接制御。複雑な条件にも対応可能 | - |
 
 JOINベースのアプローチを採用することで、SQLの集計クエリの仕組みを直接学ぶことができます。
 
@@ -73,7 +73,6 @@ JOINした結果は書籍1冊に対して複数のレビュー行が展開され
 namespace App\Http\Controllers;
 
 use App\Models\Book;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class RankingController extends Controller
@@ -83,10 +82,10 @@ class RankingController extends Controller
      */
     public function index(): View
     {
-        $rankedBooks = Book::select('books.*', DB::raw('AVG(reviews.rating) as average_rating'), DB::raw('COUNT(reviews.id) as review_count'))
-            ->join('reviews', 'books.id', '=', 'reviews.book_id')
-            ->groupBy('books.id')
-            ->orderByDesc('average_rating')
+        $rankedBooks = Book::withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->has('reviews')
+            ->orderByDesc('reviews_avg_rating')
             ->take(10)
             ->get();
 
@@ -102,12 +101,10 @@ class RankingController extends Controller
 | コード / 構文 | 解��� |
 |:---|:---|
 | `index(): View` | ランキングページを表示するメソッド。`Route::get('/ranking', ...)` に対応します。認証不要のルートです。 |
-| `Book::select('books.*', DB::raw(...), DB::raw(...))` | 取得するカラムを明示的に指定します。`books.*` で書籍の全カラムを、`DB::raw()` で集計カラムを追加します。 |
-| `DB::raw('AVG(reviews.rating) as average_rating')` | `reviews` テーブルの `rating` カラムの平均値を計算し、`average_rating` という別名で取得します。`$book->average_rating` でアクセス可能になります。 |
-| `DB::raw('COUNT(reviews.id) as review_count')` | 各書籍に紐づくレビューの件数を `review_count` として取得します。`$book->review_count` でアクセス可能になります。 |
-| `->join('reviews', 'books.id', '=', 'reviews.book_id')` | `books` テーブルと `reviews` テーブルを INNER JOIN で結合します。INNER JOIN なので、レビューが存在しない書籍は結果に含まれません。 |
-| `->groupBy('books.id')` | 書籍IDごとにグループ化します。これにより `AVG` や `COUNT` が書籍単位で計算されます。 |
-| `->orderByDesc('average_rating')` | 平均評価の高い順（降順）に並び替えます。 |
+| `Book::withAvg('reviews', 'rating')` | `reviews` リレーションの `rating` カラムの平均値をサブクエリで取得。結果は `reviews_avg_rating` 属性に格納されます。 |
+| `->withCount('reviews')` | 各書籍のレビュー件数をサブクエリで取得。結果は `reviews_count` 属性に格納されます。 |
+| `->has('reviews')` | レビューが1件以上ある書籍のみに絞り込みます。 |
+| `->orderByDesc('reviews_avg_rating')` | 平均評価の高い順（降順）に並び替えます。 |
 | `->take(10)` | 取得件数を上位10件に制限します。SQLの `LIMIT 10` に相当します。 |
 
 ### 生成されるSQL
@@ -174,8 +171,8 @@ AVGで平均評価を計算してorderByDescで降順に並べる。」
 
 このチャプターでは、ランキング機能を実装しました。
 
-- **JOINベースの集計クエリ**: `join()` と `groupBy()` を組み合わせ、書籍ごとの平均評価とレビュー件数を一度のクエリで取得しました
-- **`DB::raw()` の活用**: Eloquentだけでは表現できないSQL集計関数（`AVG`, `COUNT`）を生のSQL式として埋め込みました
-- **INNER JOINによる自動フィルタ**: INNER JOINを使うことで、レビューが存在しない書籍を自動的に除外しました
+- **`withAvg()` / `withCount()`**: サブクエリで書籍ごとの平均評価とレビュー件数を取得しました
+- **`has()` によるフィルタ**: レビューが存在する書籍のみに絞り込みました
+- **Eloquentベースの集計**: JOINや `DB::raw()` を使わず、シンプルなメソッドチェーンで実現しました
 
 次の Chapter 11 では、特定のジャンルに属する書籍を一覧表示する**ジャンル別一覧機能**を実装します。

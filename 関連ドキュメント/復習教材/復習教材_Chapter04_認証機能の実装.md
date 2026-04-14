@@ -48,6 +48,8 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 
 > **重要:** この設定がないと、ログイン後に `/home` にリダイレクトされ、「404 Not Found」エラーになります。BookShelfのトップページは `/` であるため、必ずこの変更が必要です。
 
+> **補足:** `'home' => '/'` はログイン後のリダイレクト先です。一方、ログアウト後のリダイレクト先はデフォルトで `/`（トップページ）ですが、BookShelfではログアウト後に `/login` に遷移させたいため、`FortifyServiceProvider` で `LogoutResponse` をカスタマイズします（コードは 4.5 節で掲載）。
+
 ### 4.3. FortifyServiceProvider を config/app.php に登録
 
 ```php
@@ -139,6 +141,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -148,7 +151,12 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->instance(LogoutResponse::class, new class implements LogoutResponse {
+            public function toResponse($request)
+            {
+                return redirect('/login');
+            }
+        });
     }
 
     /**
@@ -295,6 +303,7 @@ class CreateNewUser implements CreatesNewUsers
 
 | コード | 解説 |
 |:---|:---|
+| `$this->app->instance(LogoutResponse::class, ...)` | ログアウト後のリダイレクト先を `/login` に変更。Fortifyの `LogoutResponse` インターフェースの実装をサービスコンテナに登録しています。 |
 | `Fortify::createUsersUsing(CreateNewUser::class)` | ユーザー登録時に使用するアクションクラスを指定します。 |
 | `Fortify::loginView(fn () => view('auth.login'))` | Fortifyがログインビューを要求した際に、`auth.login` ビューを返すアロー関数を定義しています。 |
 | `Fortify::registerView(fn () => view('auth.register'))` | 同様に、新規登録ビューを指定しています。 |
@@ -341,6 +350,7 @@ class CreateNewUser implements CreatesNewUsers
 | 新規登録画面の表示 | ブラウザで `http://localhost/register` にアクセスし、登録フォームが表示されること |
 | 新規登録 | フォームに情報を入力して送信し、ユーザーが作成されること（phpMyAdmin で確認） |
 | ログイン後のリダイレクト | ログイン成功後、`/`（トップページ）にリダイレクトされること（`/home` ではないこと） |
+| ログアウト後のリダイレクト | ログアウト後、`/login`（ログイン画面）にリダイレクトされること |
 | バリデーションエラー | 空のフォームを送信し、日本語のエラーメッセージが表示されること |
 
 ---

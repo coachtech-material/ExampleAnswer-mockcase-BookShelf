@@ -23,7 +23,7 @@
 
 > 「まず考えるべきは、ユーザーが入力する検索条件（キーワード、ジャンル、並び順）は、常に全てが指定されるわけではない、ということ。キーワードだけで検索することもあれば、ジャンルと並び順だけを指定することもある。つまり、**条件に応じてクエリを動的に組み立てる**必要があるな。」
 > 
-> 「これは、ベースとなる`Book::query()`に対して、`if`文で条件分岐させながら`where`句や`orderBy`句を繋げていく（メソッドチェーンしていく）のが良さそうだ。この『段階的にクエリを構築する』アプローチは、複雑な検索機能を作る上での基本パターンになる。」
+> 「Laravelのクエリビルダには `when()` メソッドがある。これは『第1引数がtruthyなときだけクロージャを実行する』という条件付きクエリ構築メソッドだ。`if`文で分岐するよりもメソッドチェーンの流れを崩さずに書けるので、コードがすっきりする。この `when()` を使ったアプローチで実装しよう。」
 
 ### 思考2：「タイトル or 著者」の検索はどう実現する？
 
@@ -39,7 +39,7 @@
 
 ### 思考5：検索条件を維持したままページ移動させたい
 
-> 「最後に忘れてはいけないのが、ユーザー体験。検索結果の2ページ目に移動したときに、検索条件がリセットされて全件表示に戻ってしまったら最悪だ。Laravelのページネーションには、`withQueryString()`という便利なメソッドがある。これを`paginate()`の後ろに付けるだけで、URLのクエリパラメータ（`?keyword=...`など）を自動でページネーションリンクに引き継いでくれる。これは絶対に使うべき機能だね。」
+> 「最後に忘れてはいけないのが、ユーザー体験。検索結果の2ページ目に移動したときに、検索条件がリセットされて全件表示に戻ってしまったら最悪だ。Laravelのページネーションには `appends()` メソッドがあり、`paginate(10)->appends(request()->query())` と書くことで、現在のURLのクエリパラメータ（`?keyword=...`など）をページネーションリンクに引き継げる。これは絶対に使うべき機能だね。」
 
 このような思考プロセスを経て、これから見ていく具体的な実装コードが出来上がっていきます。一つ一つのコードが、どの思考に基づいて書かれているのかを意識しながら読み進めてみてください。
 
@@ -75,19 +75,19 @@ class BookController extends Controller
         $query = Book::with('genres');
 
         // キーワード検索（応用機能）
-        if ($keyword = $request->input('keyword')) {
-            $query->where(function ($q) use ($keyword): void {
+        $query->when($request->input('keyword'), function ($q, $keyword): void {
+            $q->where(function ($q) use ($keyword): void {
                 $q->where('title', 'like', "%{$keyword}%")
                   ->orWhere('author', 'like', "%{$keyword}%");
             });
-        }
+        });
 
         // ジャンル絞り込み（応用機能）
-        if ($genreId = $request->input('genre')) {
-            $query->whereHas('genres', function ($q) use ($genreId): void {
+        $query->when($request->input('genre'), function ($q, $genreId): void {
+            $q->whereHas('genres', function ($q) use ($genreId): void {
                 $q->where('genres.id', $genreId);
             });
-        }
+        });
 
         // 並び順（応用機能）
         switch ($request->input('sort')) {
@@ -105,7 +105,7 @@ class BookController extends Controller
                 break;
         }
 
-        $books = $query->paginate(10)->withQueryString();
+        $books = $query->paginate(10)->appends(request()->query());
         $genres = Genre::orderBy('name')->get();
 
         return view('books.index', compact('books', 'genres'));
@@ -134,17 +134,16 @@ public function index(Request $request): View
 
 ```php
 // キーワード検索（応用機能）
-if ($keyword = $request->input('keyword')) {
-    $query->where(function ($q) use ($keyword): void {
+$query->when($request->input('keyword'), function ($q, $keyword): void {
+    $q->where(function ($q) use ($keyword): void {
         $q->where('title', 'like', "%{$keyword}%")
           ->orWhere('author', 'like', "%{$keyword}%");
     });
-}
+});
 ```
 
-- **`if ($keyword = $request->input('keyword'))`**: ユーザーがキーワードを入力した場合のみ、このブロックが実行されます。`$request->input('keyword')`でリクエストから`keyword`パラメータを取得し、その値を変数`$keyword`に代入しています。値が存在すれば（空文字列や`null`でなければ）`true`と評価され、`if`文の中の処理が実行されます。
-- **`$query->where(function ($q) use ($keyword): void { ... })`**: ここがキーワード検索の核です。`where`メソッドに**クロージャ（無名関数）**を渡すことで、SQLの`WHERE`句をグループ化（`()`で囲む）できます。これにより、`WHERE (title LIKE ... OR author LIKE ...)`というSQLが生成され、他の検索条件と正しく組み合わせることができます。
-- **`use ($keyword)`**: クロージャの中から外側のスコープにある変数`$keyword`を利用するために必要です。
+- **`$query->when($request->input('keyword'), function ($q, $keyword): void { ... })`**: `when()` メソッドは、第1引数がtruthyな場合にのみ第2引数のクロージャを実行します。キーワードが入力されていない場合はクエリに影響を与えません。クロージャの第2引数 `$keyword` には第1引数の値が渡されます。
+- **`$q->where(function ($q) use ($keyword): void { ... })`**: ここがキーワード検索の核です。`where`メソッドに**クロージャ（無名関数）**を渡すことで、SQLの`WHERE`句をグループ化（`()`で囲む）できます。これにより、`WHERE (title LIKE ... OR author LIKE ...)`というSQLが生成され、他の検索条件と正しく組み合わせることができます。
 - **`$q->where('title', 'like', "%{$keyword}%")`**: 書籍の`title`カラムを`$keyword`で**部分一致検索**します。`like`演算子とワイルドカード`%`を使っています。
 - **`->orWhere('author', 'like', "%{$keyword}%")`**: `orWhere`を使うことで、「または」の条件を追加します。つまり、「タイトル`OR`著者」での検索が実現します。
 
@@ -152,15 +151,15 @@ if ($keyword = $request->input('keyword')) {
 
 ```php
 // ジャンル絞り込み（応用機能）
-if ($genreId = $request->input('genre')) {
-    $query->whereHas('genres', function ($q) use ($genreId): void {
+$query->when($request->input('genre'), function ($q, $genreId): void {
+    $q->whereHas('genres', function ($q) use ($genreId): void {
         $q->where('genres.id', $genreId);
     });
-}
+});
 ```
 
-- **`if ($genreId = $request->input('genre'))`**: ユーザーがジャンルを選択した場合のみ、このブロックが実行されます。
-- **`$query->whereHas('genres', ...)`**: **リレーション先のテーブルの条件で絞り込む**ためのメソッドです。`whereHas`は「指定した条件に合致する`genres`リレーションを持つ`Book`のみを結果に含める」というクエリを生成します。
+- **`$query->when($request->input('genre'), function ($q, $genreId): void { ... })`**: ジャンルが選択された場合のみクロージャが実行されます。
+- **`$q->whereHas('genres', ...)`**: **リレーション先のテーブルの条件で絞り込む**ためのメソッドです。`whereHas`は「指定した条件に合致する`genres`リレーションを持つ`Book`のみを結果に含める」というクエリを生成します。
 - **`function ($q) use ($genreId)`**: ここでもクロージャを使い、絞り込みの具体的な条件を定義します。
 - **`$q->where('genres.id', $genreId)`**: `genres`テーブルの`id`カラムが、ユーザーの選択した`$genreId`と一致する、という条件を指定しています。
 
@@ -194,15 +193,15 @@ switch ($request->input('sort')) {
 #### 5. 結果の取得とビューへの受け渡し
 
 ```php
-$books = $query->paginate(10)->withQueryString();
+$books = $query->paginate(10)->appends(request()->query());
 $genres = Genre::orderBy('name')->get();
 
 return view('books.index', compact('books', 'genres'));
 ```
 
-- **`$books = $query->paginate(10)->withQueryString()`**: ここで最終的なSQLが実行されます。
+- **`$books = $query->paginate(10)->appends(request()->query())`**: ここで最終的なSQLが実行されます。
     - **`paginate(10)`**: それまで組み立ててきたクエリの結果を、1ページあたり10件でページネーションします。
-    - **`withQueryString()`**: ページネーションのリンク（例：「2」「3」...）に、現在のURLのクエリパラメータ（`?keyword=...&genre=...`など）を自動的に引き継ぎます。これにより、検索条件を維持したままページ移動ができます。
+    - **`appends(request()->query())`**: ページネーションのリンク（例：「2」「3」...）に、現在のURLのクエリパラメータ（`?keyword=...&genre=...`など）を引き継ぎます。`request()->query()` で現在のクエリパラメータ全てを取得し、`appends()` でページネーションリンクに付与します。
 - **`$genres = Genre::orderBy('name')->get()`**: 検索フォームのジャンル選択プルダウンに表示するため、すべてのジャンル情報を取得しています。
 - **`return view('books.index', compact('books', 'genres'))`**: `books.index`ビュー（`resources/views/books/index.blade.php`）をレンダリングして返します。`compact('books', 'genres')`は、`$books`と`$genres`変数をビューに渡すためのPHPの関数で、`['books' => $books, 'genres' => $genres]`と書くのと同じ意味です。
 
@@ -278,10 +277,10 @@ Laravel paginate パラメータ 引き継ぎ
 ```
 
 **検索結果から得られる情報:**
-- 「ページネーションリンクにクエリパラメータを引き継ぐには`withQueryString()`を使う」という解決策が見つかる
+- 「ページネーションリンクにクエリパラメータを引き継ぐには`appends()`を使う」という解決策が見つかる
 
 **最終的にたどり着く答え:**
-- `paginate(10)->withQueryString()`と書くだけで、URLのクエリパラメータが自動的にページネーションリンクに付与されることがわかる
+- `paginate(10)->appends(request()->query())`と書くことで、URLのクエリパラメータがページネーションリンクに付与されることがわかる
 
 ### 検索のコツ
 
@@ -302,8 +301,8 @@ Laravel paginate パラメータ 引き継ぎ
 
 - **検索フォーム**: `GET`メソッドで`books.index`ルートにリクエストを送信します。検索条件はURLのクエリパラメータとして渡されます。
 - **入力値の復元**: `request('keyword')`や`request('genre') == $genre->id ? 'selected' : ''`のようにして、検索実行後もユーザーが入力・選択した条件がフォームに残るようにしています。これにより、ユーザーは自分がどの条件で検索したかを常に把握できます。
-- **ページネーションリンク**: `{{ $books->links() }}`でページネーションリンクを表示します。コントローラーで`withQueryString()`を使っているので、このリンクには自動で検索条件が付与されます。
+- **ページネーションリンク**: `{{ $books->links() }}`でページネーションリンクを表示します。コントローラーで`appends(request()->query())`を使っているので、このリンクには検索条件が付与されます。
 
 ## 7. まとめ
 
-このChapterでは、`if`文や`switch`文、`whereHas`、`withQueryString`といった機能を組み合わせることで、柔軟でユーザーフレンドリーな高度検索機能を実装する方法を学びました。条件に応じてクエリを動的に組み立てるという考え方は、実務の様々な場面で応用できる非常に重要なテクニックです。
+このChapterでは、`when()`メソッドや`switch`文、`whereHas`、`appends()`といった機能を組み合わせることで、柔軟でユーザーフレンドリーな高度検索機能を実装する方法を学びました。条件に応じてクエリを動的に組み立てるという考え方は、実務の様々な場面で応用できる非常に重要なテクニックです。
