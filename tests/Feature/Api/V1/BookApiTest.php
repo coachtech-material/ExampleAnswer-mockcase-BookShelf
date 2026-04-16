@@ -278,7 +278,7 @@ class BookApiTest extends TestCase
         ]);
 
         $response->assertStatus(403);
-        $response->assertExactJson(['error' => 'この操作を実行する権限がありません。']);
+        $response->assertJson(['message' => 'This action is unauthorized.']);
     }
 
     public function test_update_returns_404_for_unknown_book(): void
@@ -350,7 +350,7 @@ class BookApiTest extends TestCase
         $response = $this->deleteJson("/api/v1/books/{$book->id}");
 
         $response->assertStatus(403);
-        $response->assertExactJson(['error' => 'この操作を実行する権限がありません。']);
+        $response->assertJson(['message' => 'This action is unauthorized.']);
         $this->assertDatabaseHas('books', ['id' => $book->id]);
     }
 

@@ -230,7 +230,7 @@ erDiagram
     users ||--o{ favorites : "お気に入り"
     users ||--o{ review_likes : "いいね"
     books ||--o{ reviews : ""
-    books ||--o{ book_genre : ""
+    books ||--|{ book_genre : ""
     books ||--o{ favorites : ""
     genres ||--o{ book_genre : ""
     reviews ||--o{ review_likes : ""
@@ -267,7 +267,7 @@ erDiagram
 
     reviews {
         bigint id PK
-        bigint user_id FK
+        bigint user_id FK "UK(user_id, book_id)"
         bigint book_id FK
         tinyint rating
         text comment
@@ -277,7 +277,7 @@ erDiagram
 
     book_genre {
         bigint id PK
-        bigint book_id FK
+        bigint book_id FK "UK(book_id, genre_id)"
         bigint genre_id FK
         timestamp created_at
         timestamp updated_at
@@ -285,7 +285,7 @@ erDiagram
 
     favorites {
         bigint id PK
-        bigint user_id FK
+        bigint user_id FK "UK(user_id, book_id)"
         bigint book_id FK
         timestamp created_at
         timestamp updated_at
@@ -293,7 +293,7 @@ erDiagram
 
     review_likes {
         bigint id PK
-        bigint user_id FK
+        bigint user_id FK "UK(user_id, review_id)"
         bigint review_id FK
         timestamp created_at
         timestamp updated_at
