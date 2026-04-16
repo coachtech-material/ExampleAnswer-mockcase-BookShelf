@@ -28,7 +28,7 @@
                                     <p class="text-gray-600 mb-2">{{ $book->author }}</p>
                                     <div class="flex items-center justify-between">
                                         <span class="text-sm text-gray-500">ISBN: {{ $book->isbn ?? '未登録' }}</span>
-                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST">
+                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST" novalidate>
                                             @csrf
                                             <button type="submit" class="text-red-500 hover:text-red-700">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">

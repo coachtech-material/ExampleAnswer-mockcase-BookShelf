@@ -15,7 +15,7 @@
 
                     <x-validation-errors />
 
-                    <form action="{{ route('reviews.update', $review) }}" method="POST">
+                    <form action="{{ route('reviews.update', $review) }}" method="POST" novalidate>
                         @csrf
                         @method('PUT')
 

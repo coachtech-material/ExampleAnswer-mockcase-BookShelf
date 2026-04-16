@@ -22,7 +22,7 @@
             <!-- 検索フォーム -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900">
-                    <form action="{{ route('books.index') }}" method="GET" class="space-y-4">
+                    <form action="{{ route('books.index') }}" method="GET" class="space-y-4" novalidate>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label for="keyword" class="block text-sm font-medium text-gray-700 mb-1">キーワード</label>

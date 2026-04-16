@@ -1,7 +1,7 @@
 <x-guest-layout>
     <x-validation-errors />
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('login') }}" novalidate>
         @csrf
         <!-- Email Address -->
         <div>

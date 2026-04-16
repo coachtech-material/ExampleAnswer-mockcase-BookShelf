@@ -11,7 +11,7 @@
                 <div class="p-6 text-gray-900">
                     <x-validation-errors />
 
-                    <form action="{{ route('genres.store') }}" method="POST">
+                    <form action="{{ route('genres.store') }}" method="POST" novalidate>
                         @csrf
                         <div class="mb-4">
                             <label for="name" class="block text-sm font-medium text-gray-700">ジャンル名 <span class="text-red-500">*</span></label>

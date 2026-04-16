@@ -35,7 +35,7 @@
                 <div class="p-6 text-gray-900">
                     <x-validation-errors />
 
-                    <form action="{{ route('books.update', $book) }}" method="POST">
+                    <form action="{{ route('books.update', $book) }}" method="POST" novalidate>
                         @method('PUT')
                         @include('books._form')
 
