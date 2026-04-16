@@ -51,7 +51,20 @@ class ReviewTest extends TestCase
             'comment' => str_repeat('a', 1001),
         ]);
 
-        $response->assertSessionHasErrors(['rating']);
+        $response->assertSessionHasErrors(['rating', 'comment']);
+        $this->assertDatabaseCount('reviews', 0);
+    }
+
+    public function test_review_store_rating_below_min(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+
+        $this->actingAs($user)->post(route('reviews.store', $book), [
+            'rating' => 0,
+            'comment' => '下限違反',
+        ])->assertSessionHasErrors(['rating']);
+
         $this->assertDatabaseCount('reviews', 0);
     }
 
