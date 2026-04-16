@@ -103,6 +103,11 @@
 
    ブラウザで [http://localhost](http://localhost) にアクセスします。
 
+## 開発環境URL
+
+- アプリケーション: http://localhost
+- phpMyAdmin: http://localhost:8080
+
 ## テスト実行
 
 ```bash

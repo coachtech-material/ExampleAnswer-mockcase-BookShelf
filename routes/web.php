@@ -26,7 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('books', BookController::class)->except(['index', 'show']);
 
     // ジャンル管理
-    Route::resource('genres', GenreController::class)->except(['show']);
+    Route::resource('genres', GenreController::class);
 
     // レビュー管理
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
@@ -44,7 +44,6 @@ Route::middleware('auth')->group(function () {
 
 // --- 3. ワイルドカードを含む公開ルート (最後に定義) ---
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 
 // 認証機能用ルート、RouteServiceProvider.phpでミドルウェアを設定している場合は必要ない
 // require __DIR__.'/auth.php';

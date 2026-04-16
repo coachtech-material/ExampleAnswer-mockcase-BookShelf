@@ -190,9 +190,9 @@
 
                                             <!-- 編集・削除ボタン -->
                                             @can('update', $review)
-                                                <div class="flex gap-2">
+                                                <div class="flex items-center gap-2">
                                                     <a href="{{ route('reviews.edit', $review) }}" class="text-sm text-gray-500 hover:text-gray-700">編集</a>
-                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" class="inline" onsubmit="return confirm('本当に削除しますか？')">
+                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="text-sm text-red-500 hover:text-red-700">削除</button>

@@ -16,6 +16,11 @@
         </div>
 
         <div class="flex items-center justify-end mt-4">
+            <a href="{{ route('register') }}"
+                class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                {{ __('会員登録') }}
+            </a>
+
             <x-primary-button class="ml-3">
                 {{ __('ログイン') }}
             </x-primary-button>
