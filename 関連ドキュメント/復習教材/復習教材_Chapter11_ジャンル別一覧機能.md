@@ -14,7 +14,7 @@
 
 | 操作 | HTTPメソッド | URI | コントローラー@メソッド | 認証 |
 |:---|:---|:---|:---|:---|
-| ジャンル別書籍一覧 | GET | `/genres/{genre}` | GenreController@show | 不要 |
+| ジャンル別書籍一覧 | GET | `/genres/{genre}` | GenreController@show | 必要 |
 
 ---
 
