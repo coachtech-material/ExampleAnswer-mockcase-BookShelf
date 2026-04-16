@@ -85,16 +85,16 @@ class GenreSeeder extends Seeder
     public function run(): void
     {
         $genres = [
-            '文学・小説',
-            '��ジネス・経済',
+            '小説',
+            'ビジネス',
+            '技術書',
             '自己啓発',
-            'コンピュータ・IT',
-            '科学・テクノロジー',
-            '歴史・地理',
-            '芸術・エンターテインメント',
-            '健康・医学',
-            '料理・グルメ',
-            '旅行・ガイド',
+            'エッセイ',
+            '歴史',
+            '科学',
+            '芸術',
+            '料理',
+            '旅行',
         ];
 
         foreach ($genres as $name) {
@@ -169,7 +169,7 @@ class BookSeeder extends Seeder
                 'published_date' => '1905-01-01',
                 'description' => '中学校の英語教師である珍野苦沙弥先生の家に飼われている猫の視点から、人間社会を風刺的に描いた作品。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=1',
-                'genres' => ['文学・小説'],
+                'genres' => ['小説'],
             ],
             [
                 'title' => '人を動かす',
@@ -178,7 +178,7 @@ class BookSeeder extends Seeder
                 'published_date' => '1936-10-01',
                 'description' => '人間関係の古典として、あらゆる自己啓発本の原点となったベストセラー。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=2',
-                'genres' => ['ビジネス・経済', '自己啓発'],
+                'genres' => ['ビジネス', '自己啓発'],
             ],
             [
                 'title' => 'リーダブルコード',
@@ -187,7 +187,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2012-06-23',
                 'description' => 'より良いコードを書くためのシンプルで実践的なテクニックを紹介。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=3',
-                'genres' => ['コンピュータ・IT'],
+                'genres' => ['技術書'],
             ],
             [
                 'title' => '7つの習慣',
@@ -196,7 +196,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2013-08-30',
                 'description' => '人格主義の回復を訴え、真の成功を得るための7つの習慣を説く。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=4',
-                'genres' => ['ビジネス・経済', '自己啓発'],
+                'genres' => ['ビジネス', '自己啓発'],
             ],
             [
                 'title' => '坊っちゃん',
@@ -205,7 +205,7 @@ class BookSeeder extends Seeder
                 'published_date' => '1906-04-01',
                 'description' => '四国の中学校に赴任した江戸っ子の数学教師「坊っちゃん」の物語。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=5',
-                'genres' => ['文学・小説'],
+                'genres' => ['小説'],
             ],
             [
                 'title' => 'サピエンス全史',
@@ -214,7 +214,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2016-09-08',
                 'description' => 'なぜ人類だけが文明を築けたのか？その謎を解き明かす世界的ベストセラー。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=6',
-                'genres' => ['歴史・地理', '科学・テクノロジー'],
+                'genres' => ['歴史', '科学'],
             ],
             [
                 'title' => 'Clean Code',
@@ -223,7 +223,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2017-12-18',
                 'description' => 'アジャイルソフトウェア達人の技。クリーンなコードを書くための実践的ガイド。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=7',
-                'genres' => ['コンピュータ・IT'],
+                'genres' => ['技術書'],
             ],
             [
                 'title' => '嫌われる勇気',
@@ -241,7 +241,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2015-03-11',
                 'description' => '芥川賞受賞作。売れない芸人の青春と友情を描いた純文学。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=9',
-                'genres' => ['文学・小説'],
+                'genres' => ['小説'],
             ],
             [
                 'title' => 'FACTFULNESS',
@@ -250,7 +250,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2019-01-11',
                 'description' => '10の思い込みを乗り越え、データを基に世界を正しく見る習慣。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=10',
-                'genres' => ['ビジネス・経済', '科学・テクノロジー'],
+                'genres' => ['ビジネス', '科学'],
             ],
             [
                 'title' => 'コンテナ物語',
@@ -259,7 +259,7 @@ class BookSeeder extends Seeder
                 'published_date' => '2007-01-18',
                 'description' => '世界を変えたのは「箱」の発明だった。物流革命の歴史。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=11',
-                'genres' => ['ビジネス・経済', '歴史・地理'],
+                'genres' => ['ビジネス', '歴史'],
             ],
         ];
 
