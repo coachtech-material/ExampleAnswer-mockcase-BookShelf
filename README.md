@@ -267,7 +267,7 @@ erDiagram
 
     reviews {
         bigint id PK
-        bigint user_id FK "UK(user_id, book_id)"
+        bigint user_id FK
         bigint book_id FK
         tinyint rating
         text comment
