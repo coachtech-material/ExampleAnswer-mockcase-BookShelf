@@ -114,24 +114,24 @@
 
 #### 1. 手がかり1: 要件定義書 (3.1 機能一覧 / 書籍登録)
 
-* **記載内容**: 「書籍登録：タイトル、著者、ISBN、出版日、概要、画像URL...」
+* **記載内容**: 「書籍登録：タイトル、著者、ISBN、出版日、説明、画像URL...」
 * **エンジニアの思考**:
     * 「項目は分かった。だが、ISBNの桁数や、必須かどうかの記載がない。」
 
 #### 2. 手がかり2: Blade (_form.blade.php / reviews/edit.blade.php)
 
 * **ISBN**: `maxlength="13"`、プレースホルダー `978...`（ハイフンなし）
-* **概要**: プレースホルダーに `（任意）` と記載あり。
+* **説明**: プレースホルダーに `（任意）` と記載あり。
 * **評価**: ラジオボタンで `1` ~ `5` のみ。
 * **エンジニアの思考**:
     * 「ISBNは13桁固定の文字列として扱おう。」
-    * 「概要は『任意』だから、DB側でも `NULL` を許容（Nullable）しないとエラーになる。」
+    * 「説明は『任意』だから、DB側でも `NULL` を許容（Nullable）しないとエラーになる。」
     * 「評価は整数のみだから、`INTEGER` ではなく最小の `TINYINT` で十分だ。」
 
 #### PMへのヒアリング例 (Q3, Q4, Q5)
 
 * 「ISBNは画面に合わせて**13桁固定・ハイフンなし**とし、DB定義は `VARCHAR(13)` とします。また、システムとして**一意（Unique）**制約をかけますか？」
-* 「概要（description）と画像URLは、画面の記載通り**任意入力**とするため、DBのカラムも**NULL許容**で設計します。」
+* 「説明（description）と画像URLは、画面の記載通り**任意入力**とするため、DBのカラムも**NULL許容**で設計します。」
 * 「レビュー評価は1~5の整数のみのため、**`TINYINT`** 型を採用します。」
 
 ---
@@ -298,7 +298,7 @@ erDiagram
 | 著者 | `author` | VARCHAR(255) | No |  |
 | ISBN | `isbn` | VARCHAR(13) | **Yes** | **UNIQUE**, nullable |
 | 出版日 | `published_date` | DATE | **Yes** | nullable |
-| 概要 | `description` | TEXT | **Yes** |  |
+| 説明 | `description` | TEXT | **Yes** |  |
 | 画像URL | `image_url` | VARCHAR(255) | **Yes** |  |
 | 作成日時 | `created_at` | TIMESTAMP | Yes |  |
 | 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
@@ -316,8 +316,6 @@ erDiagram
 | コメント | `comment` | TEXT | **Yes** | nullable |
 | 作成日時 | `created_at` | TIMESTAMP | Yes |  |
 | 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
-
-* **複合ユニーク制約**: `(user_id, book_id)` の組み合わせは重複不可。
 
 #### 4. genres (ジャンル)
 

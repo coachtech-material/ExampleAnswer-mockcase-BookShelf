@@ -58,7 +58,6 @@ sail artisan make:migration create_review_likes_table
 | ユーザー退会時にデータ連動削除 | `cascadeOnDelete()` | Phase 4で決定した「Cascade」ルール |
 | ISBN は nullable + UNIQUE | `->nullable()->unique()` | 応用版ではISBNは任意入力 |
 | 出版日は任意入力 | `->nullable()` | Bladeのフォームで任意とされている |
-| 1ユーザー1書籍に1レビュー | `$table->unique(['user_id', 'book_id'])` | 重複レビューをDB制約で防止 |
 | 中間テーブルにidとtimestamps | `$table->id()` + `$table->timestamps()` | Eloquent標準に合わせた設計 |
 
 ---
@@ -183,8 +182,6 @@ return new class extends Migration
             $table->tinyInteger('rating');
             $table->text('comment')->nullable();
             $table->timestamps();
-
-            $table->unique(['user_id', 'book_id']);
         });
     }
 
@@ -280,7 +277,6 @@ sail artisan migrate
 | `$table->date('published_date')->nullable()` | `published_date` (DATE, NULLABLE) | 出版日も任意入力です。 |
 | `$table->text('description')->nullable()` | `description` (TEXT, NULLABLE) | 「任意」と決めた仕様を実現。 |
 | `$table->tinyInteger('rating')` | `rating` (TINYINT) | 1~5の評価値。`tinyInteger` は -128~127 の範囲を持つ最小の整数型です。 |
-| `$table->unique(['user_id', 'book_id'])` | 複合ユニーク制約 | 同じユーザーが同じ書籍に2回レビューすることを防ぎます。 |
 | `$table->timestamps()` | `created_at`, `updated_at` | Laravelの標準機能で、レコードの作成日時と更新日時を自動管理します。 |
 | `function (Blueprint $table): void` | 型定義 | クロージャの戻り値が何もないこと(`void`)を明示。コードの可読性が向上します。 |
 
