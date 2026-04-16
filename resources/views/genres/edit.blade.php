@@ -9,13 +9,14 @@
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+                    <x-validation-errors />
+
                     <form action="{{ route('genres.update', $genre) }}" method="POST">
                         @csrf
                         @method('PUT')
                         <div class="mb-4">
                             <label for="name" class="block text-sm font-medium text-gray-700">ジャンル名 <span class="text-red-500">*</span></label>
-                            <input type="text" name="name" id="name" value="{{ old('name', $genre->name) }}"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input type="text" name="name" id="name" value="{{ old('name', $genre->name) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             @error('name')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
