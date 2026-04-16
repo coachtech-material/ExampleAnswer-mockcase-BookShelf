@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <x-validation-errors />
+
     <form method="POST" action="{{ route('login') }}">
         @csrf
         <!-- Email Address -->

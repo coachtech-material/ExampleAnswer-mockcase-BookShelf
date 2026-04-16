@@ -99,6 +99,7 @@
                             <!-- レビュー投稿フォーム -->
                             <div class="mb-6 bg-gray-50 p-4 rounded-lg">
                                 <h3 class="font-semibold mb-3">レビューを投稿</h3>
+                                <x-validation-errors />
                                 <form action="{{ route('reviews.store', $book) }}" method="POST">
                                     @csrf
                                     <div class="mb-4">
