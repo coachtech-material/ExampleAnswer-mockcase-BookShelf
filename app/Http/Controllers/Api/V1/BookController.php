@@ -10,7 +10,6 @@ use App\Http\Resources\Api\V1\BookResource;
 use App\Models\Book;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
 
 class BookController extends Controller
 {
@@ -74,7 +73,7 @@ class BookController extends Controller
 
         return (new BookResource($book))
             ->response()
-            ->setStatusCode(Response::HTTP_CREATED);
+            ->setStatusCode(201);
     }
 
     /**
@@ -107,6 +106,6 @@ class BookController extends Controller
 
         $book->delete();
 
-        return response()->json(null, Response::HTTP_NO_CONTENT);
+        return response()->json(null, 204);
     }
 }

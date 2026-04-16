@@ -13,13 +13,14 @@ class ReviewLikeSeeder extends Seeder
         $users = User::all();
         $reviews = Review::all();
 
+        // ランダムにいいねを付ける
         foreach ($reviews as $review) {
-            $candidates = $users->where('id', '!=', $review->user_id);
-            $maxLikes = min(3, $candidates->count());
-            $likeCount = rand(0, $maxLikes);
-            if ($likeCount > 0) {
-                $likers = $candidates->random($likeCount);
-                $review->likedByUsers()->attach($likers->pluck('id'));
+            // 各レビューに0〜3人のユーザーがいいねする
+            $likeCount = rand(0, 3);
+            $likeUsers = $users->where('id', '!=', $review->user_id)->random(min($likeCount, $users->count() - 1));
+
+            foreach ($likeUsers as $user) {
+                $user->likedReviews()->syncWithoutDetaching([$review->id]);
             }
         }
     }

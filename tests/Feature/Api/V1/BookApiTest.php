@@ -20,7 +20,7 @@ class BookApiTest extends TestCase
     {
         $user = User::factory()->create();
         $genre = Genre::factory()->create();
-        Book::factory()->count(3)->for($user)->create()->each(function ($book) use ($genre): void {
+        Book::factory()->count(3)->for($user)->create()->each(function ($book) use ($genre) {
             $book->genres()->attach($genre);
         });
 
@@ -78,7 +78,7 @@ class BookApiTest extends TestCase
     {
         $user = User::factory()->create();
         $genre = Genre::factory()->create();
-        Book::factory()->count(5)->for($user)->create()->each(function ($book) use ($genre): void {
+        Book::factory()->count(5)->for($user)->create()->each(function ($book) use ($genre) {
             $book->genres()->attach($genre);
         });
 

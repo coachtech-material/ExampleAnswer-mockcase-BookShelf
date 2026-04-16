@@ -9,6 +9,12 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
 // トップページ（書籍一覧）
 Route::get('/', [BookController::class, 'index'])->name('home');
 

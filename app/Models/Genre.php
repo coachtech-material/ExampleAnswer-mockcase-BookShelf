@@ -15,9 +15,7 @@ class Genre extends Model
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'name',
-    ];
+    protected $fillable = ['name'];
 
     /**
      * ジャンルに属する書籍

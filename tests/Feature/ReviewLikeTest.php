@@ -52,7 +52,6 @@ class ReviewLikeTest extends TestCase
         $review = Review::factory()->create();
         $from = route('books.show', $review->book);
 
-        // 1st toggle: add
         $this->actingAs($user)
             ->from($from)
             ->post(route('reviews.like', $review))
@@ -63,7 +62,6 @@ class ReviewLikeTest extends TestCase
             'review_id' => $review->id,
         ]);
 
-        // 2nd toggle: remove
         $this->actingAs($user)
             ->from($from)
             ->post(route('reviews.like', $review))
@@ -74,7 +72,6 @@ class ReviewLikeTest extends TestCase
             'review_id' => $review->id,
         ]);
 
-        // 3rd toggle: re-add
         $this->actingAs($user)
             ->from($from)
             ->post(route('reviews.like', $review))

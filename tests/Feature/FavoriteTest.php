@@ -52,7 +52,6 @@ class FavoriteTest extends TestCase
         $book = Book::factory()->create();
         $from = route('books.show', $book);
 
-        // 1st toggle: add
         $this->actingAs($user)
             ->from($from)
             ->post(route('favorites.toggle', $book))
@@ -63,7 +62,6 @@ class FavoriteTest extends TestCase
             'book_id' => $book->id,
         ]);
 
-        // 2nd toggle: remove
         $this->actingAs($user)
             ->from($from)
             ->post(route('favorites.toggle', $book))
@@ -74,7 +72,6 @@ class FavoriteTest extends TestCase
             'book_id' => $book->id,
         ]);
 
-        // 3rd toggle: re-add
         $this->actingAs($user)
             ->from($from)
             ->post(route('favorites.toggle', $book))

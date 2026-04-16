@@ -12,7 +12,6 @@ class BookSeeder extends Seeder
     public function run(): void
     {
         $users = User::all();
-        $genres = Genre::all();
 
         $books = [
             [
@@ -20,7 +19,7 @@ class BookSeeder extends Seeder
                 'author' => '夏目漱石',
                 'isbn' => '9784101010014',
                 'published_date' => '1905-01-01',
-                'description' => '中学校の英語教師である珍野苦沙弥先生の家に飼われている猫の視点から、人間社会を風刺的に描いた作品。',
+                'description' => '中学校の英語教師である珍野苦沙弥の家に飼われている猫である「吾輩」の視点から、珍野一家や、そこに出入りする人々の様子を風刺的に描いた作品。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=1',
                 'genres' => ['小説'],
             ],
@@ -29,7 +28,7 @@ class BookSeeder extends Seeder
                 'author' => 'D・カーネギー',
                 'isbn' => '9784422100524',
                 'published_date' => '1936-10-01',
-                'description' => '人間関係の古典として、あらゆる自己啓発本の原点となったベストセラー。',
+                'description' => '人間関係の古典として、あらゆる自己啓発本の原点となったデール・カーネギーの名著。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=2',
                 'genres' => ['ビジネス', '自己啓発'],
             ],
@@ -47,7 +46,7 @@ class BookSeeder extends Seeder
                 'author' => 'スティーブン・R・コヴィー',
                 'isbn' => '9784863940246',
                 'published_date' => '2013-08-30',
-                'description' => '人格主義の回復を訴え、真の成功を得るための7つの習慣を説く。',
+                'description' => '全世界3000万部、国内180万部を超えるベストセラー。人生を成功に導く7つの習慣を解説。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=4',
                 'genres' => ['ビジネス', '自己啓発'],
             ],
@@ -56,7 +55,7 @@ class BookSeeder extends Seeder
                 'author' => '夏目漱石',
                 'isbn' => '9784101010021',
                 'published_date' => '1906-04-01',
-                'description' => '四国の中学校に赴任した江戸っ子の数学教師「坊っちゃん」の物語。',
+                'description' => '東京の物理学校を卒業後、四国の中学校に数学教師として赴任した主人公「坊っちゃん」の物語。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=5',
                 'genres' => ['小説'],
             ],
@@ -65,7 +64,7 @@ class BookSeeder extends Seeder
                 'author' => 'ユヴァル・ノア・ハラリ',
                 'isbn' => '9784309226712',
                 'published_date' => '2016-09-08',
-                'description' => 'なぜ人類だけが文明を築けたのか？その謎を解き明かす世界的ベストセラー。',
+                'description' => 'なぜ人類だけが文明を築けたのか？ホモ・サピエンスの歴史を俯瞰する世界的ベストセラー。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=6',
                 'genres' => ['歴史', '科学'],
             ],
@@ -74,7 +73,7 @@ class BookSeeder extends Seeder
                 'author' => 'Robert C. Martin',
                 'isbn' => '9784048930598',
                 'published_date' => '2017-12-18',
-                'description' => 'アジャイルソフトウェア達人の技。クリーンなコードを書くための実践的ガイド。',
+                'description' => 'アジャイルソフトウェア開発の奥義として、クリーンなコードを書くための原則を解説。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=7',
                 'genres' => ['技術書'],
             ],
@@ -83,7 +82,7 @@ class BookSeeder extends Seeder
                 'author' => '岸見一郎・古賀史健',
                 'isbn' => '9784478025819',
                 'published_date' => '2013-12-13',
-                'description' => 'アドラー心理学を対話形式でわかりやすく解説した自己啓発書。',
+                'description' => 'アドラー心理学を対話形式でわかりやすく解説した自己啓発書のベストセラー。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=8',
                 'genres' => ['自己啓発'],
             ],
@@ -92,7 +91,7 @@ class BookSeeder extends Seeder
                 'author' => '又吉直樹',
                 'isbn' => '9784163902302',
                 'published_date' => '2015-03-11',
-                'description' => '芥川賞受賞作。売れない芸人の青春と友情を描いた純文学。',
+                'description' => '芥川賞受賞作。売れない芸人の青春を描いた純文学作品。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=9',
                 'genres' => ['小説'],
             ],
@@ -101,7 +100,7 @@ class BookSeeder extends Seeder
                 'author' => 'ハンス・ロスリング',
                 'isbn' => '9784822289607',
                 'published_date' => '2019-01-11',
-                'description' => '10の思い込みを乗り越え、データを基に世界を正しく見る習慣。',
+                'description' => 'データを基に世界を正しく見る習慣を身につける。思い込みを乗り越え、世界を正しく見る方法。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=10',
                 'genres' => ['ビジネス', '科学'],
             ],
@@ -110,25 +109,24 @@ class BookSeeder extends Seeder
                 'author' => 'マルク・レビンソン',
                 'isbn' => '9784822251468',
                 'published_date' => '2007-01-18',
-                'description' => '世界を変えたのは「箱」の発明だった。物流革命の歴史。',
+                'description' => 'コンテナが世界を変えた。物流革命の歴史を描いたノンフィクション。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=11',
                 'genres' => ['ビジネス', '歴史'],
             ],
         ];
 
         foreach ($books as $bookData) {
-            $book = Book::create([
-                'user_id' => $users->random()->id,
-                'title' => $bookData['title'],
-                'author' => $bookData['author'],
-                'isbn' => $bookData['isbn'],
-                'published_date' => $bookData['published_date'],
-                'description' => $bookData['description'],
-                'image_url' => $bookData['image_url'],
-            ]);
+            $genreNames = $bookData['genres'];
+            unset($bookData['genres']);
 
-            $genreIds = $genres->whereIn('name', $bookData['genres'])->pluck('id');
-            $book->genres()->attach($genreIds);
+            $book = Book::firstOrCreate(
+                ['isbn' => $bookData['isbn']],
+                array_merge($bookData, ['user_id' => $users->random()->id])
+            );
+
+            // ジャンルを紐付け
+            $genreIds = Genre::whereIn('name', $genreNames)->pluck('id')->toArray();
+            $book->genres()->sync($genreIds);
         }
     }
 }
