@@ -84,13 +84,7 @@
    sail artisan migrate:fresh --seed
    ```
 
-7. **ストレージのシンボリックリンク作成**
-
-   ```bash
-   sail artisan storage:link
-   ```
-
-8. **フロントエンドのビルド**
+7. **フロントエンドのビルド**
 
    ```bash
    sail npm install
@@ -99,7 +93,7 @@
 
    `npm run dev` は開発中は起動したままにしてください。
 
-9. **アプリケーションへのアクセス**
+8. **アプリケーションへのアクセス**
 
    ブラウザで [http://localhost](http://localhost) にアクセスします。
 
