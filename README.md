@@ -148,7 +148,7 @@ erDiagram
     users ||--o{ favorites : "お気に入り"
     users ||--o{ review_likes : "いいね"
     books ||--o{ reviews : ""
-    books ||--o{ book_genre : ""
+    books ||--|{ book_genre : ""
     books ||--o{ favorites : ""
     genres ||--o{ book_genre : ""
     reviews ||--o{ review_likes : ""
