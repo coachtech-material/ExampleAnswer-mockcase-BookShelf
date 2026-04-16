@@ -11,7 +11,7 @@
                 <div class="p-6 text-gray-900">
                     <x-validation-errors />
 
-                    <form action="{{ route('genres.update', $genre) }}" method="POST">
+                    <form action="{{ route('genres.update', $genre) }}" method="POST" novalidate>
                         @csrf
                         @method('PUT')
                         <div class="mb-4">

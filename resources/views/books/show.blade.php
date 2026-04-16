@@ -31,7 +31,7 @@
                                 <!-- お気に入りボタン -->
                                 @auth
                                     @if(Auth::user()->favoriteBooks->contains($book->id))
-                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST">
+                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST" novalidate>
                                             @csrf
                                             <button type="submit" class="text-red-500 hover:text-red-700" title="お気に入りから削除">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24">
@@ -40,7 +40,7 @@
                                             </button>
                                         </form>
                                     @else
-                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST">
+                                        <form action="{{ route('favorites.toggle', $book) }}" method="POST" novalidate>
                                             @csrf
                                             <button type="submit" class="text-gray-400 hover:text-red-500" title="お気に入りに追加">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -79,7 +79,7 @@
                                     <a href="{{ route('books.edit', $book) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                                         編集
                                     </a>
-                                    <form action="{{ route('books.destroy', $book) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')">
+                                    <form action="{{ route('books.destroy', $book) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')" novalidate>
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
@@ -100,7 +100,7 @@
                             <div class="mb-6 bg-gray-50 p-4 rounded-lg">
                                 <h3 class="font-semibold mb-3">レビューを投稿</h3>
                                 <x-validation-errors />
-                                <form action="{{ route('reviews.store', $book) }}" method="POST">
+                                <form action="{{ route('reviews.store', $book) }}" method="POST" novalidate>
                                     @csrf
                                     <div class="mb-4">
                                         <label for="rating" class="block text-sm font-medium text-gray-700 mb-1">評価</label>
@@ -160,7 +160,7 @@
                                             <!-- いいねボタン -->
                                             @auth
                                                 @if(Auth::user()->likedReviews->contains($review->id))
-                                                    <form action="{{ route('reviews.like', $review) }}" method="POST" class="inline">
+                                                    <form action="{{ route('reviews.like', $review) }}" method="POST" class="inline" novalidate>
                                                         @csrf
                                                         <button type="submit" class="text-blue-500 hover:text-blue-700 text-sm flex items-center">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -170,7 +170,7 @@
                                                         </button>
                                                     </form>
                                                 @else
-                                                    <form action="{{ route('reviews.like', $review) }}" method="POST" class="inline">
+                                                    <form action="{{ route('reviews.like', $review) }}" method="POST" class="inline" novalidate>
                                                         @csrf
                                                         <button type="submit" class="text-gray-500 hover:text-blue-500 text-sm flex items-center">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 20 20">
@@ -193,7 +193,7 @@
                                             @can('update', $review)
                                                 <div class="flex items-center gap-2">
                                                     <a href="{{ route('reviews.edit', $review) }}" class="text-sm text-gray-500 hover:text-gray-700">編集</a>
-                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')">
+                                                    <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')" novalidate>
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="text-sm text-red-500 hover:text-red-700">削除</button>

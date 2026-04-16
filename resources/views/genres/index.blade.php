@@ -49,7 +49,7 @@
                                         <td class="px-6 py-4 whitespace-nowrap">{{ $genre->books_count }}冊</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <a href="{{ route('genres.edit', $genre) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">編集</a>
-                                            <form action="{{ route('genres.destroy', $genre) }}" method="POST" class="inline" onsubmit="return confirm('本当に削除しますか？');">
+                                            <form action="{{ route('genres.destroy', $genre) }}" method="POST" class="inline" onsubmit="return confirm('本当に削除しますか？');" novalidate>
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-red-600 hover:text-red-900">削除</button>
