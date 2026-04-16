@@ -159,7 +159,7 @@ Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index
 // 認証が必要なルート
 Route::middleware('auth')->group(function () {
     // ジャンル管理
-    Route::resource('genres', GenreController::class)->except(['show']);
+    Route::resource('genres', GenreController::class);
 
     // 書籍管理（createは{book}より先に定義）
     Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
@@ -184,9 +184,6 @@ Route::middleware('auth')->group(function () {
 
 // 書籍詳細（認証不要、{book}パラメータを含むため最後に定義）
 Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-
-// ジャンル別書籍一覧（認証不要）
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show');
 ```
 
 > **注意:** この時点では ISBN 検索ルート（Step 16）やマイ読書レポートルート（Step 17）は未定義です。これらは該当チャプターで追加します。ただし、提供 Blade（navigation.blade.php）がこれらのルートを参照している場合は、Step 15〜17 を実装するまで一部のページでエラーが出る可能性があります。

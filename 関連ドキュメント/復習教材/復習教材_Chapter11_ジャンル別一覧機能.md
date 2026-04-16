@@ -32,7 +32,7 @@ Genre (ジャンル) ※各書籍に紐づくジャンル情報
 
 | 操作 | HTTPメソッド | URI | コントローラー@メソッド | 認証 |
 |:---|:---|:---|:---|:---|
-| ジャンル別書籍一覧 | GET | `/genres/{genre}` | GenreController@show | 不要 |
+| ジャンル別書籍一覧 | GET | `/genres/{genre}` | GenreController@show | 必要 |
 
 ### 表示仕様
 
