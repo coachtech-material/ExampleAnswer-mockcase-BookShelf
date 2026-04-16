@@ -194,18 +194,18 @@ erDiagram
     }
 
     book_genre {
-        bigint book_id FK
-        bigint genre_id FK
+        bigint book_id PK,FK
+        bigint genre_id PK,FK
     }
 
     favorites {
-        bigint user_id FK
-        bigint book_id FK
+        bigint user_id PK,FK
+        bigint book_id PK,FK
     }
 
     review_likes {
-        bigint user_id FK
-        bigint review_id FK
+        bigint user_id PK,FK
+        bigint review_id PK,FK
     }
 ```
 
