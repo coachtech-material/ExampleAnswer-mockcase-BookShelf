@@ -19,8 +19,8 @@
                     <p class="text-xs text-gray-600 mb-3">13桁の ISBN を入力すると、Google Books API から書籍情報を取得してフォームを自動補完します。</p>
                     <div class="flex items-stretch gap-2 w-full">
                         <input type="text" id="isbn-search" placeholder="例: 9784101010014"
-                               class="w-full flex-1 min-w-0 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                               maxlength="13" inputmode="numeric">
+                            class="w-full flex-1 min-w-0 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                            maxlength="13" inputmode="numeric">
                         <button type="button" id="fetch-btn" class="shrink-0 inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-bold py-2 px-4 rounded shadow-sm transition whitespace-nowrap">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />

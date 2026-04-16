@@ -56,11 +56,13 @@ class GenreTest extends TestCase
 
     public function test_genre_show_page_displays_books(): void
     {
+        $user = User::factory()->create();
         $genre = Genre::factory()->create(['name' => 'Mystery']);
         $book = Book::factory()->create(['title' => 'Mystery Book']);
         $book->genres()->attach($genre);
 
-        $this->get(route('genres.show', $genre))
+        $this->actingAs($user)
+            ->get(route('genres.show', $genre))
             ->assertOk()
             ->assertSee('Mystery Book');
     }

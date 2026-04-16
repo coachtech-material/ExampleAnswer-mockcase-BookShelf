@@ -26,9 +26,9 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label for="keyword" class="block text-sm font-medium text-gray-700 mb-1">キーワード</label>
-                                <input type="text" name="keyword" id="keyword" value="{{ request('keyword') }}" 
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                       placeholder="タイトル・著者で検索">
+                                <input type="text" name="keyword" id="keyword" value="{{ request('keyword') }}"
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    placeholder="タイトル・著者で検索">
                             </div>
                             <div>
                                 <label for="genre" class="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
