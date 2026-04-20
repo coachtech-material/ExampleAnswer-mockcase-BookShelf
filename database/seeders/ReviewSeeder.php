@@ -28,16 +28,12 @@ class ReviewSeeder extends Seeder
 
             foreach ($reviewers as $user) {
                 $rating = rand(1, 5);
-                Review::firstOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'book_id' => $book->id,
-                    ],
-                    [
-                        'rating' => $rating,
-                        'comment' => $comments[$rating][array_rand($comments[$rating])],
-                    ]
-                );
+                Review::create([
+                    'user_id' => $user->id,
+                    'book_id' => $book->id,
+                    'rating' => $rating,
+                    'comment' => $comments[$rating][array_rand($comments[$rating])],
+                ]);
             }
         }
     }
