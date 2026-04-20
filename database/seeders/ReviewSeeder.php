@@ -74,16 +74,12 @@ class ReviewSeeder extends Seeder
             $book = $books[$reviewData['book_index']];
             $user = $users[$reviewData['user_index']];
 
-            Review::firstOrCreate(
-                [
-                    'book_id' => $book->id,
-                    'user_id' => $user->id,
-                ],
-                [
-                    'rating' => $reviewData['rating'],
-                    'comment' => $reviewData['comment'],
-                ]
-            );
+            Review::create([
+                'book_id' => $book->id,
+                'user_id' => $user->id,
+                'rating' => $reviewData['rating'],
+                'comment' => $reviewData['comment'],
+            ]);
         }
     }
 }
