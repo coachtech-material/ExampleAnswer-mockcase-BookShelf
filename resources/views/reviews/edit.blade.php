@@ -13,8 +13,6 @@
                         <p class="text-gray-600">書籍: <span class="font-semibold">{{ $review->book->title }}</span></p>
                     </div>
 
-                    <x-validation-errors />
-
                     <form action="{{ route('reviews.update', $review) }}" method="POST" novalidate>
                         @csrf
                         @method('PUT')

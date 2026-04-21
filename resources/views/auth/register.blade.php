@@ -1,6 +1,4 @@
 <x-guest-layout>
-    <x-validation-errors />
-
     <form method="POST" action="{{ route('register') }}" novalidate>
         @csrf
 
