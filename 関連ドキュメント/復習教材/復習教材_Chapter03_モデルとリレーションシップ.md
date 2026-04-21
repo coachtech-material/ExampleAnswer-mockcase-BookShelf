@@ -10,7 +10,6 @@ Chapter 02で作成したデータベースの「テーブル」を、Laravelの
 | リレーションシップの定義 | モデル間の関連（`hasMany`, `belongsTo`, `belongsToMany`）を定義し、関連データを簡単に取得 |
 | マスアサインメント | `$fillable` プロパティを設定し、意図しないデータがDBに保存されるのを防ぐ |
 | PHPDoc と型定義 | `@var array<int, string>` やメソッドの戻り値型でコードの意図を明確化 |
-| withTimestamps | 中間テーブルのタイムスタンプを自動管理する仕組み |
 
 ---
 
@@ -57,10 +56,6 @@ sail artisan make:model ReviewLike
 - `User` が `Book` をたくさんお気に入りする (`belongsToMany`) <-> `Book` はたくさんの `User` にお気に入りされる (`belongsToMany`)
 
 このペアを意識すると、リレーションの定義がスムーズになります。
-
-### withTimestamps() の意味
-
-`->withTimestamps()` を付けると、中間テーブル（`favorites`, `review_likes`, `book_genre`）のレコードが作成・更新された際に `created_at` と `updated_at` が自動的に記録されます。Chapter 02のマイグレーションで中間テーブルに `$table->timestamps()` を定義したので、モデル側でも対応させます。
 
 ### HasApiTokens トレイトの先行追加
 
@@ -145,7 +140,7 @@ class User extends Authenticatable
      */
     public function favoriteBooks(): BelongsToMany
     {
-        return $this->belongsToMany(Book::class, 'favorites')->withTimestamps();
+        return $this->belongsToMany(Book::class, 'favorites');
     }
 
     /**
@@ -153,7 +148,7 @@ class User extends Authenticatable
      */
     public function likedReviews(): BelongsToMany
     {
-        return $this->belongsToMany(Review::class, 'review_likes')->withTimestamps();
+        return $this->belongsToMany(Review::class, 'review_likes');
     }
 }
 ```
@@ -222,7 +217,7 @@ class Book extends Model
      */
     public function genres(): BelongsToMany
     {
-        return $this->belongsToMany(Genre::class)->withTimestamps();
+        return $this->belongsToMany(Genre::class);
     }
 
     /**
@@ -230,7 +225,7 @@ class Book extends Model
      */
     public function favoritedByUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'favorites')->withTimestamps();
+        return $this->belongsToMany(User::class, 'favorites');
     }
 }
 ```
@@ -286,7 +281,7 @@ class Review extends Model
      */
     public function likedByUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'review_likes')->withTimestamps();
+        return $this->belongsToMany(User::class, 'review_likes');
     }
 }
 ```
@@ -322,7 +317,7 @@ class Genre extends Model
      */
     public function books(): BelongsToMany
     {
-        return $this->belongsToMany(Book::class)->withTimestamps();
+        return $this->belongsToMany(Book::class);
     }
 }
 ```
@@ -424,7 +419,6 @@ class ReviewLike extends Model
 | `protected $hidden = [...]` | `password` と `remember_token` をJSON出力時に隠します。 | `$hidden` は情報漏洩を防ぐ「ブラックリスト」です。 |
 | `protected function casts(): array` | `email_verified_at` をCarbon日付オブジェクトに、`password` を自動ハッシュ化します。 | Laravel の属性キャスト機能です。 |
 | `public function books(): HasMany` | ユーザーが登録した書籍の一覧を取得するリレーションです。 | `: HasMany` が戻り値の型定義。IDE補完が効きます。 |
-| `->withTimestamps()` | 中間テーブルの `created_at`, `updated_at` を自動管理します。 | マイグレーションで `$table->timestamps()` を定義した中間テーブルに対応します。 |
 
 ### Book モデル
 
@@ -445,7 +439,6 @@ class ReviewLike extends Model
 |:---|:---|
 | リレーションの種類が分からない | 「Laravel の hasMany, belongsTo, belongsToMany の違いを、具体的なテーブル例で教えてください。」 |
 | $fillable と $guarded の違い | 「Laravel のマスアサインメント保護で、$fillable と $guarded のどちらを使うべきですか？それぞれのメリット・デメリットを教えてください。」 |
-| withTimestamps の使い時 | 「Laravel の belongsToMany で withTimestamps() を付けると何が変わりますか？付けない場合の問題点も教えてください。」 |
 | PHPDoc の書き方 | 「Laravel モデルの PHPDoc で @var array<int, string> と書く意味を教えてください。」 |
 | casts の使い方 | 「Laravel モデルの $casts プロパティと casts() メソッドの違いを教えてください。'password' => 'hashed' は何をしますか？」 |
 

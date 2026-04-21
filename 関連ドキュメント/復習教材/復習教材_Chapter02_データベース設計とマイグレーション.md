@@ -144,12 +144,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('book_genre', function (Blueprint $table): void {
-            $table->id();
             $table->foreignId('book_id')->constrained()->cascadeOnDelete();
             $table->foreignId('genre_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
-
-            $table->unique(['book_id', 'genre_id']);
+            $table->primary(['book_id', 'genre_id']);
         });
     }
 
@@ -180,7 +177,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('book_id')->constrained()->cascadeOnDelete();
             $table->tinyInteger('rating');
-            $table->text('comment')->nullable();
+            $table->text('comment');
             $table->timestamps();
         });
     }
@@ -208,12 +205,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('favorites', function (Blueprint $table): void {
-            $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('book_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
-
-            $table->unique(['user_id', 'book_id']);
+            $table->primary(['user_id', 'book_id']);
         });
     }
 
@@ -240,12 +234,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('review_likes', function (Blueprint $table): void {
-            $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('review_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
-
-            $table->unique(['user_id', 'review_id']);
+            $table->primary(['user_id', 'review_id']);
         });
     }
 
@@ -336,7 +327,6 @@ sail artisan migrate
 | CASCADE DELETE | `->cascadeOnDelete()` | 親レコード削除時の連動削除 |
 | VARCHAR(13), NULLABLE, UNIQUE | `$table->string('isbn', 13)->nullable()->unique()` | 桁数指定 + 任意 + 重複禁止 |
 | TINYINT | `$table->tinyInteger('rating')` | 最小の整数型 |
-| 複合ユニーク制約 | `$table->unique(['col1', 'col2'])` | 2カラムの組み合わせで重複禁止 |
-| id + timestamps 付き中間テーブル | `$table->id()` + `$table->timestamps()` | Eloquent標準に合わせた設計 |
+| 複合主キー | `$table->primary(['col1', 'col2'])` | 2カラムの組み合わせで主キーを定義 |
 
 これで、**Chapter 00で設計した通りの構造**で、アプリケーションのデータを保存するための器（テーブル）が用意できました。次のChapterでは、これらのテーブルを操作するための「モデル」を作成していきます。

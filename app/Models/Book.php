@@ -57,7 +57,7 @@ class Book extends Model
      */
     public function genres(): BelongsToMany
     {
-        return $this->belongsToMany(Genre::class)->withTimestamps();
+        return $this->belongsToMany(Genre::class);
     }
 
     /**
@@ -65,6 +65,6 @@ class Book extends Model
      */
     public function favoritedByUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'favorites')->withTimestamps();
+        return $this->belongsToMany(User::class, 'favorites');
     }
 }

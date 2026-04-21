@@ -313,7 +313,7 @@ erDiagram
 | ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
 | 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
 | 評価 | `rating` | TINYINT | No | 1~5の整数 |
-| コメント | `comment` | TEXT | **Yes** | nullable |
+| コメント | `comment` | TEXT | **No** | 必須 |
 | 作成日時 | `created_at` | TIMESTAMP | Yes |  |
 | 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 

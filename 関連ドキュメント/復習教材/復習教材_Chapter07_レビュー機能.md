@@ -46,7 +46,7 @@ Chapter 06では書籍という「独立したリソース」のCRUDを実装し
 | 項目 | ルール | エラーメッセージ |
 |:---|:---|:---|
 | rating | required / integer / min:1 / max:5 | 評価は必須です。/ 評価は1〜5の整数で入力してください。 |
-| comment | nullable / string / max:1000 | コメントは1000文字以内で入力してください。 |
+| comment | required / string / max:1000 | コメントは必須です。/ コメントは1000文字以内で入力してください。 |
 
 ### 認可ルール（ReviewPolicy）
 
@@ -130,7 +130,7 @@ class StoreReviewRequest extends FormRequest
     {
         return [
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
+            'comment' => ['required', 'string', 'max:1000'],
         ];
     }
 
@@ -146,6 +146,7 @@ class StoreReviewRequest extends FormRequest
             'rating.integer' => '評価は整数で入力してください。',
             'rating.min' => '評価は1〜5の整数で入力してください。',
             'rating.max' => '評価は1〜5の整数で入力してください。',
+            'comment.required' => 'コメントは必須です。',
             'comment.string' => 'コメントは文字列で入力してください。',
             'comment.max' => 'コメントは1000文字以内で入力してください。',
         ];
@@ -182,7 +183,7 @@ class UpdateReviewRequest extends FormRequest
     {
         return [
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
+            'comment' => ['required', 'string', 'max:1000'],
         ];
     }
 
@@ -198,6 +199,7 @@ class UpdateReviewRequest extends FormRequest
             'rating.integer' => '評価は整数で入力してください。',
             'rating.min' => '評価は1〜5の整数で入力してください。',
             'rating.max' => '評価は1〜5の整数で入力してください。',
+            'comment.required' => 'コメントは必須です。',
             'comment.string' => 'コメントは文字列で入力してください。',
             'comment.max' => 'コメントは1000文字以内で入力してください。',
         ];
@@ -324,7 +326,7 @@ class ReviewPolicy
 | `public function authorize(): bool` | このリクエストの実行を許可するかどうかを決定します。`true` を返すことで誰でもリクエスト可能にしています。 |
 | `public function rules(): array` | バリデーションルールを配列で返します。Laravelが自動でバリデーションを実行します。 |
 | `'rating' => ['required', 'integer', 'min:1', 'max:5']` | 評価は必須・整数・1〜5の範囲。5段階評価を想定しています。 |
-| `'comment' => ['nullable', 'string', 'max:1000']` | コメントは任意入力。空でも可、文字列で最大1000文字。 |
+| `'comment' => ['required', 'string', 'max:1000']` | コメントは必須入力。文字列で最大1000文字。 |
 | `public function messages(): array` | バリデーションエラー時のカスタムメッセージを日本語で定義します。 |
 
 ### ReviewController の解説
