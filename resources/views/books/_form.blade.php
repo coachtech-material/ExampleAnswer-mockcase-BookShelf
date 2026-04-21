@@ -37,7 +37,7 @@
         </label>
         <input type="text" name="isbn" id="isbn" value="{{ old('isbn', $book->isbn ?? '') }}"
             class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block w-full"
-            placeholder="9784000000000" maxlength="13">
+            placeholder="9784000000000">
         <p class="text-xs text-gray-500 mt-1">13桁のISBNコードを入力してください</p>
         @error('isbn')
             <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
