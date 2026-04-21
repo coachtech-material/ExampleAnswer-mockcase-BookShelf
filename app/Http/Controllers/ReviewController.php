@@ -15,7 +15,7 @@ class ReviewController extends Controller
         $book->reviews()->create([
             'user_id' => Auth::id(),
             'rating' => $request->rating,
-            'comment' => $request->comment ?? '',
+            'comment' => $request->comment,
         ]);
 
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
@@ -33,7 +33,7 @@ class ReviewController extends Controller
         $this->authorize('update', $review);
         $review->update([
             'rating' => $request->rating,
-            'comment' => $request->comment ?? '',
+            'comment' => $request->comment,
         ]);
 
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');

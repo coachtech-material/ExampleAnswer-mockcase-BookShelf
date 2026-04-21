@@ -44,7 +44,7 @@
 | isbn | required / string / size:13 / unique | ISBNは必須です。/ ISBNは13桁で入力してください。 |
 | published_date | required / date | 出版日は必須です。 |
 | description | nullable / string | -- |
-| image_url | nullable / url | 画像URLは有効なURL形式で入力してください。 |
+| image_url | nullable / url / max:255 | 画像URLは有効なURL形式で入力してください。 / 画像URLは255文字以内で入力してください。 |
 | genres | required / array | ジャンルは1つ以上選択してください。 |
 | genres.* | exists:genres,id | 選択されたジャンルは存在しません。 |
 
@@ -209,7 +209,7 @@ class StoreBookRequest extends FormRequest
             'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
             'published_date' => ['required', 'date'],
             'description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url'],
+            'image_url' => ['nullable', 'url', 'max:255'],
             'genres' => ['required', 'array'],
             'genres.*' => ['exists:genres,id'],
         ];
@@ -228,6 +228,7 @@ class StoreBookRequest extends FormRequest
             'published_date.required' => '出版日は必須です。',
             'published_date.date' => '出版日は有効な日付形式で入力してください。',
             'image_url.url' => '画像URLは有効なURL形式で入力してください。',
+            'image_url.max' => '画像URLは255文字以内で入力してください。',
             'genres.required' => 'ジャンルは1つ以上選択してください。',
             'genres.*.exists' => '選択されたジャンルは存在しません。',
         ];
@@ -260,7 +261,7 @@ class UpdateBookRequest extends FormRequest
             'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
             'published_date' => ['required', 'date'],
             'description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url'],
+            'image_url' => ['nullable', 'url', 'max:255'],
             'genres' => ['required', 'array'],
             'genres.*' => ['exists:genres,id'],
         ];
@@ -279,6 +280,7 @@ class UpdateBookRequest extends FormRequest
             'published_date.required' => '出版日は必須です。',
             'published_date.date' => '出版日は有効な日付形式で入力してください。',
             'image_url.url' => '画像URLは有効なURL形式で入力してください。',
+            'image_url.max' => '画像URLは255文字以内で入力してください。',
             'genres.required' => 'ジャンルは1つ以上選択してください。',
             'genres.*.exists' => '選択されたジャンルは存在しません。',
         ];

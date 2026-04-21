@@ -30,7 +30,7 @@
 | 項目 | ルール | エラーメッセージ |
 |:---|:---|:---|
 | rating | required / integer / min:1 / max:5 | 評価は必須です。/ 評価は1~5の整数で入力してください。 |
-| comment | nullable / string / max:1000 | コメントは1000文字以内で入力してください。 |
+| comment | required / string / max:1000 | コメントは必須です。/ コメントは1000文字以内で入力してください。 |
 
 ---
 
@@ -74,7 +74,7 @@ class ReviewController extends Controller
         $book->reviews()->create([
             'user_id' => Auth::id(),
             'rating' => $request->rating,
-            'comment' => $request->comment ?? '',
+            'comment' => $request->comment,
         ]);
 
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
@@ -92,7 +92,7 @@ class ReviewController extends Controller
         $this->authorize('update', $review);
         $review->update([
             'rating' => $request->rating,
-            'comment' => $request->comment ?? '',
+            'comment' => $request->comment,
         ]);
 
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
@@ -116,7 +116,20 @@ public function rules(): array
 {
     return [
         'rating' => ['required', 'integer', 'min:1', 'max:5'],
-        'comment' => ['nullable', 'string', 'max:1000'],
+        'comment' => ['required', 'string', 'max:1000'],
+    ];
+}
+
+public function messages(): array
+{
+    return [
+        'rating.required' => '評価は必須です。',
+        'rating.integer' => '評価は整数で入力してください。',
+        'rating.min' => '評価は1〜5の整数で入力してください。',
+        'rating.max' => '評価は1〜5の整数で入力してください。',
+        'comment.required' => 'コメントは必須です。',
+        'comment.string' => 'コメントは文字列で入力してください。',
+        'comment.max' => 'コメントは1000文字以内で入力してください。',
     ];
 }
 ```
@@ -129,7 +142,6 @@ public function rules(): array
 |:---|:---|
 | `$book->reviews()->create([...])` | リレーション経由でのデータ作成。`book_id` が自動セット。 |
 | `'user_id' => Auth::id()` | 現在ログインしているユーザーのID。 |
-| `$request->comment ?? ''` | コメントが空の場合は空文字をセット。 |
 | `$book = $review->book;` | 削除前にリダイレクト先の書籍を退避。 |
 
 ---
