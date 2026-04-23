@@ -276,27 +276,18 @@ erDiagram
     }
 
     book_genre {
-        bigint id PK
-        bigint book_id FK "UK(book_id, genre_id)"
-        bigint genre_id FK
-        timestamp created_at
-        timestamp updated_at
+        bigint book_id PK,FK
+        bigint genre_id PK,FK
     }
 
     favorites {
-        bigint id PK
-        bigint user_id FK "UK(user_id, book_id)"
-        bigint book_id FK
-        timestamp created_at
-        timestamp updated_at
+        bigint user_id PK,FK
+        bigint book_id PK,FK
     }
 
     review_likes {
-        bigint id PK
-        bigint user_id FK "UK(user_id, review_id)"
-        bigint review_id FK
-        timestamp created_at
-        timestamp updated_at
+        bigint user_id PK,FK
+        bigint review_id PK,FK
     }
 ```
 
