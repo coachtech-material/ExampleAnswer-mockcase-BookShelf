@@ -170,8 +170,8 @@ erDiagram
         varchar author
         varchar isbn UK
         date published_date
-        text description
-        varchar image_url
+        text description "nullable"
+        varchar image_url "nullable"
         timestamp created_at
         timestamp updated_at
     }
