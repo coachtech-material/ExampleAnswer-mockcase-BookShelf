@@ -250,10 +250,10 @@ erDiagram
         bigint user_id FK
         varchar title
         varchar author
-        varchar isbn UK
-        date published_date
-        text description
-        varchar image_url
+        varchar isbn UK "nullable"
+        date published_date "nullable"
+        text description "nullable"
+        varchar image_url "nullable"
         timestamp created_at
         timestamp updated_at
     }
