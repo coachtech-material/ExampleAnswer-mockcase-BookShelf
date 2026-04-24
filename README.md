@@ -241,6 +241,7 @@ erDiagram
         varchar email UK
         varchar password
         timestamp email_verified_at
+        varchar remember_token "nullable"
         timestamp created_at
         timestamp updated_at
     }
