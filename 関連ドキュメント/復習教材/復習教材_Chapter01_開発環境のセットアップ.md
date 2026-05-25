@@ -81,6 +81,12 @@ DB_PASSWORD=password
 
 **重要:** `DB_HOST` は `localhost` や `127.0.0.1` ではなく、Dockerコンテナ名である `mysql` を指定します。
 
+末尾に Google Books API キーを追加します（応用機能 ISBN検索で使用）。
+
+```dotenv
+GOOGLE_BOOKS_API_KEY=
+```
+
 ### 1.4. compose.yaml の設定
 
 phpMyAdminを追加する場合、`compose.yaml` の `services:` 配下に以下を追加します。
@@ -298,7 +304,7 @@ Alpine.js は、Bladeテンプレート内で `x-data`、`@click`、`x-show` な
 | ファイル | 操作 | 説明 |
 |:---|:---|:---|
 | `book-review-app/` | 新規作成 | Laravel 10.xプロジェクト一式 |
-| `.env` | 編集 | DB接続情報 |
+| `.env` | 編集 | DB接続情報 + Google Books APIキー |
 | `compose.yaml` | 編集 | phpMyAdmin追加 |
 | `tailwind.config.js` | 編集 | テンプレートパス設定 |
 | `postcss.config.js` | 確認 | PostCSS設定 |
@@ -376,7 +382,7 @@ Alpine.start();
 | 構成要素 | 役割 |
 |:---|:---|
 | Docker + Laravel Sail | チーム全員が同一の実行環境を共有 |
-| `.env` | データベース接続情報の管理 |
+| `.env` | データベース接続情報とAPIキーの管理 |
 | compose.yaml | phpMyAdmin等の追加サービス定義 |
 | Alpine.js (`resources/js/app.js`) | Blade内のインタラクティブUIの基盤 |
 | `lang/ja/*.php` | バリデーション・認証エラーメッセージの日本語化 |

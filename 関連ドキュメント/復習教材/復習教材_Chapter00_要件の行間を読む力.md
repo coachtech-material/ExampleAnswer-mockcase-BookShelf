@@ -2,7 +2,7 @@
 
 ## 🎯 このChapterの目標
 
-`要件定義書_詳細度50%` には、「書籍を登録したい」とは書かれていても、「ISBNカラムはVARCHAR(13)で必須」とは書かれていません。
+`要件定義書_詳細度50%` には、「書籍を登録したい」とは書かれていても、「ISBNカラムはVARCHAR(13)でユニーク制約が必要」とは書かれていません。
 実際の開発現場では、この「要件の行間」をエンジニアがヒアリングと設計で埋める必要があります。
 
 このChapterでは、曖昧な要件から**「データベース基本設計書」を完成させるための思考プロセス**と、その結果として出来上がる**完全なデータベース設計書**を提示します。
@@ -130,7 +130,7 @@
 
 #### PMへのヒアリング例 (Q3, Q4, Q5)
 
-* 「ISBNは画面に合わせて**13桁固定・ハイフンなし**とし、DB定義は `VARCHAR(13)` とします。書籍管理の基幹データなので**必須かつ一意（Unique）**制約をかけます。」
+* 「ISBNは画面に合わせて**13桁固定・ハイフンなし**とし、DB定義は `VARCHAR(13)` とします。また、システムとして**一意（Unique）**制約をかけますか？」
 * 「説明（description）と画像URLは、画面の記載通り**任意入力**とするため、DBのカラムも**NULL許容**で設計します。」
 * 「レビュー評価は1~5の整数のみのため、**`TINYINT`** 型を採用します。」
 
@@ -296,8 +296,8 @@ erDiagram
 | ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
 | タイトル | `title` | VARCHAR(255) | No |  |
 | 著者 | `author` | VARCHAR(255) | No |  |
-| ISBN | `isbn` | VARCHAR(13) | **No** | **UNIQUE**, 必須 |
-| 出版日 | `published_date` | DATE | **No** | 必須 |
+| ISBN | `isbn` | VARCHAR(13) | **Yes** | **UNIQUE**, nullable |
+| 出版日 | `published_date` | DATE | **Yes** | nullable |
 | 説明 | `description` | TEXT | **Yes** |  |
 | 画像URL | `image_url` | VARCHAR(255) | **Yes** |  |
 | 作成日時 | `created_at` | TIMESTAMP | Yes |  |
@@ -334,10 +334,13 @@ erDiagram
 
 | 論理名 | 物理名 | 型 | NULL | 制約・備考 |
 | --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
 | ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
 | 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 
-* **複合主キー**: `PRIMARY KEY (user_id, book_id)` で重複を防止。
+* **複合ユニーク制約**: `(user_id, book_id)` の組み合わせは重複不可。
 
 #### 6. review_likes (レビューいいね・中間テーブル)
 
@@ -345,10 +348,13 @@ erDiagram
 
 | 論理名 | 物理名 | 型 | NULL | 制約・備考 |
 | --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
 | ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
 | レビューID | `review_id` | BIGINT | No | FK(`reviews.id`), **CASCADE DELETE** |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 
-* **複合主キー**: `PRIMARY KEY (user_id, review_id)` で重複を防止。
+* **複合ユニーク制約**: `(user_id, review_id)` の組み合わせは重複不可。
 
 #### 7. book_genre (書籍ジャンル紐付け・中間テーブル)
 
@@ -356,10 +362,13 @@ erDiagram
 
 | 論理名 | 物理名 | 型 | NULL | 制約・備考 |
 | --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
 | 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
 | ジャンルID | `genre_id` | BIGINT | No | FK(`genres.id`), **CASCADE DELETE** |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 
-* **複合主キー**: `PRIMARY KEY (book_id, genre_id)` で重複を防止。
+* **複合ユニーク制約**: `(book_id, genre_id)` の組み合わせは重複不可。
 
 ---
 
@@ -371,7 +380,7 @@ erDiagram
 |:---|:---|
 | 機能一覧に「お気に入り」「いいね」 | `favorites`, `review_likes` 中間テーブルが必要 |
 | フォームのチェックボックス `genres[]` | 書籍とジャンルは多対多 → `book_genre` 中間テーブル |
-| `maxlength="13"` + プレースホルダー `978...` | ISBN は `VARCHAR(13)`, UNIQUE, 必須 |
+| `maxlength="13"` + プレースホルダー `978...` | ISBN は `VARCHAR(13)`, UNIQUE |
 | プレースホルダーに「(任意)」 | `description`, `image_url` は nullable |
 | ラジオボタン 1~5 | `rating` は `TINYINT` |
 | 「紐付く書籍がない場合に限り削除」 | ジャンル削除は Restrict（コントローラーでチェック） |

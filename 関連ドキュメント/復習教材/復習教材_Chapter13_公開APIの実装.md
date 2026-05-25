@@ -1,200 +1,407 @@
-# Chapter 13: Web を超えて - 公開APIの実装
-
-## 🎯 このChapterの目標
-
-このチャプターでは、BookShelfアプリケーションの書籍データを外部から利用できる**公開API（RESTful API）**を実装します。Webブラウザ以外のクライアント（モバイルアプリ、他のWebサービスなど）からもデータにアクセスできるようにします。
-
-| このChapterで学ぶこと | 解説 |
-|:---|:---|
-| APIルートの定義 | `routes/api.php` にAPIエンドポイントを定義する方法 |
-| API Resourceの活用 | レスポンスのJSON形式を制御する `JsonResource` の使い方 |
-| API専用のFormRequest | API向けのバリデーションと `user_id` をリクエストで受け取る設計 |
-| 例外ハンドリング | API向けの404レスポンスをカスタマイズする方法 |
+# Chapter 13: 公開APIの実装
 
 ---
 
-## 📖 背景知識
+## 🎯 このセクションで学ぶこと
 
-### なぜAPIが必要なのか？
+このセクションでは、これまで作ってきた書籍管理アプリケーションのデータを、外部のプログラムやクライアント（モバイルアプリやSPAなど）から利用できるようにする**公開API**を実装します。
 
-Webアプリケーションは通常ブラウザからアクセスしますが、APIを提供することで以下のような利点があります:
+- **APIルート**の定義とバージョニング（`/api/v1/`）
+- **APIリソース**（`JsonResource`）を使ったレスポンス形式の整形
+- **FormRequest**を使ったAPIリクエストのバリデーション
+- `withCount()` / `withAvg()` を使った**効率的なリレーション集計**
+- `when()` / `whenLoaded()` による**条件付きレスポンス**
+- **例外ハンドラ**のカスタマイズによるAPIエラーレスポンスの統一
 
-- モバイルアプリからBookShelfのデータにアクセスできる
-- 他のWebサービスと連携できる（例：ブログに書籍データを表示）
-- フロントエンドをReactやVue.jsなどのSPAで構築できる
+> **注意:** この Step ではまだ認証を実装しません。全エンドポイントを認証なしで公開します。Chapter 18（Sanctum認証層の追加）で、書き込み系エンドポイントに認証を追加します。
 
-### 基本版のAPI設計
+---
 
-基本版では**認証なしの公開API**として実装します。ユーザーの特定は `user_id` をリクエストパラメータで送信する方式を採用しています。
+## 📖 先輩エンジニアの思考プロセス
+
+### なぜWeb画面とは別にAPIを作るのか？
+
+> 「Webブラウザ向けの画面はHTMLを返すけど、APIはJSON形式のデータを返す。それぞれ利用者が違う。Web画面はブラウザで閲覧するユーザー向け、APIはモバイルアプリやフロントエンドフレームワーク、外部サービスなど、プログラムから利用されることを想定している。だから、データ構造やエラーハンドリングのアプローチもWeb画面とは異なってくるんだ。」
+
+### なぜAPIリソースを使うのか？
+
+> 「コントローラーでEloquentモデルをそのまま`response()->json()`に渡せば、確かにJSONは返せる。でも、それだとモデルの構造がそのまま外部に公開されてしまう。例えば、`created_at`や`updated_at`のような内部的なタイムスタンプや、APIの利用者には不要なカラムまで全部見えてしまう。
+>
+> **APIリソース**は、モデルと最終的なJSONレスポンスの間に立つ『通訳者』のようなもの。モデルからどのデータを取り出し、どのようなキー名で、どのような構造のJSONに変換するかを、リソースクラス内で一元的に管理できる。将来の仕様変更にも強くなるし、可読性も上がる。APIを作るなら、APIリソースを使うのがプロの作法だよ。」
+
+### どうやってAPIのエラーレスポンスを統一するか？
+
+> 「`routes/api.php`で定義されたルートへのリクエストで、存在しないIDが指定されたら、LaravelはデフォルトでHTMLの404エラーページを返そうとする。でも、APIの利用者はJSONを期待しているから、これは不親切だ。
+>
+> こういうアプリケーション全体に関わる例外処理は、`app/Exceptions/Handler.php`の`render`メソッドでカスタマイズするのが定石。`$request->is('api/*')`でAPIリクエストかどうかを判定し、`ModelNotFoundException`だったら要件通りのJSONを返すように上書きする。これで、どのAPIでモデルが見つからなくても、統一された親切なエラーメッセージを返せるようになる。」
 
 ---
 
 ## 📋 要件の確認
 
-### エンドポイント一覧
+### 書籍一覧API (GET /api/v1/books)
 
-| 操作 | HTTPメソッド | URI | 認証 |
-|:---|:---|:---|:---|
-| 書籍一覧 | GET | `/api/v1/books` | 不要 |
-| 書籍詳細 | GET | `/api/v1/books/{book}` | 不要 |
-| 書籍登録 | POST | `/api/v1/books` | 不要（user_idをリクエストで送信） |
-| 書籍更新 | PUT | `/api/v1/books/{book}` | 不要（user_idをリクエストで送信） |
-| 書籍削除 | DELETE | `/api/v1/books/{book}` | 不要 |
+**リクエストパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|:---|:---|:---:|:---|
+| `keyword` | string | | タイトル・著者での部分一致検索 |
+| `genre_id` | integer | | ジャンルIDでの絞り込み |
+| `page` | integer | | ページ番号（デフォルト: 1） |
+| `per_page` | integer | | 1ページあたりの件数（デフォルト: 20、最大: 100） |
+
+### 書籍詳細API (GET /api/v1/books/{book})
+
+- 成功時: 200 OK（書籍情報 + レビュー一覧を含む）
+- 書籍が見つからない場合: 404 Not Found（`{"error": "書籍が見つかりませんでした。"}`）
+
+### 書籍登録API (POST /api/v1/books)
+
+- この段階ではリクエストボディに`user_id`を含める（Chapter 18で`$request->user()`に変更）
+
+### 書籍更新API (PUT /api/v1/books/{book})
+
+- この段階ではリクエストボディに`user_id`を含める（Chapter 18で削除）
+
+### 書籍削除API (DELETE /api/v1/books/{book})
+
+- 成功時: 204 No Content
 
 ---
 
-## 💭 なぜこう作るのか？
+## 💭 実装の設計
 
-### Point 1: バージョニング（`/api/v1/`）
+以下のファイルを作成・編集します。
 
-APIのURLに `v1` を含めることで、将来的にAPIの仕様を変更する際に `v2` として別バージョンを追加できます。既存のクライアントへの影響を最小限にできます。
-
-### Point 2: API Resource でレスポンス形式を制御する
-
-Eloquentモデルをそのまま返すと、不要なフィールドやリレーションが含まれてしまいます。`JsonResource` を使うことで、APIクライアントに返すデータの形式を明確に制御できます。
-
-### Point 3: 例外ハンドリングのカスタマイズ
-
-APIでは、存在しない書籍にアクセスした場合にHTMLではなくJSONでエラーを返す必要があります。`Handler.php` で `ModelNotFoundException` をキャッチし、カスタムJSONを返します。
+| ファイル | 役割 |
+|:---|:---|
+| `app/Http/Requests/Api/V1/IndexBookRequest.php` | 一覧APIのバリデーション |
+| `app/Http/Requests/Api/V1/StoreBookRequest.php` | 登録APIのバリデーション（user_id含む） |
+| `app/Http/Requests/Api/V1/UpdateBookRequest.php` | 更新APIのバリデーション（user_id含む） |
+| `app/Http/Resources/Api/V1/GenreResource.php` | ジャンルのJSON整形 |
+| `app/Http/Resources/Api/V1/ReviewResource.php` | レビューのJSON整形 |
+| `app/Http/Resources/Api/V1/BookResource.php` | 書籍のJSON整形 |
+| `app/Http/Controllers/Api/V1/BookController.php` | APIコントローラー |
+| `app/Exceptions/Handler.php` | 例外ハンドラ（API用カスタマイズ） |
+| `routes/api.php` | APIルート定義 |
 
 ---
 
-## 🚀 コードの実装
+## 🚀 実装手順
 
-### APIルート定義 (`routes/api.php`)
+### 13.1. API用 FormRequest
 
-```php
-<?php
+#### `app/Http/Requests/Api/V1/IndexBookRequest.php`
 
-use App\Http\Controllers\Api\V1\BookController;
-use Illuminate\Support\Facades\Route;
-
-Route::prefix('v1')->group(function () {
-    Route::apiResource('books', BookController::class);
-});
+```bash
+mkdir -p app/Http/Requests/Api/V1
+sail artisan make:request Api/V1/IndexBookRequest
 ```
 
-### API コントローラー (`app/Http/Controllers/Api/V1/BookController.php`)
-
 ```php
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Requests\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\IndexBookRequest;
-use App\Http\Requests\Api\V1\StoreBookRequest;
-use App\Http\Requests\Api\V1\UpdateBookRequest;
-use App\Http\Resources\Api\V1\BookResource;
-use App\Models\Book;
+use Illuminate\Foundation\Http\FormRequest;
 
-class BookController extends Controller
+class IndexBookRequest extends FormRequest
 {
-    public function index(IndexBookRequest $request)
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
     {
-        $query = Book::with('genres')
-            ->withCount('reviews')
-            ->withAvg('reviews', 'rating');
-
-        if ($request->filled('keyword')) {
-            $keyword = $request->input('keyword');
-            $query->where(function ($q) use ($keyword) {
-                $q->where('title', 'like', "%{$keyword}%")
-                    ->orWhere('author', 'like', "%{$keyword}%");
-            });
-        }
-
-        if ($request->filled('genre_id')) {
-            $genreId = $request->input('genre_id');
-            $query->whereHas('genres', function ($q) use ($genreId) {
-                $q->where('genres.id', $genreId);
-            });
-        }
-
-        $perPage = $request->input('per_page', 20);
-        $books = $query->latest()->paginate($perPage);
-
-        return BookResource::collection($books);
+        return true;
     }
 
-    public function show(Book $book)
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function rules(): array
     {
-        $book->load(['genres', 'reviews.user']);
-        $book->loadCount('reviews');
-        $book->loadAvg('reviews', 'rating');
-
-        return new BookResource($book);
+        return [
+            'keyword' => ['nullable', 'string', 'max:255'],
+            'genre_id' => ['nullable', 'integer', 'exists:genres,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ];
     }
 
-    public function store(StoreBookRequest $request)
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
     {
-        $validated = $request->validated();
-
-        $book = Book::create([
-            'user_id' => $validated['user_id'],
-            'title' => $validated['title'],
-            'author' => $validated['author'],
-            'isbn' => $validated['isbn'],
-            'published_date' => $validated['published_date'],
-            'description' => $validated['description'] ?? null,
-            'image_url' => $validated['image_url'] ?? null,
-        ]);
-
-        $book->genres()->sync($validated['genres']);
-
-        $book->load(['genres', 'reviews.user']);
-        $book->loadCount('reviews');
-        $book->loadAvg('reviews', 'rating');
-
-        return (new BookResource($book))
-            ->response()
-            ->setStatusCode(201);
-    }
-
-    public function update(UpdateBookRequest $request, Book $book)
-    {
-        $validated = $request->validated();
-
-        $book->update([
-            'user_id' => $validated['user_id'],
-            'title' => $validated['title'],
-            'author' => $validated['author'],
-            'isbn' => $validated['isbn'],
-            'published_date' => $validated['published_date'],
-            'description' => $validated['description'] ?? null,
-            'image_url' => $validated['image_url'] ?? null,
-        ]);
-
-        $book->genres()->sync($validated['genres']);
-
-        $book->load(['genres', 'reviews.user']);
-        $book->loadCount('reviews');
-        $book->loadAvg('reviews', 'rating');
-
-        return new BookResource($book);
-    }
-
-    public function destroy(Book $book)
-    {
-        $book->delete();
-
-        return response()->json(null, 204);
+        return [
+            'keyword.max' => 'キーワードは255文字以内で入力してください。',
+            'genre_id.integer' => 'ジャンルIDは整数で指定してください。',
+            'genre_id.exists' => '指定されたジャンルが存在しません。',
+            'page.integer' => 'ページ番号は整数で指定してください。',
+            'page.min' => 'ページ番号は1以上で指定してください。',
+            'per_page.integer' => '1ページあたりの件数は整数で指定してください。',
+            'per_page.min' => '1ページあたりの件数は1以上で指定してください。',
+            'per_page.max' => '1ページあたりの件数は100以下で指定してください。',
+        ];
     }
 }
 ```
 
-### API Resource (`app/Http/Resources/Api/V1/BookResource.php`)
+#### `app/Http/Requests/Api/V1/StoreBookRequest.php`
+
+```bash
+sail artisan make:request Api/V1/StoreBookRequest
+```
+
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreBookRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function rules(): array
+    {
+        return [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:255'],
+            'genres' => ['required', 'array', 'min:1'],
+            'genres.*' => ['integer', 'exists:genres,id'],
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'user_id.required' => 'ユーザーIDは必須です。',
+            'user_id.integer' => 'ユーザーIDは整数で指定してください。',
+            'user_id.exists' => '指定されたユーザーが存在しません。',
+            'title.required' => 'タイトルは必須です。',
+            'title.string' => 'タイトルは文字列で入力してください。',
+            'title.max' => 'タイトルは255文字以内で入力してください。',
+            'author.required' => '著者名は必須です。',
+            'author.string' => '著者名は文字列で入力してください。',
+            'author.max' => '著者名は255文字以内で入力してください。',
+            'isbn.required' => 'ISBNは必須です。',
+            'isbn.string' => 'ISBNは文字列で入力してください。',
+            'isbn.size' => 'ISBNは13桁で入力してください。',
+            'isbn.unique' => 'そのISBNは既に使用されています。',
+            'published_date.required' => '出版日は必須です。',
+            'published_date.date' => '出版日は有効な日付形式で入力してください。',
+            'description.string' => '説明は文字列で入力してください。',
+            'image_url.url' => '画像URLは有効なURL形式で入力してください。',
+            'image_url.max' => '画像URLは255文字以内で入力してください。',
+            'genres.required' => 'ジャンルは1つ以上選択してください。',
+            'genres.array' => 'ジャンルは配列で入力してください。',
+            'genres.min' => 'ジャンルは1つ以上選択してください。',
+            'genres.*.exists' => '選択されたジャンルは存在しません。',
+        ];
+    }
+}
+```
+
+> **注意:** `user_id` フィールドは Chapter 18（Sanctum導入時）で削除します。この段階ではリクエストボディで書籍登録者を指定します。
+
+#### `app/Http/Requests/Api/V1/UpdateBookRequest.php`
+
+```bash
+sail artisan make:request Api/V1/UpdateBookRequest
+```
+
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateBookRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public function rules(): array
+    {
+        return [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->route('book'))],
+            'published_date' => ['required', 'date'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:255'],
+            'genres' => ['required', 'array', 'min:1'],
+            'genres.*' => ['integer', 'exists:genres,id'],
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'user_id.required' => 'ユーザーIDは必須です。',
+            'user_id.integer' => 'ユーザーIDは整数で指定してください。',
+            'user_id.exists' => '指定されたユーザーが存在しません。',
+            'title.required' => 'タイトルは必須です。',
+            'title.string' => 'タイトルは文字列で入力してください。',
+            'title.max' => 'タイトルは255文字以内で入力してください。',
+            'author.required' => '著者名は必須です。',
+            'author.string' => '著者名は文字列で入力してください。',
+            'author.max' => '著者名は255文字以内で入力してください。',
+            'isbn.required' => 'ISBNは必須です。',
+            'isbn.string' => 'ISBNは文字列で入力してください。',
+            'isbn.size' => 'ISBNは13桁で入力してください。',
+            'isbn.unique' => 'そのISBNは既に使用されています。',
+            'published_date.required' => '出版日は必須です。',
+            'published_date.date' => '出版日は有効な日付形式で入力してください。',
+            'description.string' => '説明は文字列で入力してください。',
+            'image_url.url' => '画像URLは有効なURL形式で入力してください。',
+            'image_url.max' => '画像URLは255文字以内で入力してください。',
+            'genres.required' => 'ジャンルは1つ以上選択してください。',
+            'genres.array' => 'ジャンルは配列で入力してください。',
+            'genres.min' => 'ジャンルは1つ以上選択してください。',
+            'genres.*.exists' => '選択されたジャンルは存在しません。',
+        ];
+    }
+}
+```
+
+> **注意:** `user_id` フィールドは Chapter 18（Sanctum導入時）で削除します。
+
+### 13.2. APIリソース
+
+#### `app/Http/Resources/Api/V1/GenreResource.php`
+
+```bash
+mkdir -p app/Http/Resources/Api/V1
+sail artisan make:resource Api/V1/GenreResource
+```
 
 ```php
 <?php
 
 namespace App\Http\Resources\Api\V1;
 
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class GenreResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+        ];
+    }
+}
+```
+
+#### `app/Http/Resources/Api/V1/ReviewResource.php`
+
+```bash
+sail artisan make:resource Api/V1/ReviewResource
+```
+
+```php
+<?php
+
+namespace App\Http\Resources\Api\V1;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ReviewResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'user_name' => $this->user->name,
+            'rating' => $this->rating,
+            'comment' => $this->comment,
+            'created_at' => $this->created_at,
+        ];
+    }
+}
+```
+
+#### `app/Http/Resources/Api/V1/BookResource.php`
+
+```bash
+sail artisan make:resource Api/V1/BookResource
+```
+
+```php
+<?php
+
+namespace App\Http\Resources\Api\V1;
+
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class BookResource extends JsonResource
 {
-    public function toArray($request)
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
@@ -215,68 +422,318 @@ class BookResource extends JsonResource
 }
 ```
 
-### 例外ハンドリング (`app/Exceptions/Handler.php`)
+> **ポイント:** `BookCollection` クラスは作りません。`BookResource::collection($paginator)` で Laravel が自動的に `data` + `meta` + `links` を付与します。
+
+### 13.3. 例外ハンドラのカスタマイズ
+
+#### `app/Exceptions/Handler.php`
+
+404 と 403 を API 用にカスタム JSON レスポンスとして返すように `render()` メソッドを追加します。
 
 ```php
-public function render($request, Throwable $e)
+<?php
+
+namespace App\Exceptions;
+
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Throwable;
+
+class Handler extends ExceptionHandler
 {
-    if ($request->is('api/*') && $e instanceof ModelNotFoundException) {
-        return response()->json([
-            'error' => '書籍が見つかりませんでした。',
-        ], 404);
+    /**
+     * The list of the inputs that are never flashed to the session on validation exceptions.
+     *
+     * @var array<int, string>
+     */
+    protected $dontFlash = [
+        'current_password',
+        'password',
+        'password_confirmation',
+    ];
+
+    /**
+     * Register the exception handling callbacks for the application.
+     */
+    public function register(): void
+    {
+        $this->reportable(function (Throwable $e) {
+            //
+        });
     }
 
-    return parent::render($request, $e);
+    /**
+     * Render an exception into an HTTP response.
+     */
+    public function render($request, Throwable $e)
+    {
+        if ($request->is('api/*')) {
+            if ($e instanceof ModelNotFoundException) {
+                return response()->json([
+                    'error' => '書籍が見つかりませんでした。',
+                ], 404);
+            }
+
+            if ($e instanceof AuthorizationException) {
+                return response()->json([
+                    'error' => 'この操作を実行する権限がありません。',
+                ], 403);
+            }
+        }
+
+        return parent::render($request, $e);
+    }
 }
 ```
 
+### 13.4. APIコントローラ
+
+#### `app/Http/Controllers/Api/V1/BookController.php`
+
+この段階では認証なし（CRUD全公開）で実装します。Sanctum 認証層は Chapter 18 で追加します。
+
+```bash
+mkdir -p app/Http/Controllers/Api/V1
+sail artisan make:controller Api/V1/BookController
+```
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IndexBookRequest;
+use App\Http\Requests\Api\V1\StoreBookRequest;
+use App\Http\Requests\Api\V1\UpdateBookRequest;
+use App\Http\Resources\Api\V1\BookResource;
+use App\Models\Book;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+
+class BookController extends Controller
+{
+    /**
+     * 書籍一覧を取得
+     */
+    public function index(IndexBookRequest $request): AnonymousResourceCollection
+    {
+        $query = Book::with('genres')
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating');
+
+        if ($request->filled('keyword')) {
+            $keyword = $request->input('keyword');
+            $query->where(function ($q) use ($keyword): void {
+                $q->where('title', 'like', "%{$keyword}%")
+                    ->orWhere('author', 'like', "%{$keyword}%");
+            });
+        }
+
+        if ($request->filled('genre_id')) {
+            $genreId = $request->input('genre_id');
+            $query->whereHas('genres', function ($q) use ($genreId): void {
+                $q->where('genres.id', $genreId);
+            });
+        }
+
+        $perPage = (int) $request->input('per_page', 20);
+        $books = $query->latest()->paginate($perPage);
+
+        return BookResource::collection($books);
+    }
+
+    /**
+     * 書籍詳細を取得
+     */
+    public function show(Book $book): BookResource
+    {
+        $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
+
+        return new BookResource($book);
+    }
+
+    /**
+     * 書籍を新規登録（認証なし -- Chapter 18 で Sanctum 認証を追加する）
+     */
+    public function store(StoreBookRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $genreIds = $validated['genres'];
+        $userId = $validated['user_id'];
+        unset($validated['genres'], $validated['user_id']);
+
+        $book = User::findOrFail($userId)->books()->create($validated);
+        $book->genres()->sync($genreIds);
+
+        $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
+
+        return (new BookResource($book))
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    /**
+     * 書籍を更新（認証なし -- Chapter 18 で Sanctum 認証 + BookPolicy を追加する）
+     */
+    public function update(UpdateBookRequest $request, Book $book): BookResource
+    {
+        $validated = $request->validated();
+        $genreIds = $validated['genres'];
+        unset($validated['genres'], $validated['user_id']);
+
+        $book->update($validated);
+        $book->genres()->sync($genreIds);
+
+        $book->load(['genres', 'reviews.user']);
+        $book->loadCount('reviews');
+        $book->loadAvg('reviews', 'rating');
+
+        return new BookResource($book);
+    }
+
+    /**
+     * 書籍を削除（認証なし -- Chapter 18 で Sanctum 認証 + BookPolicy を追加する）
+     */
+    public function destroy(Book $book): JsonResponse
+    {
+        $book->delete();
+
+        return response()->json(null, Response::HTTP_NO_CONTENT);
+    }
+}
+```
+
+### 13.5. APIルート定義 (`routes/api.php`)
+
+この段階では全エンドポイントを認証なしで公開します。
+
+```php
+<?php
+
+use App\Http\Controllers\Api\V1\BookController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1')->group(function () {
+    Route::apiResource('books', BookController::class);
+});
+```
+
+> **注意:** Chapter 18 で Sanctum 認証を追加する際に、読み取り系と書き込み系を分離します。
+
 ---
 
-## 🔍 コードリーディング
+## 🔍 コードの詳細解説
 
-| コード | 解説 |
-|:---|:---|
-| `Route::apiResource('books', ...)` | CRUDの5つのルート（index, show, store, update, destroy）を一括定義。 |
-| `BookResource::collection($books)` | コレクションをAPI Resource形式に変換。ページネーション情報も含まれる。 |
-| `$this->whenLoaded('genres')` | Eager Loadingされた場合のみデータを含める。 |
-| `->response()->setStatusCode(201)` | 作成成功のHTTPステータスコード。 |
-| `response()->json(null, 204)` | 削除成功。レスポンスボディなし。 |
-| `$request->filled('keyword')` | パラメータが存在し、かつ空でないかチェック。 |
+### APIコントローラー - `index` メソッド
+
+```php
+public function index(IndexBookRequest $request): AnonymousResourceCollection
+{
+    $query = Book::with('genres')
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rating');
+```
+
+1. **`IndexBookRequest $request`**: 専用のFormRequestを使うことで、リクエストパラメータのバリデーションがコントローラーに到達する前に自動実行されます。
+2. **`Book::with('genres')`**: N+1問題を避けるため、ジャンル情報をEager Loadingします。
+3. **`withCount('reviews')`**: 各書籍のレビュー数を`reviews_count`として集計します。書籍ごとにカウントクエリを発行する必要がなくなります。
+4. **`withAvg('reviews', 'rating')`**: 各書籍の平均評価を`reviews_avg_rating`として集計します。
+
+### APIリソース - `BookResource`
+
+```php
+'genres' => GenreResource::collection($this->whenLoaded('genres')),
+'average_rating' => $this->reviews_avg_rating !== null
+    ? round((float) $this->reviews_avg_rating, 1)
+    : null,
+'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
+```
+
+1. **`whenLoaded('genres')`**: `genres`リレーションが読み込まれている場合にのみレスポンスに含めます。読み込まれていない場合、このフィールドはレスポンスから除外されます。
+2. **`GenreResource::collection(...)`**: 複数のジャンルを`GenreResource`で変換します。
+3. **`round((float) $this->reviews_avg_rating, 1)`**: 平均評価を小数点以下1桁に丸めます。
+
+### 例外ハンドラ - `render` メソッド
+
+```php
+if ($request->is('api/*')) {
+    if ($e instanceof ModelNotFoundException) {
+        return response()->json(['error' => '書籍が見つかりませんでした。'], 404);
+    }
+    if ($e instanceof AuthorizationException) {
+        return response()->json(['error' => 'この操作を実行する権限がありません。'], 403);
+    }
+}
+```
+
+1. **`$request->is('api/*')`**: URLが`api/`で始まるリクエスト、つまりAPIリクエストに対してのみカスタム処理を行います。Web画面の例外処理には影響を与えません。
+2. **`ModelNotFoundException`**: ルートモデルバインディングでモデルが見つからなかった時にスローされる例外です。
+3. **`AuthorizationException`**: Chapter 18で追加する`$this->authorize()`が失敗した時にスローされる例外です。
 
 ---
 
-## 🧐 調べ方のヒント
+## 🧐 How to: この実装にたどり着くための調べ方
 
-| 疑問 | プロンプト例 |
-|:---|:---|
-| API Resource | 「Laravel の JsonResource を使ってAPIレスポンスを整形する方法を教えてください。」 |
-| apiResource ルート | 「Laravel の Route::apiResource が生成するルート一覧を教えてください。」 |
-| HTTPステータスコード | 「REST APIで使用する主要なHTTPステータスコード（200, 201, 204, 404, 422）の意味を教えてください。」 |
+### 「APIってどうやって作るの？」
+
+- **検索**: `Laravel API 作り方`
+- `routes/api.php`にルートを定義し、コントローラーでJSONを返すこと、APIリソースの存在を知る
+
+### 「レスポンスの形を整えたい」
+
+- **検索**: `Laravel APIリソース 使い方`
+- 公式ドキュメントの「Eloquent: APIリソース」で`toArray`メソッドやリソースコレクション、`whenLoaded`を学ぶ
+
+### 「レビュー数や平均評価を効率的に取るには？」
+
+- **検索**: `Laravel リレーション カウント 効率的`
+- `withCount()`と`withAvg()`で1回のクエリでリレーション先の集計ができることを知る
+
+### 「APIでデータが見つからなかった時のエラー表示」
+
+- **検索**: `Laravel API 404 JSON 返す`
+- `app/Exceptions/Handler.php`の`render`メソッドをカスタマイズする方法を習得する
 
 ---
 
 ## ✅ 動作確認
 
-curlコマンドやPostmanで以下を確認してください。
+APIが正しく動作するか、以下のコマンドで確認しましょう。
 
-| 確認項目 | 確認方法 |
-|:---|:---|
-| 書籍一覧 | `curl http://localhost/api/v1/books` でJSONが返ること |
-| 書籍詳細 | `curl http://localhost/api/v1/books/1` で書籍情報 + レビューが返ること |
-| 404 | `curl http://localhost/api/v1/books/99999` で `{"error": "書籍が見つかりませんでした。"}` が返ること |
-| 書籍登録 | POSTリクエストで201が返り、データベースに保存されること |
-| バリデーション | 不正データのPOSTで422 + エラー詳細が返ること |
+```bash
+# 書籍一覧を取得
+curl -s http://localhost/api/v1/books | jq
+
+# 書籍詳細を取得（IDを指定）
+curl -s http://localhost/api/v1/books/1 | jq
+
+# キーワード検索
+curl -s "http://localhost/api/v1/books?keyword=Laravel" | jq
+
+# 存在しないIDでの詳細取得（404エラーの確認）
+curl -s http://localhost/api/v1/books/99999 | jq
+```
 
 ---
 
-## ✨ このChapterのまとめ
+## ✨ まとめ
 
-| 構成要素 | ファイル | 役割 |
-|:---|:---|:---|
-| APIルート | `routes/api.php` | `/api/v1/books` エンドポイント定義 |
-| APIコントローラー | `Api/V1/BookController.php` | CRUD処理 |
-| APIリソース | `BookResource.php` / `GenreResource.php` / `ReviewResource.php` | レスポンスJSON形式の制御 |
-| APIバリデーション | `Api/V1/StoreBookRequest.php` 等 | 入力チェック（`user_id` 必須） |
-| 例外ハンドリング | `Handler.php` | API向け404カスタムJSON |
+このChapterでは、LaravelでRESTful APIを開発するための一連の流れを学びました。
 
-次の Chapter 14 では、ここまでに実装した機能の**テスト**を作成します。
+| 学んだこと | 内容 |
+|:---|:---|
+| **APIルートの定義** | `routes/api.php`にルートを定義し、`prefix`でバージョニングを行う |
+| **FormRequest** | APIリクエストのバリデーションを専用クラスに分離する |
+| **APIリソースの活用** | `JsonResource`を使ってモデルのデータを要件通りのJSON形式に整形する |
+| **効率的なデータ取得** | `withCount()` / `withAvg()`でN+1問題を回避しつつ集計する |
+| **エラーハンドリング** | `Handler.php`の`render`メソッドでAPIエラーレスポンスを統一する |
+
+これらのテクニックを組み合わせることで、実践的で堅牢なAPIを構築できます。次の Chapter 14 ではテストを学び、Chapter 18 でこのAPIに Sanctum 認証を追加します。

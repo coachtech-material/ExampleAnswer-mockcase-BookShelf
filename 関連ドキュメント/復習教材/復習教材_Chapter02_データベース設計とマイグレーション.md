@@ -1,4 +1,4 @@
-# Chapter 02: 「データベースのGit」 - データベース設計とマイグレーション
+# Chapter 02: 「データベースのGit」 - データベース設計とマイグレーショ���
 
 ## 🎯 このChapterの目標
 
@@ -29,35 +29,44 @@
 
 ### 2.1. マイグレーションファイルの作成
 
+まずは、各テーブルの設計図となるマイグレーションファイルを作成します。
+
 ```bash
-sail artisan make:migration create_genres_table
 sail artisan make:migration create_books_table
-sail artisan make:migration create_reviews_table
+sail artisan make:migration create_genres_table
 sail artisan make:migration create_book_genre_table
+sail artisan make:migration create_reviews_table
 sail artisan make:migration create_favorites_table
 sail artisan make:migration create_review_likes_table
 ```
 
 > **重要：マイグレーションのタイムスタンプ順序について**
-> `book_genre` テーブルは `genres` テーブルへの外部キーを持つため、必ず **`genres` のマイグレーションが先に実行される**ようタイムスタンプの順序を確認してください。
+> `make:migration` を連続実行するとタイムスタンプが同一になり、ファイル名のアルファベット順で実行される場合があります。`book_genre` テーブルは `genres` テーブルへの外部キーを持つため、必ず **`genres` のマイグレーションが先に実行される**ようタイムスタンプの順序を確認してください。もし問題が発生した場合は、ファイル名のタイムスタンプ部分を手動で修正して正しい順序にしてください。
+
+### 2.2. マイグレーションファイルへの記述
+
+作成された各���イグレーションファイルに、**Chapter 00のテーブル定義書**の内容をコードで記述していきます。
 
 ---
 
 ## 💭 なぜこう作るのか？
 
+各マイグレーションの設計判断を、Chapter 00のテーブル定義書と対応させて理解しましょう。
+
 | 設計書の判断 | マイグレーションでの表現 | 背景 |
 |:---|:---|:---|
-| ユーザー退会時にデータ連動削除 | `onDelete('cascade')` | Phase 4で決定した「Cascade」ルール |
-| ISBN は NOT NULL + UNIQUE | `->unique()` (nullable なし) | 基本版ではISBNは必須入力 |
-| 出版日は必須入力 | nullable なし | 基本版では出版日は必須 |
-| コメントは必須 | `$table->text('comment')` (nullable なし) | 基本版ではコメントは必須入力 |
-| 中間テーブルは複合主キー | `$table->primary(['col1', 'col2'])` | idカラムやtimestampsを持たないシンプルな構造 |
+| ユーザー退会時にデータ連動削除 | `cascadeOnDelete()` | Phase 4で決定した「Cascade」ルール |
+| ISBN は nullable + UNIQUE | `->nullable()->unique()` | 応用版ではISBNは任意入力 |
+| 出版日は任意入力 | `->nullable()` | Bladeのフォームで任意とされている |
+| 中間テーブルにidとtimestamps | `$table->id()` + `$table->timestamps()` | Eloquent標準に合わせた設計 |
 
 ---
 
 ## 🚀 コードの実装
 
 ### 2.2.1. `create_books_table`
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_books_table.php`
 
 ```php
 <?php
@@ -70,13 +79,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('books', function (Blueprint $table) {
+        Schema::create('books', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('title');
             $table->string('author');
-            $table->string('isbn', 13)->unique();
-            $table->date('published_date');
+            $table->string('isbn', 13)->nullable()->unique();
+            $table->date('published_date')->nullable();
             $table->text('description')->nullable();
             $table->string('image_url')->nullable();
             $table->timestamps();
@@ -92,6 +101,8 @@ return new class extends Migration
 
 ### 2.2.2. `create_genres_table`
 
+`database/migrations/YYYY_MM_DD_XXXXXX_create_genres_table.php`
+
 ```php
 <?php
 
@@ -103,7 +114,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('genres', function (Blueprint $table) {
+        Schema::create('genres', function (Blueprint $table): void {
             $table->id();
             $table->string('name')->unique();
             $table->timestamps();
@@ -119,6 +130,8 @@ return new class extends Migration
 
 ### 2.2.3. `create_book_genre_table`
 
+`database/migrations/YYYY_MM_DD_XXXXXX_create_book_genre_table.php`
+
 ```php
 <?php
 
@@ -130,9 +143,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('book_genre', function (Blueprint $table) {
-            $table->foreignId('book_id')->constrained()->onDelete('cascade');
-            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
+        Schema::create('book_genre', function (Blueprint $table): void {
+            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('genre_id')->constrained()->cascadeOnDelete();
             $table->primary(['book_id', 'genre_id']);
         });
     }
@@ -146,6 +159,8 @@ return new class extends Migration
 
 ### 2.2.4. `create_reviews_table`
 
+`database/migrations/YYYY_MM_DD_XXXXXX_create_reviews_table.php`
+
 ```php
 <?php
 
@@ -157,10 +172,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('reviews', function (Blueprint $table) {
+        Schema::create('reviews', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
             $table->tinyInteger('rating');
             $table->text('comment');
             $table->timestamps();
@@ -176,6 +191,8 @@ return new class extends Migration
 
 ### 2.2.5. `create_favorites_table`
 
+`database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php`
+
 ```php
 <?php
 
@@ -187,9 +204,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('favorites', function (Blueprint $table) {
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+        Schema::create('favorites', function (Blueprint $table): void {
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
             $table->primary(['user_id', 'book_id']);
         });
     }
@@ -203,6 +220,8 @@ return new class extends Migration
 
 ### 2.2.6. `create_review_likes_table`
 
+`database/migrations/YYYY_MM_DD_XXXXXX_create_review_likes_table.php`
+
 ```php
 <?php
 
@@ -214,9 +233,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('review_likes', function (Blueprint $table) {
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('review_id')->constrained()->onDelete('cascade');
+        Schema::create('review_likes', function (Blueprint $table): void {
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('review_id')->constrained()->cascadeOnDelete();
             $table->primary(['user_id', 'review_id']);
         });
     }
@@ -242,46 +261,72 @@ sail artisan migrate
 
 | コード | 設計書との対応 | 解説 |
 |:---|:---|:---|
-| `$table->id()` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義。 |
-| `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | 命名規則に従っているため、`constrained()` だけで参照を自動設定。 |
-| `->onDelete('cascade')` | **CASCADE DELETE** | 参照先レコードが削除された時、このレコードも自動削除。 |
-| `$table->string('isbn', 13)->unique()` | `isbn` (VARCHAR(13), NOT NULL, UNIQUE) | 基本版ではISBNは必須入力。 |
-| `$table->date('published_date')` | `published_date` (DATE, NOT NULL) | 基本版では出版日は必須。 |
-| `$table->text('comment')` | `comment` (TEXT, NOT NULL) | 基本版ではコメントは必須。 |
-| `$table->primary(['book_id', 'genre_id'])` | 複合主キー | 中間テーブルの主キー定義。idカラムは不要。 |
+| `$table->id()` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義。`unsignedBigInteger`で`auto_increment`な`id`カラムを作成します。 |
+| `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、`constrained()` だけで`users`テーブルの`id`カラムへの参照を自動設定��ます。 |
+| `->cascadeOnDelete()` | **CASCADE DELETE** | Chapter 00で「ユーザー退会時は全て消えて良い」と決めた仕様。参照先レコードが削除された時、このレコードも自動削除されます。 |
+| `$table->string('isbn', 13)->nullable()->unique()` | `isbn` (VARCHAR(13), NULLABLE, UNIQUE) | Chapter 00のヒアリングで決めた仕様をコードに反映。応用版ではISBNは任意入力のため `nullable()` を付けています。 |
+| `$table->date('published_date')->nullable()` | `published_date` (DATE, NULLABLE) | 出版日も任意入力です。 |
+| `$table->text('description')->nullable()` | `description` (TEXT, NULLABLE) | 「任意」と決めた仕様を実現。 |
+| `$table->tinyInteger('rating')` | `rating` (TINYINT) | 1~5の評価値。`tinyInteger` は -128~127 の範囲を持つ最小の整数型です。 |
+| `$table->timestamps()` | `created_at`, `updated_at` | Laravelの標準機能で、レコードの作成日時と更新日時を自動管理します。 |
+| `function (Blueprint $table): void` | 型定義 | クロージャの戻り値が何もないこと(`void`)を明示。コードの可読性が向上します。 |
+
+### make:migration コマンド
+
+| 部分 | 説明 | ポイント |
+|:---|:---|:---|
+| `sail artisan make:migration` | 新しいマイグレーションファイルを作成するArtisanコマンド | `database/migrations`ディレクトリにファイルが生成されます。 |
+| `create_genres_table` | ファイル名 | `create_..._table`という命名規則に従うと、Laravelがテーブル作成用の定型コードを自動生成します。 |
 
 ---
 
 ## 🧐 調べ方のヒント
 
+分からないことがあった時、AIに聞くプロンプト例を紹介します。
+
 | 疑問 | プロンプト例 |
 |:---|:---|
-| 外部キーの書き方 | 「Laravel のマイグレーションで foreignId と constrained を使って外部キーを定義する方法を教えてください。onDelete('cascade') の使い方も含めて。」 |
-| 複合主キー | 「Laravel のマイグレーションで2つのカラムの組み合わせに primary キーを設定する方法を教えてください。」 |
+| 外部キーの書き方 | 「Laravel のマイグレーションで foreignId と constrained を使って外部キーを定義する方法を教えてください。cascadeOnDelete との違いも含めて。」 |
+| 複合ユニーク制約 | 「Laravel のマイグレーションで2つのカラムの組み合わせに unique 制約をかける方法を教えてください。primary との違いも教えてください。」 |
 | nullable の判断 | 「Laravel のマイグレーションで nullable() を付けるべきカラムの判断基準を教えてください。」 |
 | マイグレーションの実行順序 | 「Laravel のマイグレーションの実行順序はどう決まりますか？外部キーの依存関係がある場合の注意点を教えてください。」 |
+| tinyInteger vs unsignedTinyInteger | 「Laravel の tinyInteger と unsignedTinyInteger の違いを教えてください。評価(1-5)を格納するにはどちらが適切ですか？」 |
 
 ---
 
 ## ✅ 動作確認
 
+マイグレーションが正しく実行されたか確認しましょう。
+
 | 確認項目 | 確認方法 |
 |:---|:---|
 | マイグレーション成功 | `sail artisan migrate` 実行時にエラーが出ないこと |
-| テーブルの存在 | phpMyAdmin で7テーブル + Laravel標準テーブルが存在すること |
-| カラムの確認 | 各テーブルの構造タブでカラム名・型・NULL許容が設計書と一致すること |
+| テーブルの存在 | phpMyAdmin (`http://localhost:8080`) で `bookshelf` データベースに7テーブル + Laravel標準テーブルが存在すること |
+| カラムの確認 | phpMyAdmin で各テーブルの構造タブを開き、カラム名・型・NULL許容が設計書と一致すること |
+
+> **トラブルシューティング:**
+> `sail up -d` の後すぐに `sail artisan migrate` を実行すると「Connection refused」エラーが発生する場合があります。MySQLコンテナの起動完了まで30秒ほど待ってから再実行してください。
+>
+> 「Table already exists」エラーが発生した場合は、以下のコマンドでボリュームをクリアしてください:
+> ```bash
+> sail down -v
+> sail up -d
+> sail artisan migrate
+> ```
 
 ---
 
 ## ✨ このChapterのまとめ
 
+このChapterでは、**Chapter 00で策定したデータベース基本設計書**を、Laravelのマイグレーションコードに変換するプロセスを学びました。
+
 | 設計書の項目 | Laravelのコード | 解説 |
 |:---|:---|:---|
 | BIGINT, PK, AUTO_INCREMENT | `$table->id()` | 主キーの定義 |
 | FK(`users.id`) | `$table->foreignId('user_id')->constrained()` | 外部キーの定義 |
-| CASCADE DELETE | `->onDelete('cascade')` | 親レコード削除時の連動削除 |
-| VARCHAR(13), NOT NULL, UNIQUE | `$table->string('isbn', 13)->unique()` | 桁数指定 + 必須 + 重複禁止 |
+| CASCADE DELETE | `->cascadeOnDelete()` | 親レコード削除時の連動削除 |
+| VARCHAR(13), NULLABLE, UNIQUE | `$table->string('isbn', 13)->nullable()->unique()` | 桁数指定 + 任意 + 重複禁止 |
 | TINYINT | `$table->tinyInteger('rating')` | 最小の整数型 |
-| 複合主キー | `$table->primary(['col1', 'col2'])` | 中間テーブルの主キー |
+| 複合主キー | `$table->primary(['col1', 'col2'])` | 2カラムの組み合わせで主キーを定義 |
 
-次のChapterでは、これらのテーブルを操作するための「モデル」を作成していきます。
+これで、**Chapter 00で設計した通りの構造**で、アプリケーションのデータを保存するための器（テーブル）が用意できました。次のChapterでは、これらのテーブルを操作するための「モデル」を作成していきます。
