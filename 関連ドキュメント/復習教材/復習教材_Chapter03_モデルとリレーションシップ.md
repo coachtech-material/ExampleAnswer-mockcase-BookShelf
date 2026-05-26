@@ -40,7 +40,7 @@ sail artisan make:model Genre
 
 `app/Models` ディレクトリに PHP ファイルが作成されます。
 
-> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。中間テーブル `favorites` / `review_likes` へのアクセスは、User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
+> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。`favorites` / `review_likes` テーブルは独立エンティティとしてサロゲートキー（`id`）を持つが、CRUD ロジックは User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。Eloquent の `belongsToMany` は `attach`/`detach`/`toggle`/`sync` を提供するため、独立した Eloquent モデルがなくても十分に CRUD 操作できる。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
 
 ---
 
@@ -322,90 +322,6 @@ class Genre extends Model
 }
 ```
 
-### 3.2.5. `Favorite` モデル
-
-`app/Models/Favorite.php` を以下のように編集します。
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class Favorite extends Model
-{
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'user_id',
-        'book_id',
-    ];
-
-    /**
-     * お気に入りを登録したユーザー
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * お気に入りに登録された書籍
-     */
-    public function book(): BelongsTo
-    {
-        return $this->belongsTo(Book::class);
-    }
-}
-```
-
-### 3.2.6. `ReviewLike` モデル
-
-`app/Models/ReviewLike.php` を以下のように編集します。
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class ReviewLike extends Model
-{
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'user_id',
-        'review_id',
-    ];
-
-    /**
-     * いいねしたユーザー
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * いいねされたレビュー
-     */
-    public function review(): BelongsTo
-    {
-        return $this->belongsTo(Review::class);
-    }
-}
-```
-
 ---
 
 ## 5. コードの詳細解説 🔍
@@ -456,7 +372,7 @@ class ReviewLike extends Model
 
 ## 8. まとめ ✨
 
-このChapterでは、Chapter 02で作成したテーブルに対応するモデルを6つ作成し、リレーションシップとマスアサインメントを定義しました。
+このChapterでは、Chapter 02で作成したテーブルに対応するモデルを4つ作成し、リレーションシップとマスアサインメントを定義しました。
 
 | モデル | テーブル | リレーション | 特記事項 |
 |:---|:---|:---|:---|
@@ -464,7 +380,7 @@ class ReviewLike extends Model
 | `Book` | books | belongsTo(User), hasMany(Review), belongsToMany(Genre, User via favorites) | $casts で published_date を date に |
 | `Review` | reviews | belongsTo(User, Book), belongsToMany(User via review_likes) | -- |
 | `Genre` | genres | belongsToMany(Book) | $fillable は `['name']` のみ |
-| `Favorite` | favorites | belongsTo(User, Book) | 中間テーブル用モデル |
-| `ReviewLike` | review_likes | belongsTo(User, Review) | 中間テーブル用モデル |
+
+※ `Favorite` / `ReviewLike` の独立モデルは作成しない（前述の通り `belongsToMany` 経由でアクセスする）。
 
 次のChapterでは、アプリケーションの「入り口」となる認証機能を実装していきます。

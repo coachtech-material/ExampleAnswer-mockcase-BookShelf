@@ -282,13 +282,15 @@ erDiagram
     }
 
     favorites {
-        bigint user_id PK,FK
-        bigint book_id PK,FK
+        bigint id PK
+        bigint user_id FK
+        bigint book_id FK
     }
 
     review_likes {
-        bigint user_id PK,FK
-        bigint review_id PK,FK
+        bigint id PK
+        bigint user_id FK
+        bigint review_id FK
     }
 ```
 

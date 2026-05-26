@@ -58,7 +58,7 @@ sail artisan make:migration create_review_likes_table
 | ユーザー退会時にデータ連動削除 | `onDelete('cascade')` | Phase 4で決定した「Cascade」ルール |
 | ISBN は nullable + UNIQUE | `->nullable()->unique()` | 応用版ではISBNは任意入力 |
 | 出版日は任意入力 | `->nullable()` | Bladeのフォームで任意とされている |
-| 中間テーブルにidとtimestamps | `$table->id()` + `$table->timestamps()` | Eloquent標準に合わせた設計 |
+| favorites / review_likes はサロゲートキー化 | `$table->id()` + `$table->unique([...])` | 「いいね」「お気に入り」を独立エンティティとして扱う設計（book_genre は純粋な中間テーブルなので複合主キーのまま） |
 
 ---
 
@@ -193,6 +193,8 @@ return new class extends Migration
 
 `database/migrations/YYYY_MM_DD_XXXXXX_create_favorites_table.php`
 
+> **設計方針:** `favorites` テーブルは「お気に入り」という**独立したエンティティ**として扱うため、`book_genre`（純粋な中間テーブル）と異なり**サロゲートキー（`id`）を持たせ、`(user_id, book_id)` には複合 unique 制約**で「1ユーザー1書籍1件」を担保する。Eloquent は標準で複合主キーをサポートしないため、サロゲートキーを採用することで `belongsToMany` 経由の操作も整合する。
+
 ```php
 <?php
 
@@ -205,9 +207,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('favorites', function (Blueprint $table): void {
+            $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('book_id')->constrained()->onDelete('cascade');
-            $table->primary(['user_id', 'book_id']);
+            $table->unique(['user_id', 'book_id']);
         });
     }
 
@@ -222,6 +225,8 @@ return new class extends Migration
 
 `database/migrations/YYYY_MM_DD_XXXXXX_create_review_likes_table.php`
 
+> **設計方針:** `review_likes` テーブルも `favorites` と同様に「いいね」という独立エンティティとして扱うため、サロゲートキー（`id`）+ `(user_id, review_id)` の複合 unique 制約で実装する。
+
 ```php
 <?php
 
@@ -234,9 +239,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('review_likes', function (Blueprint $table): void {
+            $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('review_id')->constrained()->onDelete('cascade');
-            $table->primary(['user_id', 'review_id']);
+            $table->unique(['user_id', 'review_id']);
         });
     }
 
