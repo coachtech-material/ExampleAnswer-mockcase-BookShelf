@@ -322,7 +322,7 @@ class StoreBookRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
             'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
-            'published_date' => ['nullable', 'date'],
+            'published_date' => ['required', 'date'],
             'description' => ['nullable', 'string'],
             'image_url' => ['nullable', 'url', 'max:255'],
             'genres' => ['required', 'array'],
@@ -339,9 +339,11 @@ class StoreBookRequest extends FormRequest
             'author.required' => '著者名は必須です。',
             'author.string' => '著者名は文字列で入力してください。',
             'author.max' => '著者名は255文字以内で入力してください。',
+            'isbn.required' => 'ISBNは必須です。',
             'isbn.string' => 'ISBNは文字列で入力してください。',
             'isbn.size' => 'ISBNは13桁で入力してください。',
             'isbn.unique' => 'そのISBNは既に使用されています。',
+            'published_date.required' => '出版日は必須です。',
             'published_date.date' => '出版日は有効な日付形式で入力してください。',
             'description.string' => '説明は文字列で入力してください。',
             'image_url.url' => '画像URLは有効なURL形式で入力してください。',
@@ -380,8 +382,8 @@ class UpdateBookRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
-            'isbn' => ['nullable', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
-            'published_date' => ['nullable', 'date'],
+            'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
+            'published_date' => ['required', 'date'],
             'description' => ['nullable', 'string'],
             'image_url' => ['nullable', 'url', 'max:255'],
             'genres' => ['required', 'array'],
@@ -398,9 +400,11 @@ class UpdateBookRequest extends FormRequest
             'author.required' => '著者名は必須です。',
             'author.string' => '著者名は文字列で入力してください。',
             'author.max' => '著者名は255文字以内で入力してください。',
+            'isbn.required' => 'ISBNは必須です。',
             'isbn.string' => 'ISBNは文字列で入力してください。',
             'isbn.size' => 'ISBNは13桁で入力してください。',
             'isbn.unique' => 'そのISBNは既に使用されています。',
+            'published_date.required' => '出版日は必須です。',
             'published_date.date' => '出版日は有効な日付形式で入力してください。',
             'description.string' => '説明は文字列で入力してください。',
             'image_url.url' => '画像URLは有効なURL形式で入力してください。',
@@ -600,7 +604,7 @@ public function authorize(): bool
 'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
 
 // UpdateBookRequest: 自分自身を除外してチェック
-'isbn' => ['nullable', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
+'isbn' => ['required', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
 ```
 
 `$this->book` はルートモデルバインディングにより自動的に解決されます。URLの `{book}` パラメータから `Book` モデルインスタンスが取得され、`ignore()` でそのIDを除外します。
