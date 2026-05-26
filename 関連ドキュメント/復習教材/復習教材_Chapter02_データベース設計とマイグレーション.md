@@ -55,7 +55,7 @@ sail artisan make:migration create_review_likes_table
 
 | 設計書の判断 | マイグレーションでの表現 | 背景 |
 |:---|:---|:---|
-| ユーザー退会時にデータ連動削除 | `cascadeOnDelete()` | Phase 4で決定した「Cascade」ルール |
+| ユーザー退会時にデータ連動削除 | `onDelete('cascade')` | Phase 4で決定した「Cascade」ルール |
 | ISBN は nullable + UNIQUE | `->nullable()->unique()` | 応用版ではISBNは任意入力 |
 | 出版日は任意入力 | `->nullable()` | Bladeのフォームで任意とされている |
 | 中間テーブルにidとtimestamps | `$table->id()` + `$table->timestamps()` | Eloquent標準に合わせた設計 |
@@ -81,7 +81,7 @@ return new class extends Migration
     {
         Schema::create('books', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->string('author');
             $table->string('isbn', 13)->nullable()->unique();
@@ -144,8 +144,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('book_genre', function (Blueprint $table): void {
-            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('genre_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('genre_id')->constrained()->onDelete('cascade');
             $table->primary(['book_id', 'genre_id']);
         });
     }
@@ -174,8 +174,8 @@ return new class extends Migration
     {
         Schema::create('reviews', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
             $table->tinyInteger('rating');
             $table->text('comment');
             $table->timestamps();
@@ -205,8 +205,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('favorites', function (Blueprint $table): void {
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('book_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
             $table->primary(['user_id', 'book_id']);
         });
     }
@@ -234,8 +234,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('review_likes', function (Blueprint $table): void {
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('review_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('review_id')->constrained()->onDelete('cascade');
             $table->primary(['user_id', 'review_id']);
         });
     }
@@ -263,7 +263,7 @@ sail artisan migrate
 |:---|:---|:---|
 | `$table->id()` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義。`unsignedBigInteger`で`auto_increment`な`id`カラムを作成します。 |
 | `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、`constrained()` だけで`users`テーブルの`id`カラムへの参照を自動設定��ます。 |
-| `->cascadeOnDelete()` | **CASCADE DELETE** | Chapter 00で「ユーザー退会時は全て消えて良い」と決めた仕様。参照先レコードが削除された時、このレコードも自動削除されます。 |
+| `->onDelete('cascade')` | **CASCADE DELETE** | Chapter 00で「ユーザー退会時は全て消えて良い」と決めた仕様。参照先レコードが削除された時、このレコードも自動削除されます。 |
 | `$table->string('isbn', 13)->nullable()->unique()` | `isbn` (VARCHAR(13), NULLABLE, UNIQUE) | Chapter 00のヒアリングで決めた仕様をコードに反映。応用版ではISBNは任意入力のため `nullable()` を付けています。 |
 | `$table->date('published_date')->nullable()` | `published_date` (DATE, NULLABLE) | 出版日も任意入力です。 |
 | `$table->text('description')->nullable()` | `description` (TEXT, NULLABLE) | 「任意」と決めた仕様を実現。 |
@@ -286,7 +286,7 @@ sail artisan migrate
 
 | 疑問 | プロンプト例 |
 |:---|:---|
-| 外部キーの書き方 | 「Laravel のマイグレーションで foreignId と constrained を使って外部キーを定義する方法を教えてください。cascadeOnDelete との違いも含めて。」 |
+| 外部キーの書き方 | 「Laravel のマイグレーションで foreignId と constrained を使って外部キーを定義する方法を教えてください。onDelete との違いも含めて。」 |
 | 複合ユニーク制約 | 「Laravel のマイグレーションで2つのカラムの組み合わせに unique 制約をかける方法を教えてください。primary との違いも教えてください。」 |
 | nullable の判断 | 「Laravel のマイグレーションで nullable() を付けるべきカラムの判断基準を教えてください。」 |
 | マイグレーションの実行順序 | 「Laravel のマイグレーションの実行順序はどう決まりますか？外部キーの依存関係がある場合の注意点を教えてください。」 |
@@ -324,7 +324,7 @@ sail artisan migrate
 |:---|:---|:---|
 | BIGINT, PK, AUTO_INCREMENT | `$table->id()` | 主キーの定義 |
 | FK(`users.id`) | `$table->foreignId('user_id')->constrained()` | 外部キーの定義 |
-| CASCADE DELETE | `->cascadeOnDelete()` | 親レコード削除時の連動削除 |
+| CASCADE DELETE | `->onDelete('cascade')` | 親レコード削除時の連動削除 |
 | VARCHAR(13), NULLABLE, UNIQUE | `$table->string('isbn', 13)->nullable()->unique()` | 桁数指定 + 任意 + 重複禁止 |
 | TINYINT | `$table->tinyInteger('rating')` | 最小の整数型 |
 | 複合主キー | `$table->primary(['col1', 'col2'])` | 2カラムの組み合わせで主キーを定義 |

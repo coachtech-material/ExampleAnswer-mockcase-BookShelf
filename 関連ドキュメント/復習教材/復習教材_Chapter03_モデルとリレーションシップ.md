@@ -6,8 +6,8 @@ Chapter 02で作成したデータベースの「テーブル」を、Laravelの
 
 | このChapterで学ぶこと | 解説 |
 |:---|:---|
-| モデルの役割 | なぜ直接SQLを書かずに、PHPのオブジェクトを通じてデータベースを操作するのか |
-| リレーションシップの定義 | モデル間の関連（`hasMany`, `belongsTo`, `belongsToMany`）を定義し、関連データを簡単に取得 |
+| モデルの役割 | なぜ直接 SQL を書くのではなく、Eloquent ORM（PHP のオブジェクト）を通じてデータベースを操作するのか |
+| リレーションシップの定義 | モデル間の関連（`hasMany`, `belongsTo`, `belongsToMany`）を定義し、関連データを取得・操作できるようにする |
 | マスアサインメント | `$fillable` プロパティを設定し、意図しないデータがDBに保存されるのを防ぐ |
 | PHPDoc と型定義 | `@var array<int, string>` やメソッドの戻り値型でコードの意図を明確化 |
 
@@ -36,11 +36,11 @@ Artisanコマンドを使って、モデルファイルを作成します。
 sail artisan make:model Book
 sail artisan make:model Review
 sail artisan make:model Genre
-sail artisan make:model Favorite
-sail artisan make:model ReviewLike
 ```
 
-`app/Models`ディレクトリにPHPファイルが作成されます。
+`app/Models` ディレクトリに PHP ファイルが作成されます。
+
+> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。中間テーブル `favorites` / `review_likes` へのアクセスは、User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
 
 ---
 
@@ -417,7 +417,7 @@ class ReviewLike extends Model
 | `use HasApiTokens, HasFactory, Notifiable;` | Sanctum API認証、ファクトリ、通知機能を有効化するトレイトです。 | `HasApiTokens` は Step 18 で使用します。 |
 | `protected $fillable = [...]` | `name`, `email`, `password` への一括代入を許可します。 | `$fillable` はマスアサインメントの「ホワイトリスト」です。 |
 | `protected $hidden = [...]` | `password` と `remember_token` をJSON出力時に隠します。 | `$hidden` は情報漏洩を防ぐ「ブラックリスト」です。 |
-| `protected function casts(): array` | `email_verified_at` をCarbon日付オブジェクトに、`password` を自動ハッシュ化します。 | Laravel の属性キャスト機能です。 |
+| `protected function casts(): array` | `email_verified_at` を Carbon 日付オブジェクトに、`password` をハッシュ化して保存するためのキャストを設定します。 | Laravel の属性キャスト機能です。 |
 | `public function books(): HasMany` | ユーザーが登録した書籍の一覧を取得するリレーションです。 | `: HasMany` が戻り値の型定義。IDE補完が効きます。 |
 
 ### Book モデル
@@ -426,8 +426,8 @@ class ReviewLike extends Model
 |:---|:---|:---|
 | `protected $casts = ['published_date' => 'date']` | `published_date` を Carbon 日付オブジェクトとして扱えるようにします。 | `$book->published_date->format('Y/m/d')` のように日付操作が可能になります。 |
 | `public function user(): BelongsTo` | この書籍を登録したユーザーを取得します。 | `belongsTo` は「多対1」で、`hasMany` の逆の関係です。 |
-| `public function genres(): BelongsToMany` | 書籍が属するジャンルを取得します。 | 中間テーブル名は命名規則（`book_genre`）に従っているため省略可能です。 |
-| `public function favoritedByUsers(): BelongsToMany` | 書籍をお気に入りしているユーザーを取得します。 | 命名規則と異なるテーブル名（`favorites`）を第二引数で明示しています。 |
+| `public function genres(): BelongsToMany` | 書籍が属するジャンルを取得します。 | 中間テーブル名が Laravel の命名規則（`book_genre`）に従っているため、テーブル名の指定は省略可能です。 |
+| `public function favoritedByUsers(): BelongsToMany` | 書籍をお気に入りしているユーザーを取得します。 | 中間テーブル名が命名規則と異なるテーブル名（`favorites`）のため、第二引数で明示しています。 |
 
 ---
 
