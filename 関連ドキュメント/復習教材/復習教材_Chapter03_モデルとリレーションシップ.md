@@ -40,7 +40,7 @@ sail artisan make:model Genre
 
 `app/Models` ディレクトリに PHP ファイルが作成されます。
 
-> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。中間テーブル `favorites` / `review_likes` へのアクセスは、User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
+> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。`favorites` / `review_likes` テーブルは独立エンティティとしてサロゲートキー（`id`）を持つが、CRUD ロジックは User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。Eloquent の `belongsToMany` は `attach`/`detach`/`toggle`/`sync` を提供するため、独立した Eloquent モデルがなくても十分に CRUD 操作できる。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
 
 ---
 
@@ -464,7 +464,7 @@ class ReviewLike extends Model
 | `Book` | books | belongsTo(User), hasMany(Review), belongsToMany(Genre, User via favorites) | $casts で published_date を date に |
 | `Review` | reviews | belongsTo(User, Book), belongsToMany(User via review_likes) | -- |
 | `Genre` | genres | belongsToMany(Book) | $fillable は `['name']` のみ |
-| `Favorite` | favorites | belongsTo(User, Book) | 中間テーブル用モデル |
-| `ReviewLike` | review_likes | belongsTo(User, Review) | 中間テーブル用モデル |
+
+※ `Favorite` / `ReviewLike` の独立モデルは作成しない（前述の通り `belongsToMany` 経由でアクセスする）。
 
 次のChapterでは、アプリケーションの「入り口」となる認証機能を実装していきます。
