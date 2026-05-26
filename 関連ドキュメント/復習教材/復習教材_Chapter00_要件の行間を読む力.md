@@ -204,72 +204,20 @@
 
 ```mermaid
 erDiagram
-    USERS {
-        bigint id PK
-        string name
-        string email
-        timestamp email_verified_at
-        string password
-        string remember_token
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    BOOKS {
-        bigint id PK
-        bigint user_id FK
-        string title
-        string author
-        string isbn
-        date published_date
-        text description
-        string image_url
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    REVIEWS {
-        bigint id PK
-        bigint user_id FK
-        bigint book_id FK
-        tinyint rating
-        text comment
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    GENRES {
-        bigint id PK
-        string name
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    FAVORITES {
-        bigint user_id PK, FK
-        bigint book_id PK, FK
-    }
-
-    REVIEW_LIKES {
-        bigint user_id PK, FK
-        bigint review_id PK, FK
-    }
-
-    BOOK_GENRE {
-        bigint book_id PK, FK
-        bigint genre_id PK, FK
-    }
-
-    USERS ||--o{ BOOKS : "registers"
-    USERS ||--o{ REVIEWS : "writes"
-    BOOKS ||--o{ REVIEWS : "has"
-    USERS ||--|{ FAVORITES : "favorites"
-    BOOKS ||--|{ FAVORITES : "is favorited by"
-    USERS ||--|{ REVIEW_LIKES : "likes"
-    REVIEWS ||--|{ REVIEW_LIKES : "is liked by"
-    BOOKS }|--|{ BOOK_GENRE : "has"
-    GENRES }|--|{ BOOK_GENRE : "belongs to"
+    users ||--o{ books : "登録する"
+    users ||--o{ reviews : "投稿する"
+    users ||--o{ favorites : "お気に入り"
+    users ||--o{ review_likes : "いいね"
+    users ||--o{ reading_plans : "計画する（応用）"
+    books ||--|{ book_genre : "分類される"
+    books ||--o{ reviews : "レビューされる"
+    books ||--o{ favorites : "お気に入りされる"
+    books ||--o{ reading_plans : "計画対象（応用）"
+    genres ||--o{ book_genre : "含む"
+    reviews ||--o{ review_likes : "いいねされる"
 ```
+
+> **注釈:** `genres` と `book_genre` は `1 対 多`（カーディナリティ）。book 登録時に book_genre レコードは必ず 1 件以上登録されるため。応用機能では `reading_plans` テーブルと、Laravel 標準の通知システムが利用する `notifications` テーブル（モーフィック関係のため ER 図には含めない）を追加する。
 
 ### テーブル定義書
 
@@ -371,6 +319,36 @@ erDiagram
 | 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 
 * **複合ユニーク制約**: `(book_id, genre_id)` の組み合わせは重複不可。
+
+#### 8. reading_plans (読書計画・応用機能)
+
+ユーザーが「いつまでにどの書籍を読み終えたいか」という読書計画を管理するテーブル（応用機能）。
+
+| 論理名 | 物理名（カラム名） | データ型 | NULL 許可 | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ID | `id` | BIGINT | No | PK, AUTO_INCREMENT |
+| ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
+| 書籍ID | `book_id` | BIGINT | No | FK(`books.id`), **CASCADE DELETE** |
+| 目標日 | `target_date` | DATE | No | 読了予定日 |
+| ステータス | `status` | VARCHAR(20) | No | `in_progress` / `completed` / `expired` |
+| 完了日時 | `completed_at` | TIMESTAMP | Yes | 完了時にセット |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
+
+#### 9. notifications (通知・応用機能)
+
+Laravel 標準の通知システムが利用するテーブル（応用機能）。`Notification` クラス（`ReadingPlanReminderNotification` 等）から発行される通知を保存する。
+
+| 論理名 | 物理名（カラム名） | データ型 | NULL 許可 | 制約・備考 |
+| --- | --- | --- | --- | --- |
+| ID | `id` | UUID | No | PK（UUID 主キー） |
+| 通知タイプ | `type` | VARCHAR(255) | No | Notification クラスの FQCN |
+| 対象モデルタイプ | `notifiable_type` | VARCHAR(255) | No | モーフィック関係 |
+| 対象モデルID | `notifiable_id` | BIGINT | No | モーフィック関係 |
+| データ | `data` | TEXT | No | 通知本文の JSON |
+| 既読日時 | `read_at` | TIMESTAMP | Yes | 既読時にセット |
+| 作成日時 | `created_at` | TIMESTAMP | Yes |  |
+| 更新日時 | `updated_at` | TIMESTAMP | Yes |  |
 
 ---
 
