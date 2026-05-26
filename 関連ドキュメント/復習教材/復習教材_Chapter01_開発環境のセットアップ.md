@@ -93,13 +93,13 @@ phpMyAdminを追加する場合、`compose.yaml` の `services:` 配下に以下
 
 ```yaml
     phpmyadmin:
-        image: phpmyadmin/phpmyadmin
+        image: 'phpmyadmin:latest'
         ports:
-            - '8080:80'
+            - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
         environment:
             PMA_HOST: mysql
-            PMA_USER: sail
-            PMA_PASSWORD: password
+            PMA_USER: '${DB_USERNAME}'
+            PMA_PASSWORD: '${DB_PASSWORD}'
         networks:
             - sail
         depends_on:
@@ -125,9 +125,11 @@ source ~/.zshrc
 ```bash
 sail npm install
 sail npm install alpinejs
+sail npm install -D tailwindcss@^3.4.0 @tailwindcss/forms postcss autoprefixer
+sail npx tailwindcss init -p
 ```
 
-> **重要:** Alpine.js は `resources/js/app.js` で使用するため、ここで必ずインストールしてください。
+> **重要:** Alpine.js は `resources/js/app.js` で使用するため、ここで必ずインストールしてください。Tailwind CSS とプラグイン (`@tailwindcss/forms`) もここでまとめてインストールします。
 
 **`tailwind.config.js`:**
 
@@ -193,8 +195,6 @@ export default defineConfig({
 **`resources/js/app.js`:**
 
 ```js
-import './bootstrap';
-
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
@@ -202,7 +202,7 @@ window.Alpine = Alpine;
 Alpine.start();
 ```
 
-> **重要:** この `app.js` は Alpine.js をインポートし起動しています。Bladeテンプレート内の `x-data` や `@click` といったAlpine.jsディレクティブが動作するために必須です。
+> **重要:** この `app.js` は Alpine.js をインポートし起動しています。Blade テンプレート内の `x-data` や `@click` といった Alpine.js ディレクティブが動作するために必須です。模範解答および要件 100% と整合させるため、Laravel デフォルトの `import './bootstrap';` は使わない（削除する）。
 
 Bladeファイルの配置後、フロントエンドをビルドします。
 
@@ -226,6 +226,10 @@ mkdir -p lang/ja
 <?php
 
 return [
+    'required' => ':attributeを入力してください。',
+    'email' => ':attributeはメール形式で入力してください。',
+    'confirmed' => ':attributeと一致しません。',
+    'unique' => 'その:attributeは既に使用されています。',
     'min' => [
         'string' => ':attributeは:min文字以上で入力してください。',
     ],
@@ -323,8 +327,6 @@ Alpine.js は、Bladeテンプレート内で `x-data`、`@click`、`x-show` な
 ### resources/js/app.js
 
 ```js
-import './bootstrap';
-
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
@@ -334,7 +336,6 @@ Alpine.start();
 
 | コード | 解説 |
 |:---|:---|
-| `import './bootstrap'` | Laravel標準の `bootstrap.js`（axios設定など）を読み込みます。 |
 | `import Alpine from 'alpinejs'` | `npm install alpinejs` でインストールした Alpine.js パッケージをインポートします。 |
 | `window.Alpine = Alpine` | グローバルオブジェクトに Alpine を設定し、Blade テンプレートからアクセス可能にします。 |
 | `Alpine.start()` | Alpine.js を起動し、HTML内の `x-data` などのディレクティブを処理開始します。 |
