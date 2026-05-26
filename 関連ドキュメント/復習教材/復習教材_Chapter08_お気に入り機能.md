@@ -106,6 +106,22 @@ class FavoriteController extends Controller
 | `Auth::user()->favoriteBooks()->paginate(10)` | ログインユーザーがお気に入りに登録した書籍を10件ずつ取得します。`favoriteBooks()` で中間テーブルを経由して `books` テーブルからデータを取得し、`paginate(10)` でページネーションを適用します。 |
 | `return view('favorites.index', compact('books'))` | `resources/views/favorites/index.blade.php` ビューを返し、`$books` 変数を渡します。 |
 
+## 6. この実装にたどり着くための調べ方 🧐
+
+| 疑問 | プロンプト例 |
+|:---|:---|
+| （Phase 1B 動作確認時に必要があれば追記） | |
+
+---
+
+## 7. 動作確認 ✅
+
+| 確認項目 | 確認方法 |
+|:---|:---|
+| （Phase 1B 動作確認時に追記） | |
+
+---
+
 ## 8. まとめ ✨
 
 このチャプターでは、お気に入り機能を実装しました。
