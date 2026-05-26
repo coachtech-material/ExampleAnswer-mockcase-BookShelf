@@ -90,6 +90,22 @@ class ReviewLikeController extends Controller
 | 中間テーブル | `favorites` | `review_likes` |
 | 処理 | `toggle($book->id)` | `toggle($review->id)` |
 
+## 6. この実装にたどり着くための調べ方 🧐
+
+| 疑問 | プロンプト例 |
+|:---|:---|
+| （Phase 1B 動作確認時に必要があれば追記） | |
+
+---
+
+## 7. 動作確認 ✅
+
+| 確認項目 | 確認方法 |
+|:---|:---|
+| （Phase 1B 動作確認時に追記） | |
+
+---
+
 ## 8. まとめ ✨
 
 このチャプターでは、レビューいいね機能を実装しました。

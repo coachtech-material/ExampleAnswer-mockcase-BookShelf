@@ -1,6 +1,6 @@
 # Chapter 04: 「エンジンとボディ」 - 認証機能の実装
 
-## 🎯 このChapterの目標
+## 🎯 このセクションで学ぶこと
 
 このChapterでは、アプリケーションの「入り口」となる認証機能を実装します。Fortifyは認証機能の「エンジン」部分だけを提供してくれるパッケージです。車のボディ（UI）は自分たちで自由にデザインし、そこに強力なエンジン（Fortify）を搭載する、というイメージで進めます。
 
@@ -14,7 +14,7 @@
 
 ---
 
-## 📖 背景知識：なぜUI付きパッケージを使わないのか？
+## 1. はじめに 📖
 
 LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を一瞬で実装できる便利なパッケージがあります。しかし、実務では必ずしもそれらの提供するUIが要件に合うとは限りません。むしろ、デザイナーが作成した独自のUIに、Laravelの認証機能を「接続する」場面の方が圧倒的に多いのです。
 
@@ -26,7 +26,7 @@ LaravelにはBreezeやJetstreamといった、UIまで含めて認証機能を�
 
 ---
 
-## 📋 実装の手順
+## 2. 要件の確認 📋
 
 ### 4.1. Laravel Fortifyのインストール
 
@@ -71,7 +71,7 @@ sail artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
 
 ---
 
-## 💭 なぜこう作るのか？
+## 3. 先輩エンジニアの思考プロセス 💭
 
 ### なぜ auth.php に分離するのか？ -- 関心の分離
 
@@ -96,7 +96,7 @@ Fortify のデフォルトバリデーションメッセージは英語です。
 
 ---
 
-## 🚀 コードの実装
+## 4. 実装 🚀
 
 ### 4.4. `routes/auth.php`（新規作成）
 
@@ -289,7 +289,7 @@ class CreateNewUser implements CreatesNewUsers
 
 ---
 
-## 🔍 コードリーディング
+## 5. コードの詳細解説 🔍
 
 ### routes/auth.php
 
@@ -326,7 +326,7 @@ class CreateNewUser implements CreatesNewUsers
 
 ---
 
-## 🧐 調べ方のヒント
+## 6. この実装にたどり着くための調べ方 🧐
 
 分からないことがあった時、AIに聞くプロンプト例を紹介します。
 
@@ -340,7 +340,7 @@ class CreateNewUser implements CreatesNewUsers
 
 ---
 
-## ✅ 動作確認
+## 7. 動作確認 ✅
 
 認証機能が正しく動作するか確認しましょう。
 
@@ -355,7 +355,7 @@ class CreateNewUser implements CreatesNewUsers
 
 ---
 
-## ✨ このChapterのまとめ
+## 8. まとめ ✨
 
 このChapterでは、Laravel Fortify を使って認証のバックエンド処理を構築し、自前のUIと接続しました。
 

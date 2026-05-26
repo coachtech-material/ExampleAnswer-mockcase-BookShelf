@@ -16,7 +16,7 @@
 
 ---
 
-## 📖 先輩エンジニアの思考プロセス
+## 1. はじめに 📖
 
 ### なぜ応用機能のテストも必要なのか？
 
@@ -48,7 +48,7 @@ Chapter 14では、基本的なCRUD操作や認証・認可のテストを行い
 
 ---
 
-## 📋 テストファイルの構成
+## 2. 要件の確認 📋
 
 | テストファイル | テスト対象 |
 |:---|:---|
@@ -62,7 +62,13 @@ Chapter 14では、基本的なCRUD操作や認証・認可のテストを行い
 
 ---
 
-## 🚀 テストコード
+## 3. 先輩エンジニアの思考プロセス 💭
+
+応用機能（高度な検索 / ISBN 検索 / マイ読書レポート / Sanctum 認証 / 読書計画 + 通知 等）をどう設計しテストするかの設計判断は、各機能の Chapter （17-20）で詳述しています。本 Chapter ではテスト戦略（ユニット / フィーチャー / 認可・認証）の観点でテストを構成します。
+
+---
+
+## 4. 実装 🚀
 
 ### 20.1. BookControllerTest の完全版
 
@@ -1426,7 +1432,7 @@ class ReadingPlanAutoExpireBatchTest extends TestCase
 
 ---
 
-## 🔍 テストコードの詳細解説
+## 5. コードの詳細解説 🔍
 
 ### Sanctum::actingAs() の使い方
 
@@ -1471,7 +1477,7 @@ public function test_other_user_cannot_update_book_returns_403_json(): void
 
 ---
 
-## 🧐 テスト実行
+## 6. この実装にたどり着くための調べ方 🧐
 
 ```bash
 # 全テストを実行
@@ -1491,7 +1497,7 @@ sail artisan test tests/Feature/ReadingPlanAutoExpireBatchTest.php
 
 ---
 
-## ✅ テスト結果の確認ポイント
+## 7. 動作確認 ✅
 
 | テスト観点 | 確認内容 |
 |:---|:---|
@@ -1511,7 +1517,7 @@ sail artisan test tests/Feature/ReadingPlanAutoExpireBatchTest.php
 
 ---
 
-## ✨ まとめ
+## 8. まとめ ✨
 
 このChapterでは、応用機能に対する包括的なテストを実装しました。
 
