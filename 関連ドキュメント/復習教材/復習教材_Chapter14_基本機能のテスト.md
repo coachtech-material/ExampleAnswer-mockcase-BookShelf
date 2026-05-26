@@ -59,9 +59,8 @@ Laravelは、テスト実行時に本番のデータベースを汚さないよ�
     <env name="APP_ENV" value="testing"/>
     <env name="BCRYPT_ROUNDS" value="4"/>
     <env name="CACHE_DRIVER" value="array"/>
-    <!-- ↓ この2行に注目！ -->
-    <env name="DB_CONNECTION" value="sqlite"/>
-    <env name="DB_DATABASE" value=":memory:"/>
+    <!-- ↓ この行に注目！ -->
+    <env name="DB_DATABASE" value="testing"/>
     <env name="MAIL_MAILER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SESSION_DRIVER" value="array"/>
@@ -69,8 +68,8 @@ Laravelは、テスト実行時に本番のデータベースを汚さないよ�
 </php>
 ```
 
-> **💡 ポイント：インメモリデータベース**
-> `DB_CONNECTION` を `sqlite` に、`DB_DATABASE` を `:memory:` に設定することで、テスト実行時に**インメモリデータベース**が使用されます。これは、実際のファイルではなく、コンピュータのメモリ上に一時的にデータベースを構築する方式です。ディスクI/Oが発生しないため、**テストが非常に高速に実行できる**という大きなメリットがあります。
+> **💡 ポイント：テスト専用データベース**
+> `DB_DATABASE` を `testing` に設定することで、テスト実行時に**テスト専用のデータベース（`testing`）** が使用されます。アプリケーションの開発用 DB（`bookshelf`）と分離することで、テスト実行中にアプリケーションのデータが消えてしまうのを防ぎます。`compose.yaml` 内の `mysql` サービスは初回起動時に `bookshelf` と `testing` の 2 つのデータベースを自動作成するように設定されています。
 
 ### RefreshDatabase トレイト
 
