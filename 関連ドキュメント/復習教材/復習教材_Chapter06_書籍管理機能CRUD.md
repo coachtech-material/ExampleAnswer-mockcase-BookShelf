@@ -30,11 +30,11 @@ CRUD（クラッド）は、データの **Create（作成）・Read（読み取
 
 | 操作 | HTTPメソッド | URI | コントローラー@メソッド | 認証 | 認可 |
 |:---|:---|:---|:---|:---|:---|
-| 書籍一覧表示 | GET | `/` または `/books` | BookController@index | 不要 | — |
-| 書籍登録フォーム | GET | `/books/create` | BookController@create | 必要 | — |
+| 書籍一覧画面表示 | GET | `/` または `/books` | BookController@index | 不要 | — |
+| 書籍登録画面表示 | GET | `/books/create` | BookController@create | 必要 | — |
 | 書籍登録処理 | POST | `/books` | BookController@store | 必要 | — |
-| 書籍詳細表示 | GET | `/books/{book}` | BookController@show | 不要 | — |
-| 書籍編集フォーム | GET | `/books/{book}/edit` | BookController@edit | 必要 | BookPolicy@update（作成者のみ） |
+| 書籍詳細画面表示 | GET | `/books/{book}` | BookController@show | 不要 | — |
+| 書籍編集画面表示 | GET | `/books/{book}/edit` | BookController@edit | 必要 | BookPolicy@update（作成者のみ） |
 | 書籍更新処理 | PUT | `/books/{book}` | BookController@update | 必要 | BookPolicy@update（作成者のみ） |
 | 書籍削除処理 | DELETE | `/books/{book}` | BookController@destroy | 必要 | BookPolicy@delete（作成者のみ） |
 
@@ -321,7 +321,7 @@ class StoreBookRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
-            'isbn' => ['nullable', 'string', 'size:13', 'unique:books'],
+            'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
             'published_date' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'image_url' => ['nullable', 'url', 'max:255'],
@@ -597,7 +597,7 @@ public function authorize(): bool
 
 ```php
 // StoreBookRequest: 新規登録は全レコードを対象にチェック
-'isbn' => ['nullable', 'string', 'size:13', 'unique:books'],
+'isbn' => ['required', 'string', 'size:13', 'unique:books,isbn'],
 
 // UpdateBookRequest: 自分自身を除外してチェック
 'isbn' => ['nullable', 'string', 'size:13', Rule::unique('books')->ignore($this->book)],
