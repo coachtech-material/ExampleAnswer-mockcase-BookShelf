@@ -214,10 +214,11 @@ sail npm run build
 
 `config/app.php` で `'locale' => 'ja'` に変更します。
 
-`lang/ja/` ディレクトリを作成し、以下3ファイルを配置します。
+`lang/ja/` ディレクトリと以下3ファイルを作成します。
 
 ```bash
 mkdir -p lang/ja
+touch lang/ja/validation.php lang/ja/auth.php lang/ja/passwords.php
 ```
 
 **`lang/ja/validation.php`:**
