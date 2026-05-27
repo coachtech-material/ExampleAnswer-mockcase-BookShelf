@@ -320,9 +320,9 @@ class ReviewModelTest extends TestCase
 
 次に、ユーザーの操作を模倣して、各機能が全体として正しく動作するかを検証するFeatureテストを作成します（テストファイルは本 Chapter 冒頭で一括 `touch` 済みのため、ここでは内容を埋めるだけです）。
 
-### BookTest (書籍管理機能)
+### BookControllerTest (書籍管理機能)
 
-`tests/Feature/BookTest.php`
+`tests/Feature/BookControllerTest.php`
 
 ```php
 <?php
@@ -335,7 +335,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class BookTest extends TestCase
+class BookControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -478,6 +478,19 @@ class BookTest extends TestCase
         $this->actingAs($otherUser)
             ->get(route('books.edit', $book))
             ->assertForbidden();
+    }
+
+    public function test_non_owner_cannot_delete_book(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($otherUser)
+            ->delete(route('books.destroy', $book))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
     }
 
     private function validBookData(array $overrides = []): array
@@ -816,6 +829,18 @@ class GenreTest extends TestCase
 - **`assertDatabaseMissing($table, $data)`**: レコードが存在しないことを確認します。
 - **`assertSessionHasErrors($keys)`**: セッションに指定したキーのバリデーションエラーが含まれていることを確認します。
 
+### その他の Feature テスト（完全手順書を参照）
+
+本 Chapter 冒頭の `touch` で作成した以下のテストファイルは、コード詳細を本 Chapter 内では割愛します。**完全手順書 Step 14** の該当節を参照して内容を埋めてください:
+
+| ファイル | テスト対象 |
+|:---|:---|
+| `tests/Feature/BookRequestTest.php` | 書籍 FormRequest のバリデーションテスト（必須・桁数・ジャンル必須等） |
+| `tests/Feature/RankingTest.php` | ランキング機能（評価降順表示・レビューなし書籍は非表示） |
+| `tests/Feature/RedirectIfAuthenticatedTest.php` | 認証ミドルウェアのリダイレクト挙動 |
+| `tests/Feature/ReviewPolicyTest.php` | レビュー Policy の認可テスト（投稿者のみ編集 / 削除可） |
+| `tests/Feature/Api/V1/BookApiTest.php` | 公開 API（書籍 CRUD・認証なし）の Feature テスト |
+
 ---
 
 ## 14.5. テストの実行
@@ -829,7 +854,7 @@ class GenreTest extends TestCase
 sail artisan test
 
 # 特定のテストファイルを実行
-sail artisan test tests/Feature/BookTest.php
+sail artisan test tests/Feature/BookControllerTest.php
 
 # 特定のテストメソッドを実行
 sail artisan test --filter=test_authenticated_user_can_create_book
