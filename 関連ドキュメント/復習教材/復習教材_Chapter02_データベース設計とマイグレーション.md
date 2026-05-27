@@ -29,19 +29,26 @@
 
 ### 2.1. マイグレーションファイルの作成
 
-まずは、各テーブルの設計図となるマイグレーションファイルを作成します。
+まずは、各テーブルの設計図となるマイグレーションファイルを作成します。Basic 機能用の 6 テーブルに加え、応用機能（読書計画機能 + リマインダー通知）用の 2 テーブルもここでまとめて作成します。
 
 ```bash
+# Basic 機能用テーブル
 sail artisan make:migration create_books_table
 sail artisan make:migration create_genres_table
 sail artisan make:migration create_book_genre_table
 sail artisan make:migration create_reviews_table
 sail artisan make:migration create_favorites_table
 sail artisan make:migration create_review_likes_table
+
+# 応用機能用テーブル
+sail artisan make:migration create_reading_plans_table
+sail artisan notifications:table  # Laravel 標準コマンドで notifications テーブル migration を生成
 ```
 
 > **重要：マイグレーションのタイムスタンプ順序について**
 > `make:migration` を連続実行するとタイムスタンプが同一になり、ファイル名のアルファベット順で実行される場合があります。`book_genre` テーブルは `genres` テーブルへの外部キーを持つため、必ず **`genres` のマイグレーションが先に実行される**ようタイムスタンプの順序を確認してください。もし問題が発生した場合は、ファイル名のタイムスタンプ部分を手動で修正して正しい順序にしてください。
+
+> **応用機能編との関係:** `reading_plans` / `notifications` テーブルは応用機能（Chapter 20 読書計画 + リマインダー通知）で使用しますが、DB 系の Chapter にまとめて記載しています。Chapter 20 段階ではマイグレーションファイル作成・記述は省略し、Controller / Notification / Console Command のみ実装します。
 
 ### 2.2. マイグレーションファイルへの記述
 
@@ -252,6 +259,80 @@ return new class extends Migration
     }
 };
 ```
+
+### 2.2.7. `create_reading_plans_table`（応用機能用）
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_reading_plans_table.php`
+
+> **設計方針:** 読書計画のステータス（進行中 / 完了 / 期限切れ）は `string(20)` で保持し、Eloquent 側で PHP Enum (`ReadingPlanStatus`) にキャストする設計（Chapter 20 で実装）。`(user_id, status)` の複合インデックスは一覧画面の status 絞り込みを高速化、`target_date` 単独インデックスは日次バッチの `whereDate('target_date', ...)` を高速化するために付与する。
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('reading_plans', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->date('target_date');
+            $table->string('status', 20)->default('in_progress');
+            $table->timestamp('completed_at')->nullable();
+            $table->timestamps();
+
+            $table->index(['user_id', 'status']);
+            $table->index('target_date');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('reading_plans');
+    }
+};
+```
+
+### 2.2.8. `create_notifications_table`（応用機能用）
+
+`database/migrations/YYYY_MM_DD_XXXXXX_create_notifications_table.php`
+
+通知テーブルは Laravel 標準の `php artisan notifications:table` コマンドで生成されます。生成された内容をそのまま採用し、任意改変はしません。
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->morphs('notifiable');
+            $table->text('data');
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('notifications');
+    }
+};
+```
+
+> **解説:** 主キーは UUID。`type` には通知クラスの完全修飾名、`notifiable` はポリモーフィック（`notifiable_id` / `notifiable_type`）、`data` は通知ペイロードの JSON 文字列を保持します。`Notifiable` トレイトの `markAsRead()` で `read_at` が更新されます。
 
 ### 2.3. マイグレーションの実行
 
