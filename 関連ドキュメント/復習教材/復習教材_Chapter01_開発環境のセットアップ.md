@@ -68,7 +68,7 @@ docker run --rm \
 
 ### 1.3. .env ファイルの設定
 
-`.env` ファイルのデータベース接続情報を確認・修正します。
+`sail:install` 直後の `.env` は `DB_DATABASE=laravel` になっているので、以下のように `bookshelf` に書き換えます（他項目も合わせて確認）。
 
 ```dotenv
 DB_CONNECTION=mysql
