@@ -246,7 +246,20 @@ return response()->json([
 
 ## 5. コードの詳細解説 🔍
 
-（Phase 1B 動作確認時にコード解説を追記予定）
+### `Http::get()` の使い方
+
+Laravel の `Http` ファサードは Guzzle ベースの HTTP クライアントで、外部 API への GET/POST を簡潔に書ける。`Http::get($url, $query)` の戻り値は `Response` オブジェクトで、`->json()` で JSON ボディを連想配列として取り出せる。`->ok()` / `->failed()` でステータス判定も可能。
+
+### エラー分岐の 3 段階
+
+ISBN 検索 API では結果を 3 段階に分けて処理する:
+1. **422 (Validation Error)**: ISBN フォーマットが不正（13 桁でない等）。FormRequest で検証する。
+2. **404 (Not Found)**: API は成功したが該当書籍が見つからない。`$response->json('totalItems') === 0` で判定。
+3. **500 (Server Error)**: API 通信に失敗（ネットワークエラー / API キー不正 / Google 側障害）。try/catch で例外を捕捉して JSON エラーを返す。
+
+### `config('services.google_books.api_key')`
+
+`config/services.php` の `'google_books' => ['api_key' => env('GOOGLE_BOOKS_API_KEY')]` を経由して `.env` の値を取得する。直接 `env()` を呼ぶより `config()` 経由が推奨（`config:cache` でキャッシュ可能・テスト時に上書きしやすい等）。
 
 ---
 
@@ -296,7 +309,12 @@ fetch async await 使い方
 
 | 確認項目 | 確認方法 |
 |:---|:---|
-| （Phase 1B 動作確認時に追記） | |
+| 正常系: ISBN で書籍情報取得 | 書籍登録フォームで実在する ISBN（例: `9784297124219`）を入力 → 「ISBN 検索」ボタン押下 → タイトル / 著者 / 出版日等が自動入力される |
+| 422: 13 桁でない ISBN | `123` のような短い値を入力 → エラーメッセージ「ISBN は 13 桁で入力してください」が表示される |
+| 404: 存在しない ISBN | `9999999999999` を入力 → 「書籍が見つかりませんでした」が表示される |
+| 500: API キー未設定の通信エラー | `.env` の `GOOGLE_BOOKS_API_KEY` を一時的に空にして検索 → 「API 通信エラーが発生しました」が表示される |
+| ローディング表示 | 検索中はボタンが無効化され、「検索中...」表示になる |
+| 未認証時のアクセス | ログアウト状態で `/books/isbn/{isbn}` を叩くとログイン画面にリダイレクト |
 
 ---
 

@@ -100,7 +100,9 @@ public function show(Genre $genre): View
 
 | 疑問 | プロンプト例 |
 |:---|:---|
-| （Phase 1B 動作確認時に必要があれば追記） | |
+| Route Model Binding で `Genre $genre` を受け取る仕組み | 「Laravel で `Route::get('/genres/{genre}', ...)` のように URL に ID を埋め込み、コントローラで `function show(Genre $genre)` のようにモデルインスタンスとして受け取れる仕組み（Route Model Binding）を解説してください。」 |
+| `with('genres')` の N+1 対策 | 「ジャンル詳細画面でそのジャンルに属する書籍を表示するとき、各書籍が複数ジャンルを持つので Eager Loading が必要です。`Genre::with('books')` と `Book::with('genres')` のどちらを使うべきか、目的別に説明してください。」 |
+| 認証不要ルートの設計 | 「`/genres/{genre}` のように『参照だけは認証不要』なルートを設計する場合、`Route::middleware('auth')->group(...)` から外す方針で良いですか？セキュリティ観点で気をつけることはありますか？」 |
 
 ---
 
@@ -108,7 +110,10 @@ public function show(Genre $genre): View
 
 | 確認項目 | 確認方法 |
 |:---|:---|
-| （Phase 1B 動作確認時に追記） | |
+| ジャンル詳細画面の表示 | `/genres/{id}` （例: `/genres/1`）にアクセスすると、ジャンル名とそのジャンルに属する書籍一覧が表示される |
+| 認証不要 | ログアウト状態でも `/genres/{id}` にアクセス可能 |
+| 紐付く書籍が無いジャンル | レビュー / 書籍が無いジャンルでも画面が正常に表示される（空メッセージや 0 件表示） |
+| 不正な ID | `/genres/9999` のように存在しない ID にアクセスすると 404 が返ること |
 
 ---
 
