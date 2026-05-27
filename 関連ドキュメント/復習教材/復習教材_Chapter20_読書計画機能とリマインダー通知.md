@@ -181,7 +181,17 @@ public function scopeExpired(Builder $query): Builder
 }
 ```
 
-呼び出し: `Auth::user()->readingPlans()->active()->get()`
+呼び出すために、`User` モデル側にも逆向きのリレーションを追記する:
+
+```php
+// app/Models/User.php
+public function readingPlans(): HasMany
+{
+    return $this->hasMany(ReadingPlan::class);
+}
+```
+
+これで `Auth::user()->readingPlans()->active()->get()` のように呼び出せる。リレーション追記を忘れると「読書計画」画面で `Call to undefined method App\Models\User::readingPlans()` エラーが発生する。
 
 ### 19.3. destroy で Transaction を使う（複数 SQL の場面）
 
