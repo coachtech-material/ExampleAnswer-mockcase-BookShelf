@@ -1,4 +1,4 @@
-# Chapter 12: もう一つのCRUD - ジャンル管理機能を実装する
+# Chapter 11: もう一つのCRUD - ジャンル管理機能を実装する
 
 ## 🎯 このセクションで学ぶこと
 
@@ -15,7 +15,7 @@
 
 書籍管理とジャンル管理は、技術的にはほぼ同じCRUDパターンです。
 
-| 機能 | 書籍管理（Chapter 06） | ジャンル管理（Chapter 12） |
+| 機能 | 書籍管理（Chapter 06） | ジャンル管理（Chapter 11） |
 |:---|:---|:---|
 | 一覧表示 | `BookController@index` | `GenreController@index` |
 | 新規作成 | `BookController@create/store` | `GenreController@create/store` |
@@ -163,7 +163,13 @@ class UpdateGenreRequest extends FormRequest
 
 ### 4.2. GenreControllerの完全実装
 
-Chapter 11 で `show` メソッドのみを実装していた `GenreController` に、残りのCRUDメソッドを追加します。
+`GenreController` を新規作成し、CRUD メソッド（一覧 / 作成 / 更新 / 削除）と `show`（ジャンル別書籍一覧）メソッドを実装します。
+
+```bash
+sail artisan make:controller GenreController
+```
+
+`show` メソッドは「特定ジャンルに属する書籍を一覧表示する」機能で、ジャンル別一覧として **Chapter 12 で解説・動作確認**します。本 Chapter ではコードに含めて先行実装します。
 
 #### `app/Http/Controllers/GenreController.php`
 
@@ -250,7 +256,7 @@ class GenreController extends Controller
 | `index(): View` | ジャンル一覧を表示。`withCount('books')` で各ジャンルの書籍数も取得。 | `$genre->books_count` で書籍数にアクセス可能。 |
 | `create(): View` | ジャンル作成フォームを表示。 | シンプルにビューを返すだけ。 |
 | `store(StoreGenreRequest $request): RedirectResponse` | バリデーション済みデータでジャンルを作成。 | `$request->validated()` をそのまま `create()` に渡せる。 |
-| `show(Genre $genre): View` | Chapter 11 で実装済み。ジャンル別書籍一覧を表示。 | Eager Loading + ページネーション。 |
+| `show(Genre $genre)` | ジャンル別書籍一覧を表示。詳細は Chapter 12 で解説。 | Eager Loading + ページネーション。 |
 | `edit(Genre $genre): View` | ジャンル編集フォームを表示。 | 編集対象のジャンルをビューに渡す。 |
 | `update(UpdateGenreRequest $request, Genre $genre): RedirectResponse` | バリデーション済みデータでジャンルを更新。 | `$genre->update()` でモデルを更新。 |
 
