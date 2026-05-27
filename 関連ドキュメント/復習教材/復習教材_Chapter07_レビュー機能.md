@@ -113,12 +113,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReviewRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
@@ -126,7 +126,7 @@ class StoreReviewRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'rating.required' => '評価は必須です。',
@@ -153,12 +153,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateReviewRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
@@ -166,7 +166,7 @@ class UpdateReviewRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'rating.required' => '評価は必須です。',
@@ -202,7 +202,7 @@ use Illuminate\View\View;
 
 class ReviewController extends Controller
 {
-    public function store(StoreReviewRequest $request, Book $book): RedirectResponse
+    public function store(StoreReviewRequest $request, Book $book)
     {
         $book->reviews()->create([
             'user_id' => Auth::id(),
@@ -213,14 +213,14 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $book)->with('success', 'レビューを投稿しました。');
     }
 
-    public function edit(Review $review): View
+    public function edit(Review $review)
     {
         $this->authorize('update', $review);
 
         return view('reviews.edit', compact('review'));
     }
 
-    public function update(UpdateReviewRequest $request, Review $review): RedirectResponse
+    public function update(UpdateReviewRequest $request, Review $review)
     {
         $this->authorize('update', $review);
 
@@ -232,7 +232,7 @@ class ReviewController extends Controller
         return redirect()->route('books.show', $review->book)->with('success', 'レビューを更新しました。');
     }
 
-    public function destroy(Review $review): RedirectResponse
+    public function destroy(Review $review)
     {
         $this->authorize('delete', $review);
 
@@ -260,12 +260,12 @@ use App\Models\User;
 
 class ReviewPolicy
 {
-    public function update(User $user, Review $review): bool
+    public function update(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }
 
-    public function delete(User $user, Review $review): bool
+    public function delete(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }

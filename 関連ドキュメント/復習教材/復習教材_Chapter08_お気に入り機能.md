@@ -64,14 +64,14 @@ use Illuminate\View\View;
 
 class FavoriteController extends Controller
 {
-    public function index(): View
+    public function index()
     {
         $books = Auth::user()->favoriteBooks()->paginate(10);
 
         return view('favorites.index', compact('books'));
     }
 
-    public function toggle(Book $book): RedirectResponse
+    public function toggle(Book $book)
     {
         Auth::user()->favoriteBooks()->toggle($book->id);
 

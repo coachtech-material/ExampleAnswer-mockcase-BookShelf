@@ -209,12 +209,12 @@ use App\Models\User;
 
 class BookPolicy
 {
-    public function update(User $user, Book $book): bool
+    public function update(User $user, Book $book)
     {
         return $user->id === $book->user_id;
     }
 
-    public function delete(User $user, Book $book): bool
+    public function delete(User $user, Book $book)
     {
         return $user->id === $book->user_id;
     }
@@ -233,12 +233,12 @@ use App\Models\User;
 
 class ReviewPolicy
 {
-    public function update(User $user, Review $review): bool
+    public function update(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }
 
-    public function delete(User $user, Review $review): bool
+    public function delete(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }
@@ -272,7 +272,7 @@ class AuthServiceProvider extends ServiceProvider
         Review::class => ReviewPolicy::class,
     ];
 
-    public function boot(): void
+    public function boot()
     {
         //
     }
@@ -296,12 +296,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'title' => ['required', 'string', 'max:255'],
@@ -315,7 +315,7 @@ class StoreBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'title.required' => 'タイトルは必須です。',
@@ -357,12 +357,12 @@ use Illuminate\Validation\Rule;
 
 class UpdateBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'title' => ['required', 'string', 'max:255'],
@@ -376,7 +376,7 @@ class UpdateBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'title.required' => 'タイトルは必須です。',
@@ -424,7 +424,7 @@ use Illuminate\View\View;
 
 class BookController extends Controller
 {
-    public function index(): View
+    public function index()
     {
         $books = Book::with('genres')->latest()->paginate(10);
         $genres = Genre::orderBy('name')->get();
@@ -432,14 +432,14 @@ class BookController extends Controller
         return view('books.index', compact('books', 'genres'));
     }
 
-    public function create(): View
+    public function create()
     {
         $genres = Genre::orderBy('name')->get();
 
         return view('books.create', compact('genres'));
     }
 
-    public function store(StoreBookRequest $request): RedirectResponse
+    public function store(StoreBookRequest $request)
     {
         $validated = $request->validated();
         $bookData = collect($validated)->except('genres')->toArray();
@@ -449,14 +449,14 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍を登録しました。');
     }
 
-    public function show(Book $book): View
+    public function show(Book $book)
     {
         $book->load(['reviews.user', 'reviews.likedByUsers', 'genres']);
 
         return view('books.show', compact('book'));
     }
 
-    public function edit(Book $book): View
+    public function edit(Book $book)
     {
         $this->authorize('update', $book);
         $genres = Genre::orderBy('name')->get();
@@ -464,7 +464,7 @@ class BookController extends Controller
         return view('books.edit', compact('book', 'genres'));
     }
 
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    public function update(UpdateBookRequest $request, Book $book)
     {
         $this->authorize('update', $book);
         $validated = $request->validated();
@@ -475,7 +475,7 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
     }
 
-    public function destroy(Book $book): RedirectResponse
+    public function destroy(Book $book)
     {
         $this->authorize('delete', $book);
         $book->delete();
@@ -542,7 +542,7 @@ $book->delete();
 #### `authorize()` メソッド
 
 ```php
-public function authorize(): bool
+public function authorize()
 {
     return true;
 }
@@ -570,7 +570,7 @@ FormRequest に `messages()` を定義すると、Laravelのデフォルトメ�
 ### BookPolicy — 認可ロジック
 
 ```php
-public function update(User $user, Book $book): bool
+public function update(User $user, Book $book)
 {
     return $user->id === $book->user_id;
 }
