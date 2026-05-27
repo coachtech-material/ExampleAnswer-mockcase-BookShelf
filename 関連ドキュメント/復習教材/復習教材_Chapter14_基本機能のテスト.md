@@ -835,7 +835,9 @@ sail artisan test tests/Feature/BookTest.php
 sail artisan test --filter=test_authenticated_user_can_create_book
 ```
 
-コマンドを実行すると、PHPUnitがテストを一つずつ実行し、結果をコンソールに表示します。全てのテストが緑色の `PASS` で表示されれば、アプリケーションの基本機能が正しく動作していることの証明になります。
+コマンドを実行すると、PHPUnitがテストを一つずつ実行し、結果をコンソールに表示します。
+
+> **注:** 本 Chapter 完了時点ではまだ `reports.index` ルート（応用機能編 Chapter 19 で実装）が未定義のため、`sail artisan test` を実行するとビューのレンダリングでエラーになります。テストファイル作成だけが本 Chapter のゴールであり、**実行は Chapter 19 完了後**（推奨は Chapter 21 で応用テストを追加した後）に行います。全テストが緑色の `PASS` で表示されれば、アプリケーション全体が正しく動作していることの証明になります。
 
 ---
 
