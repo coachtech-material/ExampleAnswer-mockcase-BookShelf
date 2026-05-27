@@ -9,7 +9,8 @@ Chapter 02で作成したデータベースの「テーブル」を、Laravelの
 | モデルの役割 | なぜ直接 SQL を書くのではなく、Eloquent ORM（PHP のオブジェクト）を通じてデータベースを操作するのか |
 | リレーションシップの定義 | モデル間の関連（`hasMany`, `belongsTo`, `belongsToMany`）を定義し、関連データを取得・操作できるようにする |
 | マスアサインメント | `$fillable` プロパティを設定し、意図しないデータがDBに保存されるのを防ぐ |
-| PHPDoc と型定義 | `@var array<int, string>` やメソッドの戻り値型でコードの意図を明確化 |
+
+> **注:** リレーションメソッドへの戻り値型宣言（`: HasMany` 等）・PHPDoc・`$casts` といった応用品質コードは、Chapter 15「既存コードへの品質強化」で一括追加する。本 Chapter では Basic 段階の素直なモデル定義に絞る。
 
 ---
 
@@ -22,7 +23,6 @@ Chapter 02で作成したデータベースの「テーブル」を、Laravelの
 | SQLを直接書くのは面倒で、間違いやすい | **Eloquentモデル**を使い、PHPのオブジェクトとしてDBを操作する | `User`が`users`テーブル、`Book`が`books`テーブルに対応し、直感的に扱える。 |
 | 関連するデータを取得するのが大変 | **リレーションシップ**をモデルに定義する | `$user->books`のように、プロパティにアクセスする感覚で関連データを取得できる。 |
 | フォームから送られてきた不要なデータまでDBに保存されてしまう | **マスアサインメント（`$fillable`）**で、保存を許可するカラムを明示的に指定する | セキュリティの基本。意図しないカラム（例：`is_admin`）が勝手に更新されるのを防ぐ。 |
-| メソッドが何を返すか分かりにくい | **戻り値の型定義**と**PHPDoc**を追加する | `public function books(): HasMany` のように型を明記し、IDE補完も効くようになる。 |
 
 ---
 
@@ -40,7 +40,7 @@ sail artisan make:model Genre
 
 `app/Models` ディレクトリに PHP ファイルが作成されます。
 
-> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。`favorites` / `review_likes` テーブルは独立エンティティとしてサロゲートキー（`id`）を持つが、CRUD ロジックは User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。Eloquent の `belongsToMany` は `attach`/`detach`/`toggle`/`sync` を提供するため、独立した Eloquent モデルがなくても十分に CRUD 操作できる。応用機能で必要な `ReadingPlan` モデルは Chapter 21（読書計画機能 + リマインダー通知）で作成する。
+> **注意:** `Favorite` モデルと `ReviewLike` モデルは作成しない。`favorites` / `review_likes` テーブルは独立エンティティとしてサロゲートキー（`id`）を持つが、CRUD ロジックは User / Book / Review に定義した `belongsToMany` リレーション経由で行う（`favoriteBooks` / `favoritedByUsers` / `likedReviews` / `likedByUsers`）。Eloquent の `belongsToMany` は `attach`/`detach`/`toggle`/`sync` を提供するため、独立した Eloquent モデルがなくても十分に CRUD 操作できる。応用機能で必要な `ReadingPlan` モデルは Chapter 20（読書計画機能 + リマインダー通知）で作成する。
 
 ---
 
@@ -57,10 +57,6 @@ sail artisan make:model Genre
 
 このペアを意識すると、リレーションの定義がスムーズになります。
 
-### HasApiTokens トレイトの先行追加
-
-`User` モデルに `HasApiTokens` トレイトを追加していますが、これは Step 18（Sanctum認証API）で使用するための先行準備です。
-
 ---
 
 ## 4. 実装 🚀
@@ -75,42 +71,24 @@ sail artisan make:model Genre
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -119,39 +97,29 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * ユーザーが登録した書籍
-     */
-    public function books(): HasMany
+    public function books()
     {
         return $this->hasMany(Book::class);
     }
 
-    /**
-     * ユーザーが投稿したレビュー
-     */
-    public function reviews(): HasMany
+    public function reviews()
     {
         return $this->hasMany(Review::class);
     }
 
-    /**
-     * ユーザーがお気に入りに登録した書籍
-     */
-    public function favoriteBooks(): BelongsToMany
+    public function favoriteBooks()
     {
         return $this->belongsToMany(Book::class, 'favorites');
     }
 
-    /**
-     * ユーザーがいいねしたレビュー
-     */
-    public function likedReviews(): BelongsToMany
+    public function likedReviews()
     {
         return $this->belongsToMany(Review::class, 'review_likes');
     }
 }
 ```
+
+> **応用機能編との関係:** `HasApiTokens` トレイトの追加は Chapter 16（Sanctum 認証層）で行う。Chapter 03 段階では追加しない。リレーションメソッドへの戻り値型宣言（`: HasMany` 等）と PHPDoc は Chapter 15（既存コードへの品質強化）で一括追加する。
 
 ### 3.2.2. `Book` モデル
 
@@ -164,19 +132,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Book extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'user_id',
         'title',
@@ -187,48 +147,29 @@ class Book extends Model
         'image_url',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'published_date' => 'date',
-    ];
-
-    /**
-     * 書籍を登録したユーザー
-     */
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * 書籍に対するレビュー
-     */
-    public function reviews(): HasMany
+    public function reviews()
     {
         return $this->hasMany(Review::class);
     }
 
-    /**
-     * 書籍のジャンル
-     */
-    public function genres(): BelongsToMany
+    public function genres()
     {
         return $this->belongsToMany(Genre::class);
     }
 
-    /**
-     * 書籍をお気に入りに登録したユーザー
-     */
-    public function favoritedByUsers(): BelongsToMany
+    public function favoritedByUsers()
     {
         return $this->belongsToMany(User::class, 'favorites');
     }
 }
 ```
+
+> **応用機能編との関係:** `$casts` への `published_date => 'date'` 追加、リレーションメソッドの戻り値型宣言と PHPDoc は Chapter 15（既存コードへの品質強化）で一括追加する。
 
 ### 3.2.3. `Review` モデル
 
@@ -241,18 +182,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Review extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'user_id',
         'book_id',
@@ -260,26 +194,17 @@ class Review extends Model
         'comment',
     ];
 
-    /**
-     * レビューを投稿したユーザー
-     */
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * レビュー対象の書籍
-     */
-    public function book(): BelongsTo
+    public function book()
     {
         return $this->belongsTo(Book::class);
     }
 
-    /**
-     * レビューにいいねしたユーザー
-     */
-    public function likedByUsers(): BelongsToMany
+    public function likedByUsers()
     {
         return $this->belongsToMany(User::class, 'review_likes');
     }
@@ -297,25 +222,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Genre extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'name',
-    ];
+    protected $fillable = ['name'];
 
-    /**
-     * ジャンルに属する書籍
-     */
-    public function books(): BelongsToMany
+    public function books()
     {
         return $this->belongsToMany(Book::class);
     }
@@ -330,20 +244,21 @@ class Genre extends Model
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `use HasApiTokens, HasFactory, Notifiable;` | Sanctum API認証、ファクトリ、通知機能を有効化するトレイトです。 | `HasApiTokens` は Step 18 で使用します。 |
+| `use HasFactory, Notifiable;` | ファクトリと通知機能を有効化するトレイトです。 | `HasApiTokens` トレイトは Chapter 16（Sanctum 認証層）で追加します。 |
 | `protected $fillable = [...]` | `name`, `email`, `password` への一括代入を許可します。 | `$fillable` はマスアサインメントの「ホワイトリスト」です。 |
 | `protected $hidden = [...]` | `password` と `remember_token` をJSON出力時に隠します。 | `$hidden` は情報漏洩を防ぐ「ブラックリスト」です。 |
 | `protected function casts(): array` | `email_verified_at` を Carbon 日付オブジェクトに、`password` をハッシュ化して保存するためのキャストを設定します。 | Laravel の属性キャスト機能です。 |
-| `public function books(): HasMany` | ユーザーが登録した書籍の一覧を取得するリレーションです。 | `: HasMany` が戻り値の型定義。IDE補完が効きます。 |
+| `public function books()` | ユーザーが登録した書籍の一覧を取得するリレーションです。 | `hasMany` は「1対多」のリレーションです。 |
 
 ### Book モデル
 
 | コード / 構文 | 値・機能の解説 | 構文・背景の解説 |
 |:---|:---|:---|
-| `protected $casts = ['published_date' => 'date']` | `published_date` を Carbon 日付オブジェクトとして扱えるようにします。 | `$book->published_date->format('Y/m/d')` のように日付操作が可能になります。 |
-| `public function user(): BelongsTo` | この書籍を登録したユーザーを取得します。 | `belongsTo` は「多対1」で、`hasMany` の逆の関係です。 |
-| `public function genres(): BelongsToMany` | 書籍が属するジャンルを取得します。 | 中間テーブル名が Laravel の命名規則（`book_genre`）に従っているため、テーブル名の指定は省略可能です。 |
-| `public function favoritedByUsers(): BelongsToMany` | 書籍をお気に入りしているユーザーを取得します。 | 中間テーブル名が命名規則と異なるテーブル名（`favorites`）のため、第二引数で明示しています。 |
+| `public function user()` | この書籍を登録したユーザーを取得します。 | `belongsTo` は「多対1」で、`hasMany` の逆の関係です。 |
+| `public function genres()` | 書籍が属するジャンルを取得します。 | 中間テーブル名が Laravel の命名規則（`book_genre`）に従っているため、テーブル名の指定は省略可能です。 |
+| `public function favoritedByUsers()` | 書籍をお気に入りしているユーザーを取得します。 | 中間テーブル名が命名規則と異なるテーブル名（`favorites`）のため、第二引数で明示しています。 |
+
+> **応用機能編との関係:** `$casts = ['published_date' => 'date']` の追加は Chapter 15（既存コードへの品質強化）で行う。Chapter 03 段階では `$casts` は定義しない。
 
 ---
 
@@ -355,7 +270,6 @@ class Genre extends Model
 |:---|:---|
 | リレーションの種類が分からない | 「Laravel の hasMany, belongsTo, belongsToMany の違いを、具体的なテーブル例で教えてください。」 |
 | $fillable と $guarded の違い | 「Laravel のマスアサインメント保護で、$fillable と $guarded のどちらを使うべきですか？それぞれのメリット・デメリットを教えてください。」 |
-| PHPDoc の書き方 | 「Laravel モデルの PHPDoc で @var array<int, string> と書く意味を教えてください。」 |
 | casts の使い方 | 「Laravel モデルの $casts プロパティと casts() メソッドの違いを教えてください。'password' => 'hashed' は何をしますか？」 |
 
 ---
@@ -376,8 +290,8 @@ class Genre extends Model
 
 | モデル | テーブル | リレーション | 特記事項 |
 |:---|:---|:---|:---|
-| `User` | users | hasMany(Book, Review), belongsToMany(Book via favorites, Review via review_likes) | HasApiTokens, casts() メソッド |
-| `Book` | books | belongsTo(User), hasMany(Review), belongsToMany(Genre, User via favorites) | $casts で published_date を date に |
+| `User` | users | hasMany(Book, Review), belongsToMany(Book via favorites, Review via review_likes) | casts() メソッド（HasApiTokens は Chapter 16 で追加） |
+| `Book` | books | belongsTo(User), hasMany(Review), belongsToMany(Genre, User via favorites) | -- |
 | `Review` | reviews | belongsTo(User, Book), belongsToMany(User via review_likes) | -- |
 | `Genre` | genres | belongsToMany(Book) | $fillable は `['name']` のみ |
 
