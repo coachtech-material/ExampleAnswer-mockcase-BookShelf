@@ -291,6 +291,24 @@ class CreateNewUser implements CreatesNewUsers
 }
 ```
 
+### 4.8. 提供 Blade ファイルの配置
+
+提供 Blade リポジトリ `coachtech-prepared-file/Preparedblade-mockcase-BookShelf` の **Basic ブランチ** から、`resources/views/` 配下のファイル一式をプロジェクトの `resources/views/` に配置します。
+
+```bash
+# 提供 Blade リポジトリを取得（任意の場所、ここでは /tmp）
+git clone -b Basic https://github.com/coachtech-prepared-file/Preparedblade-mockcase-BookShelf.git /tmp/prepared-blade
+
+# resources/views/ 配下をすべて配置（既存ファイルは上書き）
+cp -r /tmp/prepared-blade/resources/views/. resources/views/
+```
+
+これで Chapter 06 以降で使う Blade テンプレート（書籍 CRUD、レビュー、お気に入り、ランキング、ジャンル、認証）と共通レイアウト（`components/app-layout.blade.php`、`layouts/navigation.blade.php`）が一括配置されます。
+
+> **応用機能編との関係:** Chapter 15 冒頭で同リポジトリの **Advanced ブランチ** から再取得して `resources/views/` を上書きします（マイレポート画面、読書計画画面、通知画面など応用機能用 Blade を追加）。
+
+> **配置忘れによる典型エラー:** Blade 配置を忘れたまま Chapter 06 以降の動作確認をすると `View [books.index] not found.` のようなエラーが発生します。本 Chapter で必ず配置してから次に進んでください。
+
 ---
 
 ## 5. コードの詳細解説 🔍
