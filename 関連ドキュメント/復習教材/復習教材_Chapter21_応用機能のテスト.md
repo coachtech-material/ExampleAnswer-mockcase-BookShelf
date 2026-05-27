@@ -70,6 +70,15 @@ Chapter 14では、基本的なCRUD操作や認証・認可のテストを行い
 
 ## 4. 実装 🚀
 
+以下のテストファイルを一括作成します（`BookControllerTest.php` は Chapter 14 で作成済みのため、内容を 20.1 で上書きします）:
+
+```bash
+mkdir -p tests/Feature/Api/V1
+touch tests/Feature/ReportTest.php tests/Feature/Api/V1/BookApiTest.php \
+      tests/Feature/ReadingPlanCrudTest.php tests/Feature/ReadingPlanDeadlineChangeTest.php \
+      tests/Feature/ReadingPlanReminderBatchTest.php tests/Feature/ReadingPlanAutoExpireBatchTest.php
+```
+
 ### 20.1. BookControllerTest の完全版
 
 Chapter 14 で作成した基本テストに加え、検索・ソート・ISBN検索・書籍編集認可のテストを追加します。以下が **完全な** `tests/Feature/BookControllerTest.php` です。

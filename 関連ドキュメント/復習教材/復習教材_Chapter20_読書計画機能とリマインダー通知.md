@@ -122,6 +122,13 @@
 
 ### 19.1. PHP Enum + Eloquent cast
 
+`app/Enums/` ディレクトリと `ReadingPlanStatus.php` を新規作成します:
+
+```bash
+mkdir -p app/Enums
+touch app/Enums/ReadingPlanStatus.php
+```
+
 ```php
 // app/Enums/ReadingPlanStatus.php
 enum ReadingPlanStatus: string

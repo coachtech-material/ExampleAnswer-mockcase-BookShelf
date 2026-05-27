@@ -100,6 +100,10 @@ Fortify のデフォルトバリデーションメッセージは英語です。
 
 ### 4.4. `routes/auth.php`（新規作成）
 
+```bash
+touch routes/auth.php
+```
+
 ```php
 <?php
 
