@@ -411,7 +411,7 @@ class BookController extends Controller
 
 ## 7. 動作確認 ✅
 
-> **画面動作確認時の注意:** ブラウザで認証が必要な画面（書籍一覧 / 詳細 / ランキング等）にアクセスすると `Route [reports.index] not defined` で 500 エラーになります。`reports.index` / `reading-plans.index` / `notifications.index` ルートはそれぞれ **Chapter 19 マイレポート機能** と **Chapter 20 読書計画 + 通知** で定義されるため、画面動作確認は Chapter 20 完了後に行ってください。本 Chapter の動作確認は API エンドポイントの curl による確認に絞ります。
+> **画面動作確認時の注意:** ブラウザで認証が必要な画面（書籍一覧 / 詳細 / ランキング等）にアクセスすると `Route [reports.index] not defined` で 500 エラーになります。`reports.index` / `reading-plans.index` / `notifications.index` ルートはそれぞれ **Chapter 19 マイレポート機能** と **Chapter 20 読書計画 + 通知** で定義されるため、画面動作確認は Chapter 21 完了後に行ってください。本 Chapter の動作確認は API エンドポイントの curl による確認に絞ります。
 
 認証が正しく機能するか curl で確認しましょう。
 

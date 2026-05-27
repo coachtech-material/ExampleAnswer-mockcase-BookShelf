@@ -1533,9 +1533,9 @@ class BookApiTest extends TestCase
 
 ## 14.5. テストの実行
 
-> **重要:** 提供された Blade テンプレート（navigation.blade.php 等）は、応用機能編 応用機能編で追加する `reports.index` / `reading-plans.index` / `notifications.index` ルートを参照しています。テストファイルはこの Chapter で作成しますが、**`sail artisan test` の実行は Chapter 20 完了後に行ってください。** `reports.index` / `reading-plans.index` / `notifications.index` ルートが未定義の状態でテストを実行すると、ビューのレンダリングで `Route [reports.index] not defined` エラーが発生します（実際の実行は Chapter 21 で応用機能のテストを追加した後に行うのが自然）。
+> **重要:** 提供された Blade テンプレート（navigation.blade.php 等）は、応用機能編 応用機能編で追加する `reports.index` / `reading-plans.index` / `notifications.index` ルートを参照しています。テストファイルはこの Chapter で作成しますが、**`sail artisan test` の実行は Chapter 21 完了後に行ってください。** `reports.index` / `reading-plans.index` / `notifications.index` ルートが未定義の状態でテストを実行すると、ビューのレンダリングで `Route [reports.index] not defined` エラーが発生します（実際の実行は Chapter 21 で応用機能のテストを追加した後に行うのが自然）。
 
-全てのテストコードを書き終えたら、以下のコマンドでテストを実行します（Chapter 20 完了後）。
+全てのテストコードを書き終えたら、以下のコマンドでテストを実行します（Chapter 21 完了後）。
 
 ```bash
 # 全てのテストを実行
@@ -1550,7 +1550,7 @@ sail artisan test --filter=test_authenticated_user_can_create_book
 
 コマンドを実行すると、PHPUnitがテストを一つずつ実行し、結果をコンソールに表示します。
 
-> **注:** 本 Chapter 完了時点ではまだ `reports.index` / `reading-plans.index` / `notifications.index` ルート（応用機能編 Chapter 19-20 で実装）が未定義のため、`sail artisan test` を実行するとビューのレンダリングでエラーになります。テストファイル作成だけが本 Chapter のゴールであり、**実行は Chapter 20 完了後**（推奨は Chapter 21 で応用テストを追加した後）に行います。全テストが緑色の `PASS` で表示されれば、アプリケーション全体が正しく動作していることの証明になります。
+> **注:** 本 Chapter 完了時点ではまだ `reports.index` / `reading-plans.index` / `notifications.index` ルート（応用機能編 Chapter 19-20 で実装）が未定義のため、`sail artisan test` を実行するとビューのレンダリングでエラーになります。テストファイル作成だけが本 Chapter のゴールであり、**実行は Chapter 21 完了後**（推奨は Chapter 21 で応用テストを追加した後）に行います。全テストが緑色の `PASS` で表示されれば、アプリケーション全体が正しく動作していることの証明になります。
 
 ---
 

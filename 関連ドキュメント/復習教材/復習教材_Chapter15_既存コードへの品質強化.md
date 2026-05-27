@@ -507,7 +507,7 @@ sail bin pint
 | マイグレーション再実行 | `sail artisan migrate:fresh --seed` でテーブルが正常に作り直されること |
 | Carbon キャスト動作 | `sail artisan tinker` で `Book::first()->published_date->format('Y/m/d')` が動作すること |
 | リレーションが従来通り動く | `sail artisan tinker` で `User::first()->books`、`Book::first()->genres` 等のリレーション取得が正常に動作すること |
-| 既存テスト（Chapter 14）への影響 | （Chapter 20 完了後に実行）`sail artisan test` で Basic 段階の test が全 PASS のままであること |
+| 既存テスト（Chapter 14）への影響 | （Chapter 21 完了後に実行）`sail artisan test` で Basic 段階の test が全 PASS のままであること |
 
 ---
 

@@ -405,7 +405,7 @@ Laravel Collection sortByDesc
 
 ## 7. 動作確認 ✅
 
-> **画面動作確認時の注意:** 本 Chapter 完了で `reports.index` ルートは定義されますが、`navigation.blade.php` は他にも `reading-plans.index` と `notifications.index` を参照しています。これらは **Chapter 20 読書計画 + 通知** で定義されるため、本 Chapter 完了時点ではブラウザで画面アクセスすると `Route [reading-plans.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 20 完了後に行ってください。** マイレポート機能の `ReportController@index` のコード自体は本 Chapter で完成しています。
+> **画面動作確認時の注意:** 本 Chapter 完了で `reports.index` ルートは定義されますが、`navigation.blade.php` は他にも `reading-plans.index` と `notifications.index` を参照しています。これらは **Chapter 20 読書計画 + 通知** で定義されるため、本 Chapter 完了時点ではブラウザで画面アクセスすると `Route [reading-plans.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 21 完了後に行ってください。** マイレポート機能の `ReportController@index` のコード自体は本 Chapter で完成しています。
 
 | 確認項目 | 確認方法 |
 |:---|:---|
