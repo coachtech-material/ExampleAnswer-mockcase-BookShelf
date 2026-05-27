@@ -405,6 +405,8 @@ Laravel Collection sortByDesc
 
 ## 7. 動作確認 ✅
 
+> **画面動作確認時の注意:** 本 Chapter 完了で `reports.index` ルートは定義されますが、`navigation.blade.php` は他にも `reading-plans.index` と `notifications.index` を参照しています。これらは **Chapter 20 読書計画 + 通知** で定義されるため、本 Chapter 完了時点ではブラウザで画面アクセスすると `Route [reading-plans.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 20 完了後に行ってください。** マイレポート機能の `ReportController@index` のコード自体は本 Chapter で完成しています。
+
 | 確認項目 | 確認方法 |
 |:---|:---|
 | マイレポート画面表示 | ログイン状態で `/reports` にアクセス → 「マイ読書レポート」ヘッダーと 4 つの統計ブロック（サマリー / 評価分布 / 高評価書籍 TOP5 / ジャンル別評価傾向 TOP5）が表示される |
@@ -425,5 +427,7 @@ Laravel Collection sortByDesc
 - **Collectionの真価**: `foreach`で複雑なループを書く代わりに、`map`, `groupBy`, `flatMap`などのメソッドチェーンで、宣言的にデータを処理できる。
 - **関心の分離**: 複雑な処理は、意味のある単位でプライベートメソッドに分割することで、コードの可読性とメンテナンス性を高める。
 - **パフォーマンス意識**: N+1問題を避けるため、`with()`によるEager Loadingを常に意識する。
+
+次の Chapter 20 では、**読書計画機能とリマインダー通知** を実装します。`reading-plans.index` / `notifications.index` ルートが定義され、Chapter 14 以降仕込んできた画面の動作確認が一括できるようになります。
 
 データベースから取得した後のデータ加工は、Collectionを使いこなせるかどうかでコードの品質が大きく変わります。ぜひ、公式ドキュメントを片手に、様々なメソッドを試してみてください。
