@@ -209,17 +209,11 @@ use App\Models\User;
 
 class BookPolicy
 {
-    /**
-     * Determine whether the user can update the book.
-     */
     public function update(User $user, Book $book): bool
     {
         return $user->id === $book->user_id;
     }
 
-    /**
-     * Determine whether the user can delete the book.
-     */
     public function delete(User $user, Book $book): bool
     {
         return $user->id === $book->user_id;
@@ -239,17 +233,11 @@ use App\Models\User;
 
 class ReviewPolicy
 {
-    /**
-     * Determine whether the user can update the review.
-     */
     public function update(User $user, Review $review): bool
     {
         return $user->id === $review->user_id;
     }
 
-    /**
-     * Determine whether the user can delete the review.
-     */
     public function delete(User $user, Review $review): bool
     {
         return $user->id === $review->user_id;
@@ -284,9 +272,6 @@ class AuthServiceProvider extends ServiceProvider
         Review::class => ReviewPolicy::class,
     ];
 
-    /**
-     * Register any authentication / authorization services.
-     */
     public function boot(): void
     {
         //
@@ -439,9 +424,6 @@ use Illuminate\View\View;
 
 class BookController extends Controller
 {
-    /**
-     * 書籍一覧を表示
-     */
     public function index(): View
     {
         $books = Book::with('genres')->latest()->paginate(10);
@@ -450,9 +432,6 @@ class BookController extends Controller
         return view('books.index', compact('books', 'genres'));
     }
 
-    /**
-     * 書籍登録フォームを表示
-     */
     public function create(): View
     {
         $genres = Genre::orderBy('name')->get();
@@ -460,9 +439,6 @@ class BookController extends Controller
         return view('books.create', compact('genres'));
     }
 
-    /**
-     * 書籍を登録
-     */
     public function store(StoreBookRequest $request): RedirectResponse
     {
         $validated = $request->validated();
@@ -473,9 +449,6 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍を登録しました。');
     }
 
-    /**
-     * 書籍詳細を表示
-     */
     public function show(Book $book): View
     {
         $book->load(['reviews.user', 'reviews.likedByUsers', 'genres']);
@@ -483,9 +456,6 @@ class BookController extends Controller
         return view('books.show', compact('book'));
     }
 
-    /**
-     * 書籍編集フォームを表示
-     */
     public function edit(Book $book): View
     {
         $this->authorize('update', $book);
@@ -494,9 +464,6 @@ class BookController extends Controller
         return view('books.edit', compact('book', 'genres'));
     }
 
-    /**
-     * 書籍を更新
-     */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
         $this->authorize('update', $book);
@@ -508,9 +475,6 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
     }
 
-    /**
-     * 書籍を削除
-     */
     public function destroy(Book $book): RedirectResponse
     {
         $this->authorize('delete', $book);

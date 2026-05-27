@@ -100,19 +100,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreGenreRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -120,11 +112,6 @@ class StoreGenreRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
@@ -150,19 +137,11 @@ use Illuminate\Validation\Rule;
 
 class UpdateGenreRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -170,11 +149,6 @@ class UpdateGenreRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
@@ -206,9 +180,6 @@ use Illuminate\View\View;
 
 class GenreController extends Controller
 {
-    /**
-     * ジャンル一覧を表示
-     */
     public function index(): View
     {
         $genres = Genre::withCount('books')->get();
@@ -216,17 +187,11 @@ class GenreController extends Controller
         return view('genres.index', compact('genres'));
     }
 
-    /**
-     * ジャンル登録フォームを表示
-     */
     public function create(): View
     {
         return view('genres.create');
     }
 
-    /**
-     * ジャンルを登録
-     */
     public function store(StoreGenreRequest $request): RedirectResponse
     {
         Genre::create($request->validated());
@@ -234,9 +199,6 @@ class GenreController extends Controller
         return redirect()->route('genres.index')->with('success', 'ジャンルを作成しました。');
     }
 
-    /**
-     * ジャンル別書籍一覧を表示
-     */
     public function show(Genre $genre): View
     {
         $books = $genre->books()->with('genres')->paginate(10);
@@ -244,17 +206,11 @@ class GenreController extends Controller
         return view('genres.show', compact('genre', 'books'));
     }
 
-    /**
-     * ジャンル編集フォームを表示
-     */
     public function edit(Genre $genre): View
     {
         return view('genres.edit', compact('genre'));
     }
 
-    /**
-     * ジャンルを更新
-     */
     public function update(UpdateGenreRequest $request, Genre $genre): RedirectResponse
     {
         $genre->update($request->validated());
@@ -262,9 +218,6 @@ class GenreController extends Controller
         return redirect()->route('genres.index')->with('success', 'ジャンルを更新しました。');
     }
 
-    /**
-     * ジャンルを削除
-     */
     public function destroy(Genre $genre): RedirectResponse
     {
         if ($genre->books()->count() > 0) {
