@@ -322,90 +322,6 @@ class Genre extends Model
 }
 ```
 
-### 3.2.5. `Favorite` モデル
-
-`app/Models/Favorite.php` を以下のように編集します。
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class Favorite extends Model
-{
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'user_id',
-        'book_id',
-    ];
-
-    /**
-     * お気に入りを登録したユーザー
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * お気に入りに登録された書籍
-     */
-    public function book(): BelongsTo
-    {
-        return $this->belongsTo(Book::class);
-    }
-}
-```
-
-### 3.2.6. `ReviewLike` モデル
-
-`app/Models/ReviewLike.php` を以下のように編集します。
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class ReviewLike extends Model
-{
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'user_id',
-        'review_id',
-    ];
-
-    /**
-     * いいねしたユーザー
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * いいねされたレビュー
-     */
-    public function review(): BelongsTo
-    {
-        return $this->belongsTo(Review::class);
-    }
-}
-```
-
 ---
 
 ## 5. コードの詳細解説 🔍
@@ -456,7 +372,7 @@ class ReviewLike extends Model
 
 ## 8. まとめ ✨
 
-このChapterでは、Chapter 02で作成したテーブルに対応するモデルを6つ作成し、リレーションシップとマスアサインメントを定義しました。
+このChapterでは、Chapter 02で作成したテーブルに対応するモデルを4つ作成し、リレーションシップとマスアサインメントを定義しました。
 
 | モデル | テーブル | リレーション | 特記事項 |
 |:---|:---|:---|:---|
