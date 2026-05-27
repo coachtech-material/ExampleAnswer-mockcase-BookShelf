@@ -334,7 +334,7 @@ Laravel paginate パラメータ 引き継ぎ
 
 ## 7. 動作確認 ✅
 
-> **画面動作確認時の注意:** 本 Chapter の動作確認はすべて書籍一覧画面（`/books`）の操作です。`/books` をはじめとする認証必須でない画面でも `navigation.blade.php` が `reports.index` を参照しているため、Chapter 19 マイ読書レポート機能の実装前は `Route [reports.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 19 完了後に行ってください。** 本 Chapter 完了時点では、`BookController@index` のコード変更と Blade（高度な検索フォーム）の配置までを終え、Chapter 19 完了後にまとめて画面動作確認するのが推奨フローです。
+> **画面動作確認時の注意:** 本 Chapter の動作確認はすべて書籍一覧画面（`/books`）の操作です。`/books` をはじめとする認証必須でない画面でも `navigation.blade.php` が `reports.index` を参照しているため、Chapter 20 読書計画 + 通知の実装前は `Route [reports.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 20 完了後に行ってください。** 本 Chapter 完了時点では、`BookController@index` のコード変更と Blade（高度な検索フォーム）の配置までを終え、Chapter 20 完了後にまとめて画面動作確認するのが推奨フローです。
 
 | 確認項目 | 確認方法 |
 |:---|:---|
