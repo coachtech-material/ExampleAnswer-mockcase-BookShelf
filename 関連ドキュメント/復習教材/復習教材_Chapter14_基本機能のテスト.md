@@ -14,6 +14,17 @@
 
 > **重要:** 提供された Blade テンプレート（navigation.blade.php 等）は、Chapter 15~17 で追加するルート（`reports.index` 等）を参照しています。テストファイルはこの Chapter で作成しますが、**`sail artisan test` の実行は Chapter 17 完了後に行ってください。** Chapter 15~17 のコントローラ・ルートが未定義の状態でテストを実行すると、ビューのレンダリングでエラーが発生します。
 
+以下のテストファイルを一括作成します:
+
+```bash
+mkdir -p tests/Feature/Api/V1
+touch tests/Unit/UserModelTest.php tests/Unit/BookModelTest.php tests/Unit/ReviewModelTest.php \
+      tests/Feature/BookRequestTest.php tests/Feature/BookControllerTest.php tests/Feature/ReviewTest.php \
+      tests/Feature/FavoriteTest.php tests/Feature/ReviewLikeTest.php tests/Feature/GenreTest.php \
+      tests/Feature/RankingTest.php tests/Feature/RedirectIfAuthenticatedTest.php tests/Feature/ReviewPolicyTest.php \
+      tests/Feature/Api/V1/BookApiTest.php
+```
+
 ---
 
 ## 🧠 先輩エンジニアの思考プロセス
