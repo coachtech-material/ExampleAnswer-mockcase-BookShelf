@@ -118,11 +118,9 @@
 
 ## 4. 実装 🚀
 
-完全コードは `応用機能編_完全手順書.md` の **Step 19** を参照してください。本 Chapter では設計の核心となるコード片と詳細解説に絞ります。
+> **マイグレーションについて:** `reading_plans` / `notifications` テーブルのマイグレーションは Chapter 02（データベース設計とマイグレーション）の 2.2.7 / 2.2.8 で既に作成済みです。本 Chapter では Controller / Model / Policy / Notification / Console Command など、テーブル定義以外の実装に集中します。
 
-### 19.1. PHP Enum + Eloquent cast
-
-`app/Enums/` ディレクトリと `ReadingPlanStatus.php` を新規作成します:
+### 4.1. `app/Enums/ReadingPlanStatus.php`
 
 ```bash
 mkdir -p app/Enums
@@ -130,13 +128,26 @@ touch app/Enums/ReadingPlanStatus.php
 ```
 
 ```php
-// app/Enums/ReadingPlanStatus.php
+<?php
+
+namespace App\Enums;
+
+/**
+ * 読書計画のステータス
+ *
+ * - InProgress: 進行中（期日までに「読了する」操作で Completed に切り替わる）
+ * - Completed: 完了済み（「読了する」操作を実行済み）
+ * - Expired: 期日超過（in_progress のまま target_date を過ぎた）
+ */
 enum ReadingPlanStatus: string
 {
     case InProgress = 'in_progress';
     case Completed = 'completed';
     case Expired = 'expired';
 
+    /**
+     * UI 表示用のラベルを返す
+     */
     public function label(): string
     {
         return match ($this) {
@@ -146,6 +157,9 @@ enum ReadingPlanStatus: string
         };
     }
 
+    /**
+     * UI 表示用のバッジカラー（Tailwind クラス）を返す
+     */
     public function badgeClass(): string
     {
         return match ($this) {
@@ -157,193 +171,980 @@ enum ReadingPlanStatus: string
 }
 ```
 
-Model 側で:
-```php
-protected $casts = [
-    'target_date' => 'date',
-    'status' => ReadingPlanStatus::class,
-    'completed_at' => 'datetime',
-];
+`label()` は Blade からの表示用、`badgeClass()` は同じ Blade からバッジの Tailwind クラスを取得するためのメソッド。Enum 内に表示ロジックを集約することで、Blade 側で `match` を書かずに `$plan->status->label()` だけで済む。
+
+### 4.2. `app/Models/ReadingPlan.php`
+
+```bash
+sail artisan make:model ReadingPlan
 ```
 
-これで `$plan->status` から取り出した瞬間に Enum オブジェクトとして扱える。
-
-### 19.2. Eloquent scope
-
 ```php
-// app/Models/ReadingPlan.php
-public function scopeActive(Builder $query): Builder
+<?php
+
+namespace App\Models;
+
+use App\Enums\ReadingPlanStatus;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class ReadingPlan extends Model
 {
-    return $query->where('status', ReadingPlanStatus::InProgress);
-}
+    use HasFactory;
 
-public function scopeCompleted(Builder $query): Builder
-{
-    return $query->where('status', ReadingPlanStatus::Completed);
-}
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'user_id',
+        'book_id',
+        'target_date',
+        'status',
+        'completed_at',
+    ];
 
-public function scopeExpired(Builder $query): Builder
-{
-    return $query->where('status', ReadingPlanStatus::Expired);
-}
-```
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'target_date' => 'date',
+        'status' => ReadingPlanStatus::class,
+        'completed_at' => 'datetime',
+    ];
 
-呼び出すために、`User` モデル側にも逆向きのリレーションを追記する:
+    /**
+     * 計画を立てたユーザー
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
-```php
-// app/Models/User.php
-public function readingPlans(): HasMany
-{
-    return $this->hasMany(ReadingPlan::class);
-}
-```
+    /**
+     * 計画対象の書籍
+     */
+    public function book(): BelongsTo
+    {
+        return $this->belongsTo(Book::class);
+    }
 
-これで `Auth::user()->readingPlans()->active()->get()` のように呼び出せる。リレーション追記を忘れると「読書計画」画面で `Call to undefined method App\Models\User::readingPlans()` エラーが発生する。
+    /**
+     * 進行中の計画を絞り込むスコープ
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', ReadingPlanStatus::InProgress);
+    }
 
-### 19.3. destroy で Transaction を使う（複数 SQL の場面）
+    /**
+     * 完了済みの計画を絞り込むスコープ
+     */
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', ReadingPlanStatus::Completed);
+    }
 
-```php
-// app/Http/Controllers/ReadingPlanController.php
-public function destroy(ReadingPlan $readingPlan): RedirectResponse
-{
-    $this->authorize('delete', $readingPlan);
-
-    DB::transaction(function () use ($readingPlan): void {
-        Auth::user()->notifications()
-            ->where('data->plan_id', $readingPlan->id)
-            ->delete();
-
-        $readingPlan->delete();
-    });
-
-    return redirect()->route('reading-plans.index')
-        ->with('success', '読書計画を削除しました。');
-}
-```
-
-**ポイント**: 複数 DELETE 文を 1 単位で扱うため Transaction で囲む。`data->plan_id` は Laravel の JSON path クエリで、`notifications.data` JSON カラム内の `plan_id` を検索している。
-
-一方、`complete()` や `update()` は単一 update なので Transaction は不要：
-
-```php
-public function complete(ReadingPlan $readingPlan): RedirectResponse
-{
-    $this->authorize('update', $readingPlan);
-
-    $readingPlan->update([
-        'status' => ReadingPlanStatus::Completed,
-        'completed_at' => now(),
-    ]);
-
-    return redirect()->route('reading-plans.index')
-        ->with('success', '読書計画を完了しました。');
-}
-```
-
-### 19.4. Schedule + Console Command
-
-`app/Console/Kernel.php`:
-```php
-protected function schedule(Schedule $schedule): void
-{
-    $schedule->command('reading-plans:run-daily')->daily()->at('20:00');
+    /**
+     * 期限切れの計画を絞り込むスコープ
+     */
+    public function scopeExpired(Builder $query): Builder
+    {
+        return $query->where('status', ReadingPlanStatus::Expired);
+    }
 }
 ```
 
-Console Command の `handle()`:
-```php
-// app/Console/Commands/RunReadingPlanDailyBatch.php
-public function handle(): int
-{
-    $today = Carbon::today();
+`status` を Enum にキャストすることで `$plan->status === ReadingPlanStatus::InProgress` のような型安全な比較が可能になる。`scopeActive` / `scopeCompleted` / `scopeExpired` の 3 つは Controller で `->active()` のように呼べるようになり、Controller の責務が「クエリの組み立て」から「リクエストの分岐」に縮小される。
 
-    // 1. 期日経過した in_progress を一括 Expired 化
-    // bulk update では updated_at が自動更新されないため明示的に付与
-    ReadingPlan::query()
-        ->where('status', ReadingPlanStatus::InProgress)
-        ->whereDate('target_date', '<', $today)
-        ->update([
+#### `app/Models/User.php` への readingPlans リレーション追加
+
+**この追加を忘れると「読書計画」画面で `Call to undefined method App\Models\User::readingPlans()` エラーが発生する。** ReadingPlan モデル定義に合わせて User モデル側にも逆向きのリレーションを追加すること。
+
+```php
+    /**
+     * ユーザーが立てた読書計画
+     */
+    public function readingPlans(): HasMany
+    {
+        return $this->hasMany(ReadingPlan::class);
+    }
+```
+
+> **重要:** ファイル冒頭に `use Illuminate\Database\Eloquent\Relations\HasMany;` が import されているか確認すること。Step 15.2 で User モデルを書き換えた時点で既に import されているはずだが、もし無い場合は追加する。`use` 宣言が無いと PHP が `HasMany` を `App\Models\HasMany` と解釈し、`Return value must be of type App\Models\HasMany` というエラーが発生する。
+
+### 4.3. `database/factories/ReadingPlanFactory.php`
+
+```bash
+sail artisan make:factory ReadingPlanFactory --model=ReadingPlan
+```
+
+```php
+<?php
+
+namespace Database\Factories;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\Book;
+use App\Models\ReadingPlan;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends Factory<ReadingPlan>
+ */
+class ReadingPlanFactory extends Factory
+{
+    protected $model = ReadingPlan::class;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'user_id' => User::factory(),
+            'book_id' => Book::factory(),
+            'target_date' => now()->addDays(7)->format('Y-m-d'),
+            'status' => ReadingPlanStatus::InProgress,
+            'completed_at' => null,
+        ];
+    }
+
+    public function inProgress(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => ReadingPlanStatus::InProgress,
+            'completed_at' => null,
+        ]);
+    }
+
+    public function completed(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => ReadingPlanStatus::Completed,
+            'completed_at' => now(),
+        ]);
+    }
+
+    public function expired(): static
+    {
+        return $this->state(fn (array $attributes): array => [
             'status' => ReadingPlanStatus::Expired,
-            'updated_at' => now(),
+            'target_date' => now()->subDays(3)->format('Y-m-d'),
+            'completed_at' => null,
+        ]);
+    }
+}
+```
+
+`inProgress()` / `completed()` / `expired()` の 3 つの状態 state を提供することで、テスト側で `ReadingPlan::factory()->expired()->create()` のように 1 行で目的の状態を作れる。
+
+### 4.4. `app/Policies/ReadingPlanPolicy.php` と AuthServiceProvider 登録
+
+```bash
+sail artisan make:policy ReadingPlanPolicy --model=ReadingPlan
+```
+
+```php
+<?php
+
+namespace App\Policies;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\ReadingPlan;
+use App\Models\User;
+
+class ReadingPlanPolicy
+{
+    /**
+     * Determine whether the user can update the reading plan.
+     *
+     * 所有者 かつ 完了済みでない 場合のみ編集可能。
+     * completed 計画は編集不可（読了済みなので変更させない）。
+     */
+    public function update(User $user, ReadingPlan $readingPlan): bool
+    {
+        return $user->id === $readingPlan->user_id
+            && $readingPlan->status !== ReadingPlanStatus::Completed;
+    }
+
+    /**
+     * Determine whether the user can delete the reading plan.
+     */
+    public function delete(User $user, ReadingPlan $readingPlan): bool
+    {
+        return $user->id === $readingPlan->user_id;
+    }
+}
+```
+
+`update` には「所有者である」と「完了済みでない」の 2 条件を集約する。Controller / FormRequest にこのチェックを散らさないことで、編集ルートの認可を Policy 1 箇所で制御できる。
+
+次に `app/Providers/AuthServiceProvider.php` の `$policies` 配列に **追記** する（既存の `Book` / `Review` のマッピングに `ReadingPlan` を追加する）:
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Models\Book;
+use App\Models\ReadingPlan;
+use App\Models\Review;
+use App\Policies\BookPolicy;
+use App\Policies\ReadingPlanPolicy;
+use App\Policies\ReviewPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The model to policy mappings for the application.
+     *
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        Book::class => BookPolicy::class,
+        Review::class => ReviewPolicy::class,
+        ReadingPlan::class => ReadingPlanPolicy::class,
+    ];
+
+    /**
+     * Register any authentication / authorization services.
+     */
+    public function boot(): void
+    {
+        //
+    }
+}
+```
+
+> **注意:** 既存の `Book` / `Review` マッピングを **置き換える** のではなく、`ReadingPlan` 行を **追加** すること。`use` 文の追加も忘れずに行う。
+
+### 4.5. `app/Http/Requests/{Store,Update}ReadingPlanRequest.php`
+
+```bash
+sail artisan make:request StoreReadingPlanRequest
+sail artisan make:request UpdateReadingPlanRequest
+```
+
+#### `app/Http/Requests/StoreReadingPlanRequest.php`
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\ReadingPlan;
+use Closure;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
+
+class StoreReadingPlanRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    public function rules(): array
+    {
+        return [
+            'book_id' => [
+                'required',
+                'integer',
+                'exists:books,id',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $exists = ReadingPlan::where('user_id', Auth::id())
+                        ->where('book_id', $value)
+                        ->where('status', ReadingPlanStatus::InProgress)
+                        ->exists();
+                    if ($exists) {
+                        $fail('この書籍は既に進行中の読書計画が存在します。');
+                    }
+                },
+            ],
+            'target_date' => ['required', 'date', 'after_or_equal:today'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'book_id.required' => '書籍を選択してください。',
+            'book_id.integer' => '書籍IDは整数で入力してください。',
+            'book_id.exists' => '選択された書籍は存在しません。',
+            'target_date.required' => '期日は必須です。',
+            'target_date.date' => '期日は有効な日付形式で入力してください。',
+            'target_date.after_or_equal' => '期日は今日以降の日付を指定してください。',
+        ];
+    }
+}
+```
+
+#### `app/Http/Requests/UpdateReadingPlanRequest.php`
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\ReadingPlan;
+use Closure;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
+
+class UpdateReadingPlanRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        // 認可は ReadingPlanPolicy@update に集約（Controller 側で $this->authorize('update', $plan) を呼ぶ）
+        return true;
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    public function rules(): array
+    {
+        return [
+            'target_date' => [
+                'required',
+                'date',
+                'after_or_equal:today',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    /** @var ReadingPlan $plan */
+                    $plan = $this->route('reading_plan');
+                    $exists = ReadingPlan::where('user_id', Auth::id())
+                        ->where('book_id', $plan->book_id)
+                        ->where('status', ReadingPlanStatus::InProgress)
+                        ->where('id', '!=', $plan->id)
+                        ->exists();
+                    if ($exists) {
+                        $fail('この書籍は既に進行中の読書計画が存在します。');
+                    }
+                },
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'target_date.required' => '期日は必須です。',
+            'target_date.date' => '期日は有効な日付形式で入力してください。',
+            'target_date.after_or_equal' => '期日は今日以降の日付を指定してください。',
+        ];
+    }
+}
+```
+
+両 FormRequest とも `Closure` バリデーションで「同じ書籍に対する進行中計画が他に存在するか」を確認する。Store では `Auth::id()` の全進行中計画を、Update では「自身を除く」進行中計画を検査する点が異なる。Update の `authorize()` は `true` を返し、認可は Controller 側の `$this->authorize('update', $plan)` で `ReadingPlanPolicy@update` に委譲する。
+
+### 4.6. `app/Notifications/PlanReminderNotification.php`
+
+```bash
+sail artisan make:notification PlanReminderNotification
+```
+
+```php
+<?php
+
+namespace App\Notifications;
+
+use App\Models\ReadingPlan;
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
+
+class PlanReminderNotification extends Notification
+{
+    use Queueable;
+
+    public const TIMING_THREE_DAYS_BEFORE = 'three_days_before';
+
+    public const TIMING_ON_DUE_DATE = 'on_due_date';
+
+    public const TIMING_THREE_DAYS_AFTER = 'three_days_after';
+
+    public function __construct(
+        public ReadingPlan $plan,
+        public string $timing,
+    ) {}
+
+    /**
+     * Get the notification's delivery channels.
+     *
+     * @return array<int, string>
+     */
+    public function via(object $notifiable): array
+    {
+        return ['database'];
+    }
+
+    /**
+     * Get the array representation of the notification (for DatabaseChannel).
+     *
+     * @return array<string, mixed>
+     */
+    public function toDatabase(object $notifiable): array
+    {
+        return [
+            'plan_id' => $this->plan->id,
+            'book_title' => $this->plan->book->title,
+            'timing' => $this->timing,
+            'title' => $this->buildTitle(),
+            'body' => $this->buildBody(),
+        ];
+    }
+
+    private function buildTitle(): string
+    {
+        return match ($this->timing) {
+            self::TIMING_THREE_DAYS_BEFORE => '読書計画リマインド — 期限まであと 3 日',
+            self::TIMING_ON_DUE_DATE => '読書計画 — 本日が期限',
+            self::TIMING_THREE_DAYS_AFTER => '読書計画 — 期限超過 3 日経過',
+        };
+    }
+
+    private function buildBody(): string
+    {
+        $title = $this->plan->book->title;
+
+        return match ($this->timing) {
+            self::TIMING_THREE_DAYS_BEFORE => "「{$title}」の期限まで残り 3 日です。引き続き読書を進めましょう。",
+            self::TIMING_ON_DUE_DATE => "「{$title}」は本日が期限です。読了済みなら完了登録を、もう少し必要なら期限を変更してください。",
+            self::TIMING_THREE_DAYS_AFTER => "「{$title}」の期限から 3 日が経過しました。読了済みなら完了登録、続けるなら期限を変更してください。",
+        };
+    }
+}
+```
+
+通知のチャネルは `database` のみ（メールは送らない）。3 つの timing 定数（`TIMING_THREE_DAYS_BEFORE` / `TIMING_ON_DUE_DATE` / `TIMING_THREE_DAYS_AFTER`）でいつのリマインダーかを区別し、`toDatabase()` の `data` カラムには `plan_id` / `book_title` / `timing` / `title` / `body` の 5 フィールドを保存する。`book_title` を保存しておくことで、後から書籍タイトルが変更されても通知本文は当時のままで残る。
+
+### 4.7. `app/Console/Commands/RunReadingPlanDailyBatch.php` と Console Kernel
+
+```bash
+sail artisan make:command RunReadingPlanDailyBatch
+```
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\ReadingPlan;
+use App\Notifications\PlanReminderNotification;
+use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
+
+class RunReadingPlanDailyBatch extends Command
+{
+    /**
+     * @var string
+     */
+    protected $signature = 'reading-plans:run-daily';
+
+    /**
+     * @var string
+     */
+    protected $description = '読書計画の日次バッチ：期日経過した in_progress を一括 Expired 化し、3 日前 / 当日 / 3 日後 の各タイミングでリマインダー通知を発火する。';
+
+    public function handle(): int
+    {
+        $today = Carbon::today();
+
+        // 1. 期日経過した in_progress 計画を一括 Expired 化
+        // bulk update では updated_at が自動更新されないため明示的に付与
+        ReadingPlan::query()
+            ->where('status', ReadingPlanStatus::InProgress)
+            ->whereDate('target_date', '<', $today)
+            ->update([
+                'status' => ReadingPlanStatus::Expired,
+                'updated_at' => now(),
+            ]);
+
+        // 2. 期日 3 日前の in_progress 計画にリマインダー（予告）発火
+        $this->notify(
+            ReadingPlan::query()
+                ->with(['user', 'book'])
+                ->where('status', ReadingPlanStatus::InProgress)
+                ->whereDate('target_date', $today->copy()->addDays(3))
+                ->get(),
+            PlanReminderNotification::TIMING_THREE_DAYS_BEFORE,
+        );
+
+        // 3. 期日当日の in_progress 計画にリマインダー（最終リマインド）発火
+        $this->notify(
+            ReadingPlan::query()
+                ->with(['user', 'book'])
+                ->where('status', ReadingPlanStatus::InProgress)
+                ->whereDate('target_date', $today)
+                ->get(),
+            PlanReminderNotification::TIMING_ON_DUE_DATE,
+        );
+
+        // 4. 期日 3 日後の Expired 計画にリマインダー（再エンゲージメント）発火
+        $this->notify(
+            ReadingPlan::query()
+                ->with(['user', 'book'])
+                ->where('status', ReadingPlanStatus::Expired)
+                ->whereDate('target_date', $today->copy()->subDays(3))
+                ->get(),
+            PlanReminderNotification::TIMING_THREE_DAYS_AFTER,
+        );
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * 対象計画群に通知を発火する
+     *
+     * @param  Collection<int, ReadingPlan>  $plans
+     */
+    private function notify(Collection $plans, string $timing): void
+    {
+        $plans->each(function (ReadingPlan $plan) use ($timing): void {
+            $plan->user->notify(new PlanReminderNotification($plan, $timing));
+        });
+    }
+}
+```
+
+> **重要:** `Eloquent` の `update()` を Builder 経由で **bulk update** する場合、Eloquent モデルのライフサイクルを通らないため `updated_at` カラムは自動更新されない。自動更新したい場合は `'updated_at' => now()` を明示的に組み込む必要がある。Auto-expire のクエリでこの注意を守らないと、`updated_at` が古いまま残り、後続の差分検知系処理で不具合の原因になる。
+
+次に `app/Console/Kernel.php` の `schedule()` に毎日 20:00 実行を登録する:
+
+```php
+<?php
+
+namespace App\Console;
+
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+
+class Kernel extends ConsoleKernel
+{
+    /**
+     * Define the application's command schedule.
+     */
+    protected function schedule(Schedule $schedule): void
+    {
+        // 読書計画の日次バッチ：毎日 20:00 に実行
+        $schedule->command('reading-plans:run-daily')->daily()->at('20:00');
+    }
+
+    /**
+     * Register the commands for the application.
+     */
+    protected function commands(): void
+    {
+        $this->load(__DIR__.'/Commands');
+
+        require base_path('routes/console.php');
+    }
+}
+```
+
+採点時には `sail artisan reading-plans:run-daily` を直接実行することで、Cron を待たずにバッチ動作を確認できる。
+
+### 4.8. `app/Http/Controllers/ReadingPlanController.php`
+
+```bash
+sail artisan make:controller ReadingPlanController --resource
+```
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Enums\ReadingPlanStatus;
+use App\Http\Requests\StoreReadingPlanRequest;
+use App\Http\Requests\UpdateReadingPlanRequest;
+use App\Models\Book;
+use App\Models\ReadingPlan;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+
+class ReadingPlanController extends Controller
+{
+    /**
+     * 読書計画一覧を表示（ReadingPlanStatus Enum を活用した status 絞り込み + Eloquent scope）
+     */
+    public function index(Request $request): View
+    {
+        $statusValue = $request->input('status');
+        $query = Auth::user()->readingPlans()->with('book');
+
+        $status = ReadingPlanStatus::tryFrom($statusValue ?? '');
+        if ($status === ReadingPlanStatus::InProgress) {
+            $query->active();
+        } elseif ($status === ReadingPlanStatus::Completed) {
+            $query->completed();
+        } elseif ($status === ReadingPlanStatus::Expired) {
+            $query->expired();
+        }
+
+        $readingPlans = $query->orderBy('target_date')->get();
+
+        return view('reading-plans.index', [
+            'readingPlans' => $readingPlans,
+            'currentStatus' => $statusValue,
+        ]);
+    }
+
+    /**
+     * 読書計画作成フォームを表示（書籍プルダウン）
+     */
+    public function create(): View
+    {
+        $books = Book::orderBy('title')->get();
+
+        return view('reading-plans.create', compact('books'));
+    }
+
+    /**
+     * 読書計画を新規作成
+     */
+    public function store(StoreReadingPlanRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        Auth::user()->readingPlans()->create([
+            'book_id' => $validated['book_id'],
+            'target_date' => $validated['target_date'],
+            'status' => ReadingPlanStatus::InProgress,
         ]);
 
-    // 2. 期日 3 日前の進行中計画にリマインダー通知発火
-    $this->notify(
-        ReadingPlan::query()
-            ->with(['user', 'book'])
-            ->where('status', ReadingPlanStatus::InProgress)
-            ->whereDate('target_date', $today->copy()->addDays(3))
-            ->get(),
-        PlanReminderNotification::TIMING_THREE_DAYS_BEFORE,
-    );
+        return redirect()
+            ->route('reading-plans.index')
+            ->with('success', '読書計画を作成しました。');
+    }
 
-    // 3. 期日当日の進行中計画 / 4. 期日 3 日後の期限切れ計画 ...
-    return self::SUCCESS;
+    /**
+     * 読書計画編集フォームを表示（所有者かつ completed でない場合のみ）
+     */
+    public function edit(ReadingPlan $readingPlan): View
+    {
+        $this->authorize('update', $readingPlan);
+
+        return view('reading-plans.edit', compact('readingPlan'));
+    }
+
+    /**
+     * 読書計画を更新（Expired 計画は in_progress に復帰）
+     */
+    public function update(UpdateReadingPlanRequest $request, ReadingPlan $readingPlan): RedirectResponse
+    {
+        $this->authorize('update', $readingPlan);
+        $validated = $request->validated();
+
+        $updateData = ['target_date' => $validated['target_date']];
+
+        if ($readingPlan->status === ReadingPlanStatus::Expired) {
+            $updateData['status'] = ReadingPlanStatus::InProgress;
+        }
+
+        $readingPlan->update($updateData);
+
+        return redirect()
+            ->route('reading-plans.index')
+            ->with('success', '読書計画を更新しました。');
+    }
+
+    /**
+     * 読書計画を削除（関連リマインダー通知も同時削除し、Transaction で原子化）
+     */
+    public function destroy(ReadingPlan $readingPlan): RedirectResponse
+    {
+        $this->authorize('delete', $readingPlan);
+
+        DB::transaction(function () use ($readingPlan): void {
+            Auth::user()->notifications()
+                ->where('data->plan_id', $readingPlan->id)
+                ->delete();
+
+            $readingPlan->delete();
+        });
+
+        return redirect()
+            ->route('reading-plans.index')
+            ->with('success', '読書計画を削除しました。');
+    }
+
+    /**
+     * 「読了する」操作で計画を Completed 化
+     */
+    public function complete(ReadingPlan $readingPlan): RedirectResponse
+    {
+        $this->authorize('update', $readingPlan);
+
+        $readingPlan->update([
+            'status' => ReadingPlanStatus::Completed,
+            'completed_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('reading-plans.index')
+            ->with('success', '読書計画を完了しました。');
+    }
 }
 ```
 
-### 19.5. 通知データの 5 フィールド構造
+> **重要:** `destroy` の `DB::transaction` は「関連通知の削除」と「計画の削除」を 1 つの単位で扱うために必要。一方の `update` / `complete` / `store` は 1 SQL なので Transaction は不要（Eloquent の `update()` は内部で 1 SQL なので原子性が保証されている）。「複数 SQL を不可分に処理する場面」だけで Transaction を使うのが Laravel 慣習。
+
+### 4.9. `app/Http/Controllers/NotificationController.php`
+
+```bash
+sail artisan make:controller NotificationController
+```
 
 ```php
-// app/Notifications/PlanReminderNotification.php
-public function toDatabase(object $notifiable): array
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+
+class NotificationController extends Controller
 {
-    return [
-        'plan_id' => $this->plan->id,
-        'book_title' => $this->plan->book->title,
-        'timing' => $this->timing,
-        'title' => $this->buildTitle(),
-        'body' => $this->buildBody(),
-    ];
+    /**
+     * 通知一覧を表示（時系列降順）
+     */
+    public function index(): View
+    {
+        $notifications = Auth::user()->notifications()->latest()->get();
+
+        return view('notifications.index', compact('notifications'));
+    }
+
+    /**
+     * 通知を既読化（Notifiable trait の markAsRead を使用）
+     */
+    public function markAsRead(string $id): RedirectResponse
+    {
+        $notification = Auth::user()->notifications()->findOrFail($id);
+        $notification->markAsRead();
+
+        return redirect()
+            ->route('notifications.index')
+            ->with('success', '通知を既読にしました。');
+    }
 }
 ```
 
-`book_title` を `belongsTo` 参照ではなく**値として埋め込む**ことで、書籍タイトル変更後も通知発火時の値が保たれる（耐性のある通知設計）。
+`Notifiable` トレイトが提供する `notifications()` リレーションで通知一覧を取得し、`markAsRead()` で `read_at` を更新する。コントローラの責務を最小化し、表示と既読化の 2 アクションのみを提供する。
 
-### 19.6. Policy に状態判定を統合
+### 4.10. `routes/web.php`（最終版）
 
 ```php
-// app/Policies/ReadingPlanPolicy.php
-public function update(User $user, ReadingPlan $readingPlan): bool
+<?php
+
+use App\Http\Controllers\BookController;
+use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\GenreController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\RankingController;
+use App\Http\Controllers\ReadingPlanController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewLikeController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// トップページ（書籍一覧）
+Route::get('/', [BookController::class, 'index'])->name('home');
+
+// 書籍関連（認証不要）
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+
+// ランキング（認証不要）
+Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+
+// 認証が必要なルート
+Route::middleware('auth')->group(function () {
+    // ジャンル管理
+    Route::resource('genres', GenreController::class);
+
+    // 書籍管理（createは{book}より先に定義）
+    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
+    Route::get('/books/isbn/{isbn}', [BookController::class, 'searchByIsbn'])->name('books.searchByIsbn');
+    Route::post('/books', [BookController::class, 'store'])->name('books.store');
+    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
+    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
+    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
+
+    // レビュー管理
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('/reviews/{review}/edit', [ReviewController::class, 'edit'])->name('reviews.edit');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    // お気に入り
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+
+    // いいね
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])->name('reviews.like');
+
+    // マイ読書レポート
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+    // 読書計画
+    Route::post('/reading-plans/{reading_plan}/complete', [ReadingPlanController::class, 'complete'])->name('reading-plans.complete');
+    Route::resource('reading-plans', ReadingPlanController::class)->except(['show']);
+
+    // 通知
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+});
+
+// 書籍詳細（認証不要、{book}パラメータを含むため最後に定義）
+Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+
+// 認証機能用ルート、RouteServiceProvider.php でミドルウェアを設定しているので必要ない
+// require __DIR__.'/auth.php';
+```
+
+> **重要（順序）:** `Route::post('/reading-plans/{reading_plan}/complete', ...)` を `Route::resource('reading-plans', ...)` の **前** に置く必要がある。逆にすると `resource` の `update` ルート（`PUT /reading-plans/{reading_plan}`）がマッチしてしまう、あるいは `complete` パラメータが `{reading_plan}` として解釈されて 404 になる。明示的なルートを Resource 系より先に定義するのが鉄則。
+
+### 4.11. `resources/views/layouts/navigation.blade.php`（提供済の確認）
+
+ナビゲーション Blade は `coachtech-prepared-file/Preparedblade-mockcase-BookShelf` から提供されている。読書計画機能と通知機能の実装後に、以下のリンク・アイコンが追加で表示されるはずなので、配置とリンクの動作を確認する:
+
+- 「読書計画」ナビゲーションリンク（`reading-plans.index` への遷移）
+- 通知ベルアイコン（`notifications.index` への遷移、未読件数のバッジ表示）
+
+提供 Blade を改変する必要はない。`Auth::user()->unreadNotifications->count()` を参照しているため、通知が DB に投入されるとベルの右上に件数バッジが表示される。動作確認は 19.15 で行う。
+
+### 4.12. `database/seeders/ReadingPlanSeeder.php` と DatabaseSeeder 登録
+
+```bash
+sail artisan make:seeder ReadingPlanSeeder
+```
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Enums\ReadingPlanStatus;
+use App\Models\Book;
+use App\Models\ReadingPlan;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Database\Seeder;
+
+class ReadingPlanSeeder extends Seeder
 {
-    return $user->id === $readingPlan->user_id
-        && $readingPlan->status !== ReadingPlanStatus::Completed;
+    /**
+     * 読書計画のシードデータを投入する。
+     *
+     * 採点者がいつ実行しても同じ挙動になるよう、Carbon::today() 起点で動的に target_date を設定する。
+     * 採点時の動作確認効率を考慮し、主要シナリオ（リマインダー / Auto-expire / 完了済み等）は山田太郎 1 ユーザーに集約する。
+     * 鈴木花子に 1 計画を最後に追加し、他ユーザー認可テスト用とする（ID = 6）。
+     */
+    public function run(): void
+    {
+        $today = Carbon::today();
+        $books = Book::all();
+
+        // 山田太郎（主要シナリオ集約: ID 1〜5）
+        $yamada = User::where('email', 'yamada@example.com')->first();
+        $yamadaPlans = [
+            // 1. 期日 3 日後 / in_progress → 3 日前リマインダー対象
+            ['target_date' => $today->copy()->addDays(3), 'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
+            // 2. 期日当日 / in_progress → 当日リマインダー対象
+            ['target_date' => $today->copy(), 'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
+            // 3. 期日 3 日前 / in_progress → バッチで Auto-expire 化 + 3 日後再エンゲージメント対象（二重シナリオ）
+            ['target_date' => $today->copy()->subDays(3), 'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
+            // 4. 期日 7 日後 / in_progress → リマインダー対象外
+            ['target_date' => $today->copy()->addDays(7), 'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
+            // 5. 期日 10 日前 / completed → 完了済み（編集不可・絞り込み確認用）
+            ['target_date' => $today->copy()->subDays(10), 'status' => ReadingPlanStatus::Completed, 'completed_at' => $today->copy()->subDays(5)],
+        ];
+        foreach ($yamadaPlans as $i => $plan) {
+            ReadingPlan::create([
+                'user_id' => $yamada->id,
+                'book_id' => $books[$i]->id,
+                'target_date' => $plan['target_date'],
+                'status' => $plan['status'],
+                'completed_at' => $plan['completed_at'],
+            ]);
+        }
+
+        // 鈴木花子（他ユーザー認可テスト用: ID 6）
+        // 山田太郎ログイン中に URL `/reading-plans/6/edit` を直打ちして 403 確認するためのデータ
+        $suzuki = User::where('email', 'suzuki@example.com')->first();
+        ReadingPlan::create([
+            'user_id' => $suzuki->id,
+            'book_id' => $books[5]->id,
+            'target_date' => $today->copy()->addDays(5),
+            'status' => ReadingPlanStatus::InProgress,
+            'completed_at' => null,
+        ]);
+    }
 }
 ```
 
-Controller 側は単純化される：
+`Carbon::today()` 起点の動的シードにより、いつ実行しても同じ「日数差」のシナリオが再現できる（採点日依存性を回避）。山田太郎 1 ユーザーに 5 シナリオ（3 日前 / 当日 / Auto-expire+3 日後 / 範囲外 / 完了済み）を集約することで、採点者は山田太郎にログインするだけで全シナリオを 1 画面で確認できる。鈴木花子の 1 計画（ID = 6）は他ユーザー認可テスト用で、山田太郎ログイン状態で `/reading-plans/6/edit` を直打ちすると 403 が返ることを確認する。
+
+次に `database/seeders/DatabaseSeeder.php` の `call()` 配列の末尾に `ReadingPlanSeeder` を追記する:
+
 ```php
-public function edit(ReadingPlan $readingPlan): View
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
 {
-    $this->authorize('update', $readingPlan);
-    return view('reading-plans.edit', compact('readingPlan'));
+    public function run(): void
+    {
+        // 依存関係を考慮して実行順序を変更
+        $this->call([
+            UserSeeder::class,        // 先にユーザーを作成
+            GenreSeeder::class,       // ジャンルも先に作成
+            BookSeeder::class,        // ユーザーとジャンルを使って書籍を作成
+            ReviewSeeder::class,      // ユーザーと書籍を使ってレビューを作成
+            FavoriteSeeder::class,    // ユーザーと書籍を使ってお気に入りを作成
+            ReviewLikeSeeder::class,  // ユーザーとレビューを使っていいねを作成
+            ReadingPlanSeeder::class, // ユーザーと書籍を使って読書計画を作成（応用機能）
+        ]);
+    }
 }
 ```
 
-`UpdateReadingPlanRequest::authorize()` も `return true;` で OK（認可は Policy に集約）。
-
-### 19.7. 動的シード + ユーザー集約
-
-```php
-// database/seeders/ReadingPlanSeeder.php
-$today = Carbon::today();
-
-// 山田太郎に主要シナリオ 5 計画を集約（ID 1〜5）
-$yamadaPlans = [
-    ['target_date' => $today->copy()->addDays(3),  'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
-    ['target_date' => $today->copy(),               'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
-    ['target_date' => $today->copy()->subDays(3),   'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
-    ['target_date' => $today->copy()->addDays(7),   'status' => ReadingPlanStatus::InProgress, 'completed_at' => null],
-    ['target_date' => $today->copy()->subDays(10),  'status' => ReadingPlanStatus::Completed,  'completed_at' => $today->copy()->subDays(5)],
-];
-
-// 鈴木花子に 1 計画を最後に追加（ID = 6）
-// 山田太郎ログイン中に URL /reading-plans/6/edit 直打ちで 403 確認するためのデータ
-```
-
-`Carbon::today()` 起点で動的に target_date を設定することで、いつ実行しても同じ挙動になる。
-
----
+`ReadingPlanSeeder` は `User` と `Book` に依存するので、必ず `UserSeeder` / `BookSeeder` の **後** に置く。
 
 ## 5. コードの詳細解説 🔍
 
