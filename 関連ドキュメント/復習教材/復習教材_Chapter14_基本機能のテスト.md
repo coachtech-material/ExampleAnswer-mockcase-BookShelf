@@ -193,13 +193,7 @@ class ReviewFactory extends Factory
 
 ## 14.3. Unitテスト：モデルのリレーションシップ
 
-最初に、アプリケーションの心臓部であるモデルのリレーションシップが正しく定義されているかを確認するUnitテストを作成します。
-
-```bash
-sail artisan make:test UserModelTest --unit
-sail artisan make:test BookModelTest --unit
-sail artisan make:test ReviewModelTest --unit
-```
+最初に、アプリケーションの心臓部であるモデルのリレーションシップが正しく定義されているかを確認するUnitテストを作成します（テストファイルは本 Chapter 冒頭で一括 `touch` 済みのため、ここでは内容を埋めるだけです）。
 
 ### UserModelTest
 
@@ -324,15 +318,7 @@ class ReviewModelTest extends TestCase
 
 ## 14.4. Featureテスト：各機能の振る舞い
 
-次に、ユーザーの操作を模倣して、各機能が全体として正しく動作するかを検証するFeatureテストを作成します。
-
-```bash
-sail artisan make:test BookTest
-sail artisan make:test ReviewTest
-sail artisan make:test FavoriteTest
-sail artisan make:test ReviewLikeTest
-sail artisan make:test GenreTest
-```
+次に、ユーザーの操作を模倣して、各機能が全体として正しく動作するかを検証するFeatureテストを作成します（テストファイルは本 Chapter 冒頭で一括 `touch` 済みのため、ここでは内容を埋めるだけです）。
 
 ### BookTest (書籍管理機能)
 

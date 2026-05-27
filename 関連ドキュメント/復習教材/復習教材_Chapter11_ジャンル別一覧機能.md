@@ -61,7 +61,11 @@ Genre起点の方が、「このジャンルに属する書籍」という要件
 
 ## 4. 実装 🚀
 
-`GenreController` は Chapter 06 の「ルート定義とコントローラーの準備」で既に作成済みです。ここでは `show` メソッドを実装します。Chapter 12 で残りのCRUDメソッドを追加します。
+`GenreController` を新規作成し、`show` メソッドを実装します。Chapter 12 で残りのCRUDメソッド（index / create / store / edit / update / destroy）を追加します。
+
+```bash
+sail artisan make:controller GenreController
+```
 
 ### `app/Http/Controllers/GenreController.php`（showメソッドのみ）
 
