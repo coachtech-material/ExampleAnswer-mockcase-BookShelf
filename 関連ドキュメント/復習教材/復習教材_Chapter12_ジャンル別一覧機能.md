@@ -1,4 +1,4 @@
-# Chapter 11: 分類の窓口 - ジャンル別一覧機能を実装する
+# Chapter 12: 分類の窓口 - ジャンル別一覧機能を読み解く
 
 ## 🎯 このセクションで学ぶこと
 
@@ -61,13 +61,9 @@ Genre起点の方が、「このジャンルに属する書籍」という要件
 
 ## 4. 実装 🚀
 
-`GenreController` を新規作成し、`show` メソッドを実装します。Chapter 12 で残りのCRUDメソッド（index / create / store / edit / update / destroy）を追加します。
+`GenreController@show` は **Chapter 11 で先行実装済み**です。本 Chapter では実装コードを書かず、その動作と設計判断を読み解きます。
 
-```bash
-sail artisan make:controller GenreController
-```
-
-### `app/Http/Controllers/GenreController.php`（showメソッドのみ）
+### `app/Http/Controllers/GenreController.php`（show メソッド・Chapter 11 で実装済み）
 
 ```php
 public function show(Genre $genre)
@@ -78,7 +74,7 @@ public function show(Genre $genre)
 }
 ```
 
-> **注意:** この時点では `show` メソッドのみを実装します。GenreControllerの完全な実装（index / create / store / edit / update / destroy）は Chapter 12 で行います。
+> **注意:** コード自体は Chapter 11 の GenreController 完全実装に含まれています。本 Chapter ではこのメソッドの「なぜそう書くか」「何が起きるか」を学びます。
 
 ## 5. コードの詳細解説 🔍
 
@@ -94,7 +90,7 @@ public function show(Genre $genre)
 
 | コード / 構文 | 解説 |
 |:---|:---|
-| `show(Genre $genre): View` | ルートモデルバインディングで `Genre` モデルを受け取り、`View` オブジェクトを返します。`/genres/{genre}` のURLに対応します。 |
+| `show(Genre $genre)` | ルートモデルバインディングで `Genre` モデルを受け取り、View を返します。`/genres/{genre}` のURLに対応します。 |
 | `$genre->books()` | `Genre` モデルに定義した `books` リレーション（`belongsToMany`）を呼び出します。中間テーブル `book_genre` を経由して書籍を取得するクエリビルダが返されます。 |
 | `->with('genres')` | 各書籍に紐づくジャンル情報をEager Loadingします。N+1問題を防ぎ、書籍のジャンルバッジ表示時に追加クエリが発生しません。 |
 | `->paginate(10)` | 10件ずつページネーションして取得します。大量の書籍があっても適切な件数で分割表示できます。 |
@@ -129,4 +125,4 @@ public function show(Genre $genre)
 - **Eager Loadingの活用**: `with('genres')` で各書籍のジャンル情報を事前に読み込み、N+1問題を防止しました
 - **ページネーション**: `paginate(10)` で大量データに対応しました
 
-次の Chapter 12 では、ジャンルの登録・編集・削除を行う**ジャンル管理機能（CRUD）**を実装します。Chapter 06 の書籍CRUDと同じパターンを、別のリソースで再実践します。
+次の Chapter 13 では、外部アプリケーション向けの**公開 API（書籍 CRUD）** を `Api\V1` 名前空間で実装します。Web ルートとは別の名前空間設計、API リソースの構造、認証なしの公開エンドポイント設計を学びます。
