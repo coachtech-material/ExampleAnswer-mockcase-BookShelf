@@ -230,7 +230,7 @@ class BookSeeder extends Seeder
                 'author' => '岸見一郎・古賀史健',
                 'isbn' => '9784478025819',
                 'published_date' => '2013-12-13',
-                'description' => 'アドラー心理学を対話形式でわかりや���く解説した自己啓発書。',
+                'description' => 'アドラー心理学を対話形式でわかりやすく解説した自己啓発書。',
                 'image_url' => 'https://placehold.co/200x300/e2e8f0/475569?text=8',
                 'genres' => ['自己啓発'],
             ],
