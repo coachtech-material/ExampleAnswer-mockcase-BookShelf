@@ -313,7 +313,7 @@ fetch async await 使い方
 
 ## 7. 動作確認 ✅
 
-> **画面動作確認時の注意:** 本 Chapter の動作確認は書籍登録フォーム（`/books/create`）での ISBN 検索ボタン押下が中心ですが、`navigation.blade.php` が `reports.index` を参照しているため、Chapter 20 読書計画 + 通知の実装前は画面表示で `Route [reports.index] not defined` の 500 エラーになります。**画面動作確認は Chapter 20 完了後に行ってください。** ISBN 検索エンドポイント自体は curl で直接叩けば確認可能です（例: `curl -s http://localhost/books/isbn/9784297124219`、ただし認証必須のため Cookie が必要）。
+> **画面動作確認時の注意:** 本 Chapter の動作確認は書籍登録フォーム（`/books/create`）での ISBN 検索ボタン押下が中心ですが、`navigation.blade.php` が `reports.index` を参照しているため、Chapter 20 読書計画 + 通知の実装前は画面表示で `Route [reports.index] not defined` の 500 エラーになります。**画面動作確認は Chapter 21 完了後に行ってください。** ISBN 検索エンドポイント自体は curl で直接叩けば確認可能です（例: `curl -s http://localhost/books/isbn/9784297124219`、ただし認証必須のため Cookie が必要）。
 
 | 確認項目 | 確認方法 |
 |:---|:---|
