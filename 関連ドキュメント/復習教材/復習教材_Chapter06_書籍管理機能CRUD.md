@@ -521,16 +521,6 @@ class BookController extends Controller
 }
 ```
 
-### 4.5. Bladeテンプレートの配置
-
-提供された Blade ファイルを以下に配置します:
-
-- `resources/views/books/index.blade.php` — 書籍一覧
-- `resources/views/books/show.blade.php` — 書籍詳細
-- `resources/views/books/create.blade.php` — 書籍登録フォーム
-- `resources/views/books/edit.blade.php` — 書籍編集フォーム
-- `resources/views/books/_form.blade.php` — フォーム共通パーシャル
-
 ## 5. コードの詳細解説 🔍
 
 ### BookController — 各メソッドの解説
