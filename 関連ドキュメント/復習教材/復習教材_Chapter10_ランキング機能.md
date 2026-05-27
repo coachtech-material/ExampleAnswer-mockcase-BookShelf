@@ -77,7 +77,7 @@ use Illuminate\View\View;
 
 class RankingController extends Controller
 {
-    public function index(): View
+    public function index()
     {
         $rankedBooks = Book::withAvg('reviews', 'rating')
             ->withCount('reviews')

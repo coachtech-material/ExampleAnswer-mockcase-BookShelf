@@ -11,21 +11,21 @@ use Illuminate\View\View;
 
 class BookController extends Controller
 {
-    public function index(): View
+    public function index()
     {
         $books = Book::with('genres')->latest()->paginate(10);
 
         return view('books.index', compact('books'));
     }
 
-    public function create(): View
+    public function create()
     {
         $genres = Genre::all();
 
         return view('books.create', compact('genres'));
     }
 
-    public function store(StoreBookRequest $request): RedirectResponse
+    public function store(StoreBookRequest $request)
     {
         $validated = $request->validated();
         $bookData = collect($validated)->except('genres')->toArray();
@@ -35,14 +35,14 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍を登録しました。');
     }
 
-    public function show(Book $book): View
+    public function show(Book $book)
     {
         $book->load(['reviews.user', 'genres']);
 
         return view('books.show', compact('book'));
     }
 
-    public function edit(Book $book): View
+    public function edit(Book $book)
     {
         $this->authorize('update', $book);
         $genres = Genre::all();
@@ -50,7 +50,7 @@ class BookController extends Controller
         return view('books.edit', compact('book', 'genres'));
     }
 
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    public function update(UpdateBookRequest $request, Book $book)
     {
         $this->authorize('update', $book);
         $validated = $request->validated();
@@ -61,7 +61,7 @@ class BookController extends Controller
         return redirect()->route('books.show', $book)->with('success', '書籍情報を更新しました。');
     }
 
-    public function destroy(Book $book): RedirectResponse
+    public function destroy(Book $book)
     {
         $this->authorize('delete', $book);
         $book->delete();

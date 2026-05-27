@@ -107,12 +107,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class IndexBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'keyword' => ['nullable', 'string', 'max:255'],
@@ -122,7 +122,7 @@ class IndexBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'keyword.max' => 'キーワードは255文字以内で入力してください。',
@@ -153,12 +153,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -173,7 +173,7 @@ class StoreBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'user_id.required' => 'ユーザーIDは必須です。',
@@ -221,12 +221,12 @@ use Illuminate\Validation\Rule;
 
 class UpdateBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -241,7 +241,7 @@ class UpdateBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'user_id.required' => 'ユーザーIDは必須です。',
@@ -292,7 +292,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class GenreResource extends JsonResource
 {
-    public function toArray(Request $request): array
+    public function toArray(Request $request)
     {
         return [
             'id' => $this->id,
@@ -318,7 +318,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ReviewResource extends JsonResource
 {
-    public function toArray(Request $request): array
+    public function toArray(Request $request)
     {
         return [
             'id' => $this->id,
@@ -347,7 +347,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class BookResource extends JsonResource
 {
-    public function toArray(Request $request): array
+    public function toArray(Request $request)
     {
         return [
             'id' => $this->id,
@@ -399,7 +399,7 @@ class Handler extends ExceptionHandler
         'password_confirmation',
     ];
 
-    public function register(): void
+    public function register()
     {
         $this->reportable(function (Throwable $e) {
             //
@@ -456,7 +456,7 @@ use Illuminate\Http\Response;
 
 class BookController extends Controller
 {
-    public function index(IndexBookRequest $request): AnonymousResourceCollection
+    public function index(IndexBookRequest $request)
     {
         $query = Book::with('genres')
             ->withCount('reviews')
@@ -483,7 +483,7 @@ class BookController extends Controller
         return BookResource::collection($books);
     }
 
-    public function show(Book $book): BookResource
+    public function show(Book $book)
     {
         $book->load(['genres', 'reviews.user']);
         $book->loadCount('reviews');
@@ -492,7 +492,7 @@ class BookController extends Controller
         return new BookResource($book);
     }
 
-    public function store(StoreBookRequest $request): JsonResponse
+    public function store(StoreBookRequest $request)
     {
         $validated = $request->validated();
         $genreIds = $validated['genres'];
@@ -511,7 +511,7 @@ class BookController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
-    public function update(UpdateBookRequest $request, Book $book): BookResource
+    public function update(UpdateBookRequest $request, Book $book)
     {
         $validated = $request->validated();
         $genreIds = $validated['genres'];
@@ -527,7 +527,7 @@ class BookController extends Controller
         return new BookResource($book);
     }
 
-    public function destroy(Book $book): JsonResponse
+    public function destroy(Book $book)
     {
         $book->delete();
 
@@ -560,7 +560,7 @@ Route::prefix('v1')->group(function () {
 ### APIコントローラー - `index` メソッド
 
 ```php
-public function index(IndexBookRequest $request): AnonymousResourceCollection
+public function index(IndexBookRequest $request)
 {
     $query = Book::with('genres')
         ->withCount('reviews')

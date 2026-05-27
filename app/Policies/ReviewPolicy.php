@@ -7,12 +7,12 @@ use App\Models\User;
 
 class ReviewPolicy
 {
-    public function update(User $user, Review $review): bool
+    public function update(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }
 
-    public function delete(User $user, Review $review): bool
+    public function delete(User $user, Review $review)
     {
         return $user->id === $review->user_id;
     }

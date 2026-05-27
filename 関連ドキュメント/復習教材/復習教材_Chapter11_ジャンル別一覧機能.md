@@ -66,7 +66,7 @@ Genre起点の方が、「このジャンルに属する書籍」という要件
 ### `app/Http/Controllers/GenreController.php`（showメソッドのみ）
 
 ```php
-public function show(Genre $genre): View
+public function show(Genre $genre)
 {
     $books = $genre->books()->with('genres')->paginate(10);
 

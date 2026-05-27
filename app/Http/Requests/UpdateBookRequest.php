@@ -7,12 +7,12 @@ use Illuminate\Validation\Rule;
 
 class UpdateBookRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'title' => ['required', 'string', 'max:255'],
@@ -26,7 +26,7 @@ class UpdateBookRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'title.required' => 'タイトルは必須です。',

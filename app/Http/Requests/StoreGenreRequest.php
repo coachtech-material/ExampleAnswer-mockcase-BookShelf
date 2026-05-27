@@ -6,19 +6,19 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreGenreRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'name' => ['required', 'string', 'max:255', 'unique:genres,name'],
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'name.required' => 'ジャンル名は必須です。',

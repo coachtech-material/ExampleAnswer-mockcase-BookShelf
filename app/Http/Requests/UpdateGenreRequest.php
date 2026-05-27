@@ -7,19 +7,19 @@ use Illuminate\Validation\Rule;
 
 class UpdateGenreRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize()
     {
         return true;
     }
 
-    public function rules(): array
+    public function rules()
     {
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('genres')->ignore($this->genre)],
         ];
     }
 
-    public function messages(): array
+    public function messages()
     {
         return [
             'name.required' => 'ジャンル名は必須です。',
