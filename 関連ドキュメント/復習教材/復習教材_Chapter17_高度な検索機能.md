@@ -334,6 +334,8 @@ Laravel paginate パラメータ 引き継ぎ
 
 ## 7. 動作確認 ✅
 
+> **画面動作確認時の注意:** 本 Chapter の動作確認はすべて書籍一覧画面（`/books`）の操作です。`/books` をはじめとする認証必須でない画面でも `navigation.blade.php` が `reports.index` を参照しているため、Chapter 19 マイ読書レポート機能の実装前は `Route [reports.index] not defined` で 500 エラーになります。**画面動作確認は Chapter 19 完了後に行ってください。** 本 Chapter 完了時点では、`BookController@index` のコード変更と Blade（高度な検索フォーム）の配置までを終え、Chapter 19 完了後にまとめて画面動作確認するのが推奨フローです。
+
 | 確認項目 | 確認方法 |
 |:---|:---|
 | キーワード検索 | `/books?keyword=Laravel` のように URL を直接叩く or 検索フォームでキーワード入力 → タイトル or 著者に含まれる書籍だけ表示される |
@@ -348,3 +350,5 @@ Laravel paginate パラメータ 引き継ぎ
 ## 8. まとめ ✨
 
 このChapterでは、`when()`メソッドや`switch`文、`whereHas`、`appends()`といった機能を組み合わせることで、柔軟でユーザーフレンドリーな高度検索機能を実装する方法を学びました。条件に応じてクエリを動的に組み立てるという考え方は、実務の様々な場面で応用できる非常に重要なテクニックです。
+
+次の Chapter 18 では、Google Books API と連携して **ISBN から書籍情報を自動取得**する機能を実装します。外部 API 連携の典型パターン（HTTP クライアント・エラー分岐・非同期通信）を学びます。

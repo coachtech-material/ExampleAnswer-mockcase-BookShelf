@@ -313,6 +313,8 @@ fetch async await 使い方
 
 ## 7. 動作確認 ✅
 
+> **画面動作確認時の注意:** 本 Chapter の動作確認は書籍登録フォーム（`/books/create`）での ISBN 検索ボタン押下が中心ですが、`navigation.blade.php` が `reports.index` を参照しているため、Chapter 19 マイ読書レポート機能の実装前は画面表示で `Route [reports.index] not defined` の 500 エラーになります。**画面動作確認は Chapter 19 完了後に行ってください。** ISBN 検索エンドポイント自体は curl で直接叩けば確認可能です（例: `curl -s http://localhost/books/isbn/9784297124219`、ただし認証必須のため Cookie が必要）。
+
 | 確認項目 | 確認方法 |
 |:---|:---|
 | 正常系: ISBN で書籍情報取得 | 書籍登録フォームで実在する ISBN（例: `9784297124219`）を入力 → 「ISBN 検索」ボタン押下 → タイトル / 著者 / 出版日等が自動入力される |
@@ -335,3 +337,5 @@ fetch async await 使い方
 - **モダンなフロントエンド**: `fetch`と`async/await`による非同期処理
 
 これらはすべて、実務で即戦力となるための重要なスキルセットです。
+
+次の Chapter 19 では、ユーザーの読書傾向を可視化する**マイ読書レポート機能**を実装します。Laravel Collection の `groupBy` / `map` / `flatMap` / `filter` / `sortByDesc` を駆使した 4 統計の集計を学びます。Chapter 19 完了で `reports.index` ルートが定義され、本 Chapter までで仕込んだ画面の動作確認もここで一括できるようになります。
