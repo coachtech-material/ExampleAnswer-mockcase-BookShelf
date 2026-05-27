@@ -369,6 +369,7 @@ class BookControllerTest extends TestCase
 
         $payload = $this->validBookData([
             'title' => 'My Test Book',
+            'isbn' => '1111111111111',
             'genres' => $genres->pluck('id')->toArray(),
         ]);
 
@@ -428,6 +429,7 @@ class BookControllerTest extends TestCase
 
         $payload = $this->validBookData([
             'title' => 'Updated Title',
+            'isbn' => '9876543210123',
             'genres' => $newGenres->pluck('id')->toArray(),
         ]);
 
@@ -438,6 +440,7 @@ class BookControllerTest extends TestCase
         $this->assertDatabaseHas('books', [
             'id' => $book->id,
             'title' => 'Updated Title',
+            'isbn' => '9876543210123',
         ]);
 
         foreach ($newGenres as $genre) {
@@ -465,6 +468,19 @@ class BookControllerTest extends TestCase
         $this->assertDatabaseMissing('books', ['id' => $book->id]);
     }
 
+    public function test_non_owner_cannot_delete_book(): void
+    {
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($otherUser)
+            ->delete(route('books.destroy', $book))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+    }
+
     public function test_only_owner_can_view_edit_form(): void
     {
         $owner = User::factory()->create();
@@ -478,19 +494,6 @@ class BookControllerTest extends TestCase
         $this->actingAs($otherUser)
             ->get(route('books.edit', $book))
             ->assertForbidden();
-    }
-
-    public function test_non_owner_cannot_delete_book(): void
-    {
-        $owner = User::factory()->create();
-        $book = Book::factory()->for($owner)->create();
-        $otherUser = User::factory()->create();
-
-        $this->actingAs($otherUser)
-            ->delete(route('books.destroy', $book))
-            ->assertForbidden();
-
-        $this->assertDatabaseHas('books', ['id' => $book->id]);
     }
 
     private function validBookData(array $overrides = []): array
@@ -564,11 +567,40 @@ class ReviewTest extends TestCase
         $book = Book::factory()->create();
 
         $response = $this->actingAs($user)->post(route('reviews.store', $book), [
-            'rating' => 6, // 不正な値
+            'rating' => 6,
+            'comment' => str_repeat('a', 1001),
         ]);
 
-        $response->assertSessionHasErrors(['rating']);
+        $response->assertSessionHasErrors(['rating', 'comment']);
         $this->assertDatabaseCount('reviews', 0);
+    }
+
+    public function test_review_store_rating_below_min(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+
+        $this->actingAs($user)->post(route('reviews.store', $book), [
+            'rating' => 0,
+            'comment' => '下限違反',
+        ])->assertSessionHasErrors(['rating']);
+
+        $this->assertDatabaseCount('reviews', 0);
+    }
+
+    public function test_only_owner_can_edit_review(): void
+    {
+        $owner = User::factory()->create();
+        $review = Review::factory()->for($owner)->create();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($owner)
+            ->get(route('reviews.edit', $review))
+            ->assertOk();
+
+        $this->actingAs($otherUser)
+            ->get(route('reviews.edit', $review))
+            ->assertForbidden();
     }
 
     public function test_only_owner_can_update_review(): void
@@ -577,7 +609,6 @@ class ReviewTest extends TestCase
         $review = Review::factory()->for($owner)->create(['rating' => 3]);
         $otherUser = User::factory()->create();
 
-        // オーナーは更新できる
         $this->actingAs($owner)
             ->put(route('reviews.update', $review), [
                 'rating' => 4,
@@ -585,12 +616,24 @@ class ReviewTest extends TestCase
             ])
             ->assertRedirect(route('books.show', $review->book));
 
-        $this->assertDatabaseHas('reviews', ['id' => $review->id, 'rating' => 4]);
+        $this->assertDatabaseHas('reviews', [
+            'id' => $review->id,
+            'rating' => 4,
+            'comment' => 'Updated comment',
+        ]);
 
-        // 他のユーザーは更新できない
         $this->actingAs($otherUser)
-            ->put(route('reviews.update', $review), ['rating' => 2])
+            ->put(route('reviews.update', $review), [
+                'rating' => 2,
+                'comment' => 'Not allowed',
+            ])
             ->assertForbidden();
+
+        $this->assertDatabaseHas('reviews', [
+            'id' => $review->id,
+            'rating' => 4,
+            'comment' => 'Updated comment',
+        ]);
     }
 
     public function test_only_owner_can_delete_review(): void
@@ -599,14 +642,12 @@ class ReviewTest extends TestCase
         $review = Review::factory()->for($owner)->create();
         $otherUser = User::factory()->create();
 
-        // 他のユーザーは削除できない
         $this->actingAs($otherUser)
             ->delete(route('reviews.destroy', $review))
             ->assertForbidden();
 
         $this->assertDatabaseHas('reviews', ['id' => $review->id]);
 
-        // オーナーは削除できる
         $this->actingAs($owner)
             ->delete(route('reviews.destroy', $review))
             ->assertRedirect(route('books.show', $review->book));
@@ -634,7 +675,7 @@ class FavoriteTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_favorite_book(): void
+    public function test_user_can_add_favorite(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
@@ -642,7 +683,7 @@ class FavoriteTest extends TestCase
 
         $this->actingAs($user)
             ->from($from)
-            ->post(route('books.favorite', $book))
+            ->post(route('favorites.toggle', $book))
             ->assertRedirect($from);
 
         $this->assertDatabaseHas('favorites', [
@@ -651,7 +692,7 @@ class FavoriteTest extends TestCase
         ]);
     }
 
-    public function test_user_can_unfavorite_book(): void
+    public function test_user_can_remove_favorite(): void
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
@@ -660,7 +701,7 @@ class FavoriteTest extends TestCase
 
         $this->actingAs($user)
             ->from($from)
-            ->post(route('books.favorite', $book))
+            ->post(route('favorites.toggle', $book))
             ->assertRedirect($from);
 
         $this->assertDatabaseMissing('favorites', [
@@ -669,11 +710,60 @@ class FavoriteTest extends TestCase
         ]);
     }
 
-    public function test_guest_cannot_favorite_book(): void
+    public function test_favorite_toggle_works_correctly(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+        $from = route('books.show', $book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('favorites.toggle', $book))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+    }
+
+    public function test_favorite_index_page_can_be_rendered(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Favorite Book']);
+        $user->favoriteBooks()->attach($book->id);
+
+        $this->actingAs($user)
+            ->get(route('favorites.index'))
+            ->assertOk()
+            ->assertSee('Favorite Book');
+    }
+
+    public function test_guest_cannot_toggle_favorite(): void
     {
         $book = Book::factory()->create();
 
-        $this->post(route('books.favorite', $book))
+        $this->post(route('favorites.toggle', $book))
             ->assertRedirect(route('login'));
     }
 }
@@ -732,6 +822,43 @@ class ReviewLikeTest extends TestCase
         ]);
     }
 
+    public function test_like_toggle_works_correctly(): void
+    {
+        $user = User::factory()->create();
+        $review = Review::factory()->create();
+        $from = route('books.show', $review->book);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseMissing('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from($from)
+            ->post(route('reviews.like', $review))
+            ->assertRedirect($from);
+
+        $this->assertDatabaseHas('review_likes', [
+            'user_id' => $user->id,
+            'review_id' => $review->id,
+        ]);
+    }
+
     public function test_guest_cannot_like_review(): void
     {
         $review = Review::factory()->create();
@@ -761,15 +888,59 @@ class GenreTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_genre_index_page_can_be_rendered(): void
+    {
+        $user = User::factory()->create();
+        Genre::factory()->count(3)->create();
+
+        $this->actingAs($user)
+            ->get(route('genres.index'))
+            ->assertOk();
+    }
+
     public function test_authenticated_user_can_create_genre(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->post(route('genres.store'), ['name' => 'Science Fiction'])
+            ->post(route('genres.store'), [
+                'name' => 'Science Fiction',
+            ])
             ->assertRedirect(route('genres.index'));
 
         $this->assertDatabaseHas('genres', ['name' => 'Science Fiction']);
+    }
+
+    public function test_genre_store_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        Genre::factory()->create(['name' => 'Fantasy']);
+
+        $this->actingAs($user)
+            ->post(route('genres.store'), ['name' => 'Fantasy'])
+            ->assertSessionHasErrors(['name']);
+    }
+
+    public function test_authenticated_user_can_view_create_form(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('genres.create'))
+            ->assertOk();
+    }
+
+    public function test_genre_show_page_displays_books(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Mystery']);
+        $book = Book::factory()->create(['title' => 'Mystery Book']);
+        $book->genres()->attach($genre);
+
+        $this->actingAs($user)
+            ->get(route('genres.show', $genre))
+            ->assertOk()
+            ->assertSee('Mystery Book');
     }
 
     public function test_authenticated_user_can_update_genre(): void
@@ -781,20 +952,33 @@ class GenreTest extends TestCase
             ->put(route('genres.update', $genre), ['name' => 'World History'])
             ->assertRedirect(route('genres.index'));
 
-        $this->assertDatabaseHas('genres', ['id' => $genre->id, 'name' => 'World History']);
+        $this->assertDatabaseHas('genres', [
+            'id' => $genre->id,
+            'name' => 'World History',
+        ]);
+    }
+
+    public function test_authenticated_user_can_view_edit_form(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Poetry']);
+
+        $this->actingAs($user)
+            ->get(route('genres.edit', $genre))
+            ->assertOk();
     }
 
     public function test_genre_with_books_cannot_be_deleted(): void
     {
         $user = User::factory()->create();
-        $genre = Genre::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Adventure']);
         $book = Book::factory()->create();
         $book->genres()->attach($genre);
 
         $this->actingAs($user)
             ->delete(route('genres.destroy', $genre))
             ->assertRedirect(route('genres.index'))
-            ->assertSessionHas('error');
+            ->assertSessionHas('error', 'このジャンルには書籍が紐付いているため削除できません。');
 
         $this->assertDatabaseHas('genres', ['id' => $genre->id]);
     }
@@ -802,12 +986,12 @@ class GenreTest extends TestCase
     public function test_genre_without_books_can_be_deleted(): void
     {
         $user = User::factory()->create();
-        $genre = Genre::factory()->create();
+        $genre = Genre::factory()->create(['name' => 'Short Stories']);
 
         $this->actingAs($user)
             ->delete(route('genres.destroy', $genre))
             ->assertRedirect(route('genres.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('success', 'ジャンルを削除しました。');
 
         $this->assertDatabaseMissing('genres', ['id' => $genre->id]);
     }
