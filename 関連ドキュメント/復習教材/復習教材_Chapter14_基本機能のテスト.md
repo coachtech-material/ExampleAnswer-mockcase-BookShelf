@@ -829,17 +829,521 @@ class GenreTest extends TestCase
 - **`assertDatabaseMissing($table, $data)`**: レコードが存在しないことを確認します。
 - **`assertSessionHasErrors($keys)`**: セッションに指定したキーのバリデーションエラーが含まれていることを確認します。
 
-### その他の Feature テスト（完全手順書を参照）
+### BookRequestTest (書籍 FormRequest)
 
-本 Chapter 冒頭の `touch` で作成した以下のテストファイルは、コード詳細を本 Chapter 内では割愛します。**完全手順書 Step 14** の該当節を参照して内容を埋めてください:
+`tests/Feature/BookRequestTest.php`
 
-| ファイル | テスト対象 |
-|:---|:---|
-| `tests/Feature/BookRequestTest.php` | 書籍 FormRequest のバリデーションテスト（必須・桁数・ジャンル必須等） |
-| `tests/Feature/RankingTest.php` | ランキング機能（評価降順表示・レビューなし書籍は非表示） |
-| `tests/Feature/RedirectIfAuthenticatedTest.php` | 認証ミドルウェアのリダイレクト挙動 |
-| `tests/Feature/ReviewPolicyTest.php` | レビュー Policy の認可テスト（投稿者のみ編集 / 削除可） |
-| `tests/Feature/Api/V1/BookApiTest.php` | 公開 API（書籍 CRUD・認証なし）の Feature テスト |
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Genre;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class BookRequestTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_タイトルは必須(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => '',
+            'author' => 'テスト著者',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertSessionHasErrors('title');
+    }
+
+    public function test_著者は必須(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => 'テスト書籍',
+            'author' => '',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertSessionHasErrors('author');
+    }
+
+    public function test_isbnは13桁でなければならない(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => 'テスト書籍',
+            'author' => 'テスト著者',
+            'isbn' => '123456789',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertSessionHasErrors('isbn');
+    }
+
+    public function test_ジャンルは必須(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => 'テスト書籍',
+            'author' => 'テスト著者',
+            'genres' => [],
+        ]);
+
+        $response->assertSessionHasErrors('genres');
+    }
+}
+```
+
+### RankingTest (ランキング機能)
+
+`tests/Feature/RankingTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Review;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RankingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_ranking_page_can_be_rendered(): void
+    {
+        $book = Book::factory()->create(['title' => 'Ranked Book']);
+        Review::factory()->for($book)->count(2)->create(['rating' => 5]);
+
+        $this->get(route('ranking.index'))
+            ->assertOk()
+            ->assertSee('Ranked Book');
+    }
+
+    public function test_ranking_is_ordered_by_average_rating(): void
+    {
+        $topBook = Book::factory()->create(['title' => 'Top Book']);
+        Review::factory()->for($topBook)->count(2)->create(['rating' => 5]);
+
+        $middleBook = Book::factory()->create(['title' => 'Middle Book']);
+        Review::factory()->for($middleBook)->count(2)->create(['rating' => 3]);
+
+        $lowBook = Book::factory()->create(['title' => 'Low Book']);
+        Review::factory()->for($lowBook)->count(2)->create(['rating' => 1]);
+
+        $this->get(route('ranking.index'))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Top Book',
+                'Middle Book',
+                'Low Book',
+            ]);
+    }
+}
+```
+
+### RedirectIfAuthenticatedTest (認証ミドルウェア)
+
+`tests/Feature/RedirectIfAuthenticatedTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Http\Middleware\RedirectIfAuthenticated;
+use App\Models\User;
+use App\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Tests\TestCase;
+
+class RedirectIfAuthenticatedTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_user_is_redirected_to_home(): void
+    {
+        $middleware = new RedirectIfAuthenticated;
+        $request = Request::create('/login', 'GET');
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+
+        $response = $middleware->handle($request, fn () => response('next'));
+
+        $this->assertEquals(url(RouteServiceProvider::HOME), $response->headers->get('Location'));
+
+        Auth::logout();
+    }
+
+    public function test_guest_can_access_route(): void
+    {
+        $middleware = new RedirectIfAuthenticated;
+        $request = Request::create('/login', 'GET');
+
+        $response = $middleware->handle($request, fn () => response('allowed'));
+
+        $this->assertEquals('allowed', $response->getContent());
+    }
+}
+```
+
+### ReviewPolicyTest (レビュー Policy)
+
+`tests/Feature/ReviewPolicyTest.php`
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ReviewPolicyTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_レビュー投稿者のみが編集できる(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->create(['user_id' => $owner->id]);
+        $book->genres()->attach($genre->id);
+        $review = Review::factory()->create(['user_id' => $owner->id, 'book_id' => $book->id]);
+
+        $this->assertTrue($owner->can('update', $review));
+        $this->assertFalse($other->can('update', $review));
+    }
+
+    public function test_レビュー投稿者のみが削除できる(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->create(['user_id' => $owner->id]);
+        $book->genres()->attach($genre->id);
+        $review = Review::factory()->create(['user_id' => $owner->id, 'book_id' => $book->id]);
+
+        $this->assertTrue($owner->can('delete', $review));
+        $this->assertFalse($other->can('delete', $review));
+    }
+}
+```
+
+### BookApiTest (公開 API)
+
+`tests/Feature/Api/V1/BookApiTest.php`
+
+公開 API（書籍 CRUD・認証なし）の Feature テスト。Sanctum 認証付き完全版は応用機能編 Chapter 21 で置き換えます。
+
+```php
+<?php
+
+namespace Tests\Feature\Api\V1;
+
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class BookApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    // ===== GET /api/v1/books =====
+
+    public function test_index_returns_data_and_meta_structure(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        Book::factory()->count(3)->for($user)->create()->each(function ($book) use ($genre) {
+            $book->genres()->attach($genre);
+        });
+
+        $response = $this->getJson('/api/v1/books');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                '*' => [
+                    'id', 'title', 'author', 'isbn', 'published_date',
+                    'description', 'image_url', 'genres',
+                    'average_rating', 'review_count',
+                ],
+            ],
+            'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        ]);
+        $response->assertJsonMissing(['reviews' => []]);
+    }
+
+    public function test_index_filters_by_keyword(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $hit = Book::factory()->for($user)->create(['title' => 'Laravel入門']);
+        $miss = Book::factory()->for($user)->create(['title' => 'PHP基礎']);
+        $hit->genres()->attach($genre);
+        $miss->genres()->attach($genre);
+
+        $response = $this->getJson('/api/v1/books?keyword=Laravel');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'Laravel入門');
+    }
+
+    public function test_index_filters_by_genre_id(): void
+    {
+        $user = User::factory()->create();
+        $genreA = Genre::factory()->create();
+        $genreB = Genre::factory()->create();
+        $bookA = Book::factory()->for($user)->create(['title' => 'BookA']);
+        $bookB = Book::factory()->for($user)->create(['title' => 'BookB']);
+        $bookA->genres()->attach($genreA);
+        $bookB->genres()->attach($genreB);
+
+        $response = $this->getJson("/api/v1/books?genre_id={$genreA->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'BookA');
+    }
+
+    public function test_index_pagination_per_page(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        Book::factory()->count(5)->for($user)->create()->each(function ($book) use ($genre) {
+            $book->genres()->attach($genre);
+        });
+
+        $response = $this->getJson('/api/v1/books?per_page=2');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('meta.per_page', 2);
+        $response->assertJsonPath('meta.last_page', 3);
+        $response->assertJsonPath('meta.total', 5);
+    }
+
+    public function test_index_returns_422_when_per_page_exceeds_max(): void
+    {
+        $response = $this->getJson('/api/v1/books?per_page=200');
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['per_page']);
+    }
+
+    // ===== GET /api/v1/books/{book} =====
+
+    public function test_show_returns_book_with_reviews(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $book->genres()->attach($genre);
+        Review::factory()->for($book)->for($user)->create();
+
+        $response = $this->getJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                'id', 'title', 'author', 'isbn', 'published_date',
+                'description', 'image_url', 'genres',
+                'average_rating', 'review_count',
+                'reviews' => [
+                    '*' => ['id', 'user_name', 'rating', 'comment', 'created_at'],
+                ],
+            ],
+        ]);
+        $response->assertJsonPath('data.id', $book->id);
+    }
+
+    public function test_show_returns_custom_404_json_when_not_found(): void
+    {
+        $response = $this->getJson('/api/v1/books/99999');
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
+    }
+
+    // ===== POST /api/v1/books =====
+
+    public function test_store_creates_book_and_attaches_genres(): void
+    {
+        $user = User::factory()->create();
+        $genres = Genre::factory()->count(2)->create();
+
+        $payload = [
+            'user_id' => $user->id,
+            'title' => 'New API Book',
+            'author' => 'API Author',
+            'isbn' => '9784000000000',
+            'published_date' => '2024-01-01',
+            'description' => 'desc',
+            'image_url' => 'https://example.com/image.jpg',
+            'genres' => $genres->pluck('id')->toArray(),
+        ];
+
+        $response = $this->postJson('/api/v1/books', $payload);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'New API Book');
+
+        $this->assertDatabaseHas('books', [
+            'user_id' => $user->id,
+            'title' => 'New API Book',
+            'isbn' => '9784000000000',
+        ]);
+
+        $book = Book::where('isbn', '9784000000000')->first();
+        foreach ($genres as $genre) {
+            $this->assertDatabaseHas('book_genre', [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ]);
+        }
+    }
+
+    public function test_store_returns_422_with_validation_errors(): void
+    {
+        $response = $this->postJson('/api/v1/books', [
+            'title' => '',
+            'author' => '',
+            'isbn' => '123',
+            'published_date' => 'invalid',
+            'genres' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors([
+            'user_id', 'title', 'author', 'isbn', 'published_date', 'genres',
+        ]);
+    }
+
+    // ===== PUT /api/v1/books/{book} =====
+
+    public function test_update_modifies_book_fields_and_genres(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create(['title' => 'Old Title']);
+        $oldGenre = Genre::factory()->create();
+        $newGenre = Genre::factory()->create();
+        $book->genres()->attach($oldGenre);
+
+        $payload = [
+            'user_id' => $user->id,
+            'title' => 'Updated Title',
+            'author' => 'Updated Author',
+            'isbn' => '9784000000111',
+            'published_date' => '2024-02-02',
+            'description' => null,
+            'image_url' => null,
+            'genres' => [$newGenre->id],
+        ];
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", $payload);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated Title');
+
+        $this->assertDatabaseHas('books', [
+            'id' => $book->id,
+            'title' => 'Updated Title',
+        ]);
+        $this->assertDatabaseHas('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $newGenre->id,
+        ]);
+        $this->assertDatabaseMissing('book_genre', [
+            'book_id' => $book->id,
+            'genre_id' => $oldGenre->id,
+        ]);
+    }
+
+    public function test_update_returns_404_for_unknown_book(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $response = $this->putJson('/api/v1/books/99999', [
+            'user_id' => $user->id,
+            'title' => 'X',
+            'author' => 'Y',
+            'isbn' => '9784000000222',
+            'published_date' => '2024-01-01',
+            'genres' => [$genre->id],
+        ]);
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
+    }
+
+    public function test_update_returns_422_with_validation_errors(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $response = $this->putJson("/api/v1/books/{$book->id}", [
+            'title' => '',
+            'author' => '',
+            'isbn' => 'short',
+            'published_date' => 'no-date',
+            'genres' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors([
+            'user_id', 'title', 'author', 'isbn', 'published_date', 'genres',
+        ]);
+    }
+
+    // ===== DELETE /api/v1/books/{book} =====
+
+    public function test_destroy_deletes_book_and_returns_204(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $response = $this->deleteJson("/api/v1/books/{$book->id}");
+
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+    }
+
+    public function test_destroy_returns_404_for_unknown_book(): void
+    {
+        $response = $this->deleteJson('/api/v1/books/99999');
+
+        $response->assertStatus(404);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
+    }
+}
+```
 
 ---
 
