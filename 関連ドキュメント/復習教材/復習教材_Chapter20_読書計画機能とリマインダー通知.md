@@ -173,7 +173,9 @@ enum ReadingPlanStatus: string
 
 `label()` は Blade からの表示用、`badgeClass()` は同じ Blade からバッジの Tailwind クラスを取得するためのメソッド。Enum 内に表示ロジックを集約することで、Blade 側で `match` を書かずに `$plan->status->label()` だけで済む。
 
-### 4.2. `app/Models/ReadingPlan.php`
+### 4.2. `app/Models/ReadingPlan.php` + User モデルへの readingPlans リレーション追記
+
+> **重要:** 本 subsection は **2 ファイル** の変更を含みます（`ReadingPlan.php` 新規作成 + `User.php` への 1 メソッド追記）。User 側の追記を忘れると「読書計画」画面で `Call to undefined method App\Models\User::readingPlans()` エラーが発生するので必ず両方実装してください。
 
 ```bash
 sail artisan make:model ReadingPlan
