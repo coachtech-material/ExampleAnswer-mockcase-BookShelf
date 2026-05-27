@@ -40,7 +40,7 @@ Chapter 13 で実装した公開APIは、全てのエンドポイントが認証
 | ファイル | 変更内容 |
 |:---|:---|
 | Sanctumパッケージ | インストール・マイグレーション |
-| `app/Models/User.php` | `HasApiTokens`トレイトの確認 |
+| `app/Models/User.php` | `HasApiTokens`トレイトの追加 |
 | `routes/api.php` | 読み取り/書き込みルートの分離 |
 | `app/Http/Requests/Api/V1/StoreBookRequest.php` | `user_id`ルール削除 |
 | `app/Http/Requests/Api/V1/UpdateBookRequest.php` | `user_id`ルール削除 |
@@ -56,7 +56,7 @@ Chapter 13 で実装した公開APIは、全てのエンドポイントが認証
 
 ## 4. 実装 🚀
 
-### 18.1. Sanctum のインストール
+### 16.1. Sanctum のインストール
 
 ```bash
 sail composer require laravel/sanctum
@@ -64,9 +64,11 @@ sail artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 sail artisan migrate
 ```
 
-### 18.2. User モデルの確認
+### 16.2. User モデルへの HasApiTokens トレイト追加
 
-Chapter 3 で既に `HasApiTokens` トレイトを追加済みです。追加されていない場合は `app/Models/User.php` に追加してください。
+Chapter 03（モデルとリレーションシップ）では `HasApiTokens` トレイトを意図的に追加していません。Sanctum 認証層を導入するこの Chapter で `app/Models/User.php` に追加します。
+
+> **重要:** この追加を忘れると Sanctum 認証 API のテスト（`Sanctum::actingAs($user)` を使う）で `Call to undefined method App\Models\User::withAccessToken()` エラーが発生します。
 
 ```php
 use Laravel\Sanctum\HasApiTokens;
@@ -76,7 +78,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 ```
 
-### 18.3. APIルートの更新 (`routes/api.php`)
+### 16.3. APIルートの更新 (`routes/api.php`)
 
 認証不要の読み取り系と、Sanctum 必須の書き込み系を分離します。
 
@@ -108,7 +110,7 @@ Route::prefix('v1')->group(function () {
 });
 ```
 
-### 18.4. StoreBookRequest / UpdateBookRequest の更新
+### 16.4. StoreBookRequest / UpdateBookRequest の更新
 
 Sanctum 認証により `$request->user()` からユーザーを取得できるようになるため、`user_id` フィールドを削除します。
 
@@ -253,7 +255,7 @@ class UpdateBookRequest extends FormRequest
 }
 ```
 
-### 18.5. Api\V1\BookController の更新
+### 16.5. Api\V1\BookController の更新
 
 `store` / `update` / `destroy` を Sanctum 認証版に書き換えます。以下が**最終版の完全なコントローラ**です。
 
