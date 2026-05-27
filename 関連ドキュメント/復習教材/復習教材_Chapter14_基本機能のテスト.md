@@ -823,7 +823,9 @@ class GenreTest extends TestCase
 
 ## 14.5. テストの実行
 
-全てのテストコードを書き終えたら、以下のコマンドでテストを実行します。
+> **重要:** 提供された Blade テンプレート（navigation.blade.php 等）は、応用機能編 Chapter 19 マイレポート機能で追加する `reports.index` ルートを参照しています。テストファイルはこの Chapter で作成しますが、**`sail artisan test` の実行は Chapter 19 完了後に行ってください。** `reports.index` ルートが未定義の状態でテストを実行すると、ビューのレンダリングで `Route [reports.index] not defined` エラーが発生します（実際の実行は Chapter 21 で応用機能のテストを追加した後に行うのが自然）。
+
+全てのテストコードを書き終えたら、以下のコマンドでテストを実行します（Chapter 19 完了後）。
 
 ```bash
 # 全てのテストを実行
