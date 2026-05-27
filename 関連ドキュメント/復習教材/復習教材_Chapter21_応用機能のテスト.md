@@ -447,7 +447,7 @@ class BookControllerTest extends TestCase
             ->getJson(route('books.searchByIsbn', ['isbn' => '9784000000000']));
 
         $response->assertStatus(404);
-        $response->assertJson(['error' => '書籍が��つかりませんでした。']);
+        $response->assertJson(['error' => '書籍が見つかりませんでした。']);
     }
 
     public function test_search_by_isbn_returns_500_on_api_exception(): void
@@ -462,7 +462,7 @@ class BookControllerTest extends TestCase
             ->getJson(route('books.searchByIsbn', ['isbn' => '9784000000000']));
 
         $response->assertStatus(500);
-        $response->assertJson(['error' => 'API通信エラーが発生���ました。']);
+        $response->assertJson(['error' => 'API通信エラーが発生しました。']);
     }
 
     private function validBookData(array $overrides = []): array
@@ -669,7 +669,7 @@ class BookApiTest extends TestCase
     {
         $user = User::factory()->create();
         $genre = Genre::factory()->create();
-        $hit = Book::factory()->for($user)->create(['title' => 'Laravel���門']);
+        $hit = Book::factory()->for($user)->create(['title' => 'Laravel入門']);
         $miss = Book::factory()->for($user)->create(['title' => 'PHP基礎']);
         $hit->genres()->attach($genre);
         $miss->genres()->attach($genre);
@@ -754,7 +754,7 @@ class BookApiTest extends TestCase
         $response = $this->getJson('/api/v1/books/99999');
 
         $response->assertStatus(404);
-        $response->assertExactJson(['error' => '書籍が見つかりませんでし��。']);
+        $response->assertExactJson(['error' => '書籍が見つかりませんでした。']);
     }
 
     // ===== POST /api/v1/books (Sanctum 必須) =====
@@ -902,7 +902,7 @@ class BookApiTest extends TestCase
         ]);
 
         $response->assertStatus(403);
-        $response->assertExactJson(['error' => 'この操作を実行する権��がありません。']);
+        $response->assertExactJson(['error' => 'この操作を実行する権限がありません。']);
     }
 
     public function test_update_returns_404_for_unknown_book(): void
@@ -974,7 +974,7 @@ class BookApiTest extends TestCase
         $response = $this->deleteJson("/api/v1/books/{$book->id}");
 
         $response->assertStatus(403);
-        $response->assertExactJson(['error' => 'この操作を実行する権限���ありません。']);
+        $response->assertExactJson(['error' => 'この操作を実行する権限がありません。']);
         $this->assertDatabaseHas('books', ['id' => $book->id]);
     }
 

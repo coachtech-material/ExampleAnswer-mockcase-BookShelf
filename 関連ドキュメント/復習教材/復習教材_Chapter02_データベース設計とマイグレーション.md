@@ -1,4 +1,4 @@
-# Chapter 02: 「データベースのGit」 - データベース設計とマイグレーショ���
+# Chapter 02: 「データベースのGit」 - データベース設計とマイグレーション
 
 ## 🎯 このセクションで学ぶこと
 
@@ -45,7 +45,7 @@ sail artisan make:migration create_review_likes_table
 
 ### 2.2. マイグレーションファイルへの記述
 
-作成された各���イグレーションファイルに、**Chapter 00のテーブル定義書**の内容をコードで記述していきます。
+作成された各マイグレーションファイルに、**Chapter 00のテーブル定義書**の内容をコードで記述していきます。
 
 ---
 
@@ -268,7 +268,7 @@ sail artisan migrate
 | コード | 設計書との対応 | 解説 |
 |:---|:---|:---|
 | `$table->id()` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義。`unsignedBigInteger`で`auto_increment`な`id`カラムを作成します。 |
-| `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、`constrained()` だけで`users`テーブルの`id`カラムへの参照を自動設定��ます。 |
+| `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、`constrained()` だけで`users`テーブルの`id`カラムへの参照を自動設定します。 |
 | `->onDelete('cascade')` | **CASCADE DELETE** | Chapter 00で「ユーザー退会時は全て消えて良い」と決めた仕様。参照先レコードが削除された時、このレコードも自動削除されます。 |
 | `$table->string('isbn', 13)->nullable()->unique()` | `isbn` (VARCHAR(13), NULLABLE, UNIQUE) | Chapter 00のヒアリングで決めた仕様をコードに反映。応用版ではISBNは任意入力のため `nullable()` を付けています。 |
 | `$table->date('published_date')->nullable()` | `published_date` (DATE, NULLABLE) | 出版日も任意入力です。 |
