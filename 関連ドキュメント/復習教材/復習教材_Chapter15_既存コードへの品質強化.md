@@ -484,9 +484,26 @@ DB から取得した `published_date` カラム（文字列「2024-01-01」）�
 
 ## 7. 動作確認 ✅
 
+### Laravel Pint（コードフォーマッタ）の紹介
+
+本 Chapter で多数のファイルに型宣言・PHPDoc を追加したため、スペースや改行などのスタイル違反が混入していないかを **Laravel Pint** で確認します。Pint は Laravel デフォルトで同梱されているコードフォーマッタ（PHP-CS-Fixer ベース）で、追加インストール不要です。
+
+```bash
+# 違反を検出するだけ（修正しない・CI 用）
+sail bin pint --test
+
+# 違反を自動修正
+sail bin pint
+```
+
+`sail bin pint --test` で `No fixable issues were found` と出れば OK。違反があれば該当行が表示されるので、`sail bin pint`（test 無し）で自動修正します。
+
+### 確認項目
+
 | 確認項目 | 確認方法 |
 |:---|:---|
-| 構文エラーがないか | `sail bin pint --test` で No fixable issues、または `sail artisan about` でエラーが出ないこと |
+| 構文エラー / スタイル違反がないか | `sail bin pint --test` で `No fixable issues were found` が出ること。違反があれば `sail bin pint` で自動修正後に再実行 |
+| Laravel 全体の構成が壊れていないか | `sail artisan about` がエラーなく実行できること |
 | マイグレーション再実行 | `sail artisan migrate:fresh --seed` でテーブルが正常に作り直されること |
 | Carbon キャスト動作 | `sail artisan tinker` で `Book::first()->published_date->format('Y/m/d')` が動作すること |
 | リレーションが従来通り動く | `sail artisan tinker` で `User::first()->books`、`Book::first()->genres` 等のリレーション取得が正常に動作すること |
