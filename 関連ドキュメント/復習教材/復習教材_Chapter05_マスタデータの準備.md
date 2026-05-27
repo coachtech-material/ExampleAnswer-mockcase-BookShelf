@@ -49,16 +49,16 @@ sail artisan make:seeder ReviewLikeSeeder
 
 Seeder にはデータの依存関係があります。例えば `BookSeeder` は `UserSeeder`（登録者のユーザー）と `GenreSeeder`（紐付けるジャンル）が完了している必要があります。依存関係を無視して実行すると、外部キー制約違反のエラーが発生します。
 
-> **重要：応用版（Advanced）の実行順序**
-> 応用版の `DatabaseSeeder` では **`GenreSeeder` を最初に、次に `UserSeeder`** の順で実行します。これは `BookSeeder` がジャンル情報も使用するため、ジャンルデータが先に存在している必要があるためです。
+> **重要：実行順序**
+> `DatabaseSeeder` では **`UserSeeder` を最初に、次に `GenreSeeder`** の順で実行します。これは `BookSeeder` がユーザーとジャンルの両方に依存するため、両方が先に存在している必要があるためです。
 
 ```
-GenreSeeder → UserSeeder → BookSeeder → ReviewSeeder → FavoriteSeeder → ReviewLikeSeeder
+UserSeeder → GenreSeeder → BookSeeder → ReviewSeeder → FavoriteSeeder → ReviewLikeSeeder
 ```
 
 ### create() vs firstOrCreate()
 
-完全手順書のSeederでは `Model::create()` を使用しています。これはSeederを `migrate:fresh --seed` で実行することを前提としているため、テーブルは常に空の状態です。一方、既存データがある状態で追加したい場合は `firstOrCreate()` が安全です。
+Seeder では `create()` と `firstOrCreate()` を使い分けています。`GenreSeeder` / `UserSeeder` / `BookSeeder` のように一意キー（`name` / `email` / `isbn` 等）を持つマスタデータは `firstOrCreate()` を使い、`migrate:fresh --seed` を複数回実行しても重複エラーが発生しないようにします。一方、`ReviewSeeder` のように毎回新規データを作成する場合は `create()` を使います。
 
 ### ランダムデータの意義
 
@@ -82,7 +82,7 @@ use Illuminate\Database\Seeder;
 
 class GenreSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $genres = [
             '小説',
@@ -97,8 +97,8 @@ class GenreSeeder extends Seeder
             '旅行',
         ];
 
-        foreach ($genres as $name) {
-            Genre::create(['name' => $name]);
+        foreach ($genres as $genre) {
+            Genre::firstOrCreate(['name' => $genre]);
         }
     }
 }
@@ -119,22 +119,41 @@ use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $users = [
-            ['name' => '山田太郎', 'email' => 'yamada@example.com'],
-            ['name' => '鈴木花子', 'email' => 'suzuki@example.com'],
-            ['name' => '田中一郎', 'email' => 'tanaka@example.com'],
-            ['name' => '佐藤美咲', 'email' => 'sato@example.com'],
-            ['name' => '高橋健太', 'email' => 'takahashi@example.com'],
+            [
+                'name' => '山田太郎',
+                'email' => 'yamada@example.com',
+                'password' => Hash::make('password'),
+            ],
+            [
+                'name' => '鈴木花子',
+                'email' => 'suzuki@example.com',
+                'password' => Hash::make('password'),
+            ],
+            [
+                'name' => '田中一郎',
+                'email' => 'tanaka@example.com',
+                'password' => Hash::make('password'),
+            ],
+            [
+                'name' => '佐藤美咲',
+                'email' => 'sato@example.com',
+                'password' => Hash::make('password'),
+            ],
+            [
+                'name' => '高橋健太',
+                'email' => 'takahashi@example.com',
+                'password' => Hash::make('password'),
+            ],
         ];
 
-        foreach ($users as $userData) {
-            User::create([
-                'name' => $userData['name'],
-                'email' => $userData['email'],
-                'password' => Hash::make('password'),
-            ]);
+        foreach ($users as $user) {
+            User::firstOrCreate(
+                ['email' => $user['email']],
+                $user
+            );
         }
     }
 }
@@ -156,10 +175,9 @@ use Illuminate\Database\Seeder;
 
 class BookSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $users = User::all();
-        $genres = Genre::all();
 
         $books = [
             [
@@ -264,18 +282,17 @@ class BookSeeder extends Seeder
         ];
 
         foreach ($books as $bookData) {
-            $book = Book::create([
-                'user_id' => $users->random()->id,
-                'title' => $bookData['title'],
-                'author' => $bookData['author'],
-                'isbn' => $bookData['isbn'],
-                'published_date' => $bookData['published_date'],
-                'description' => $bookData['description'],
-                'image_url' => $bookData['image_url'],
-            ]);
+            $genreNames = $bookData['genres'];
+            unset($bookData['genres']);
 
-            $genreIds = $genres->whereIn('name', $bookData['genres'])->pluck('id');
-            $book->genres()->attach($genreIds);
+            $book = Book::firstOrCreate(
+                ['isbn' => $bookData['isbn']],
+                array_merge($bookData, ['user_id' => $users->random()->id])
+            );
+
+            // ジャンルを紐付け
+            $genreIds = Genre::whereIn('name', $genreNames)->pluck('id')->toArray();
+            $book->genres()->sync($genreIds);
         }
     }
 }
@@ -297,7 +314,7 @@ use Illuminate\Database\Seeder;
 
 class ReviewSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $users = User::all();
         $books = Book::all();
@@ -343,15 +360,29 @@ use Illuminate\Database\Seeder;
 
 class FavoriteSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $users = User::all();
         $books = Book::all();
 
-        foreach ($users as $user) {
-            $favoriteCount = rand(3, 5);
-            $favoriteBooks = $books->random($favoriteCount);
-            $user->favoriteBooks()->attach($favoriteBooks->pluck('id'));
+        // 各ユーザーにお気に入りを設定
+        $favorites = [
+            // 山田太郎のお気に入り
+            ['user_index' => 0, 'book_indices' => [0, 2, 5, 9]],
+            // 鈴木花子のお気に入り
+            ['user_index' => 1, 'book_indices' => [1, 3, 5, 7]],
+            // 田中一郎のお気に入り
+            ['user_index' => 2, 'book_indices' => [0, 1, 7]],
+            // 佐藤美咲のお気に入り
+            ['user_index' => 3, 'book_indices' => [3, 4, 7, 8]],
+            // 高橋健太のお気に入り
+            ['user_index' => 4, 'book_indices' => [2, 5, 6, 9, 10]],
+        ];
+
+        foreach ($favorites as $favoriteData) {
+            $user = $users[$favoriteData['user_index']];
+            $bookIds = collect($favoriteData['book_indices'])->map(fn ($i) => $books[$i]->id)->toArray();
+            $user->favoriteBooks()->syncWithoutDetaching($bookIds);
         }
     }
 }
@@ -372,18 +403,19 @@ use Illuminate\Database\Seeder;
 
 class ReviewLikeSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
         $users = User::all();
         $reviews = Review::all();
 
+        // ランダムにいいねを付ける
         foreach ($reviews as $review) {
-            $candidates = $users->where('id', '!=', $review->user_id);
-            $maxLikes = min(3, $candidates->count());
-            $likeCount = rand(0, $maxLikes);
-            if ($likeCount > 0) {
-                $likers = $candidates->random($likeCount);
-                $review->likedByUsers()->attach($likers->pluck('id'));
+            // 各レビューに0〜3人のユーザーがいいねする
+            $likeCount = rand(0, 3);
+            $likeUsers = $users->where('id', '!=', $review->user_id)->random(min($likeCount, $users->count() - 1));
+
+            foreach ($likeUsers as $user) {
+                $user->likedReviews()->syncWithoutDetaching([$review->id]);
             }
         }
     }
@@ -394,7 +426,7 @@ class ReviewLikeSeeder extends Seeder
 
 `database/seeders/DatabaseSeeder.php`
 
-> **重要:** 応用版（Advanced）では **GenreSeeder を最初に** 実行します。BookSeeder がジャンルデータに依存しているためです。
+> **重要:** **UserSeeder を最初に** 実行します。BookSeeder がユーザーとジャンルの両方に依存するためです。
 
 ```php
 <?php
@@ -405,15 +437,16 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
+        // 依存関係を考慮して実行順序を変更
         $this->call([
-            GenreSeeder::class,
-            UserSeeder::class,
-            BookSeeder::class,
-            ReviewSeeder::class,
-            FavoriteSeeder::class,
-            ReviewLikeSeeder::class,
+            UserSeeder::class,       // 先にユーザーを作成
+            GenreSeeder::class,      // ジャンルも先に作成
+            BookSeeder::class,       // ユーザーとジャンルを使って書籍を作成
+            ReviewSeeder::class,     // ユーザーと書籍を使ってレビューを作成
+            FavoriteSeeder::class,   // ユーザーと書籍を使ってお気に入りを作成
+            ReviewLikeSeeder::class, // ユーザーとレビューを使っていいねを作成
         ]);
     }
 }
@@ -434,25 +467,25 @@ sail artisan migrate:fresh --seed
 | コード | 解説 |
 |:---|:---|
 | `$users = User::all()` | 全ユーザーをコレクションとして取得。後で `->random()` でランダム選択に使用します。 |
-| `$genres = Genre::all()` | 全ジャンルをコレクションとして取得。ジャンル名からIDを検索するために使用します。 |
 | `$users->random()->id` | コレクションからランダムに1人のユーザーを選び、そのIDを返します。各書籍の登録者をランダムに割り当てます。 |
-| `$genres->whereIn('name', $bookData['genres'])->pluck('id')` | ジャンル名の配列から対応するジャンルIDの配列を取得します。`whereIn` はコレクションのフィルタメソッドです。 |
-| `$book->genres()->attach($genreIds)` | `book_genre` 中間テーブルにレコードを挿入し、書籍とジャンルを紐付けます。 |
+| `Book::firstOrCreate(['isbn' => ...], array_merge(...))` | `isbn` をキーに既存レコードを探し、なければ新規作成します。`migrate:fresh --seed` を複数回実行しても重複エラーが発生しません。 |
+| `Genre::whereIn('name', $genreNames)->pluck('id')->toArray()` | ジャンル名の配列から対応するジャンルIDの配列を取得します。`whereIn` はクエリビルダのメソッドで、SQL の `WHERE IN` 句を発行します。 |
+| `$book->genres()->sync($genreIds)` | `book_genre` 中間テーブルの状態を `$genreIds` と完全一致するように同期します。`attach` と違い、再シーディング時にも中間テーブルが正しい状態に保たれます。 |
 
 ### ReviewLikeSeeder の主要ロジック
 
 | コード | 解説 |
 |:---|:---|
-| `$candidates = $users->where('id', '!=', $review->user_id)` | レビュー投稿者自身を除外した候補ユーザーリスト。自分のレビューに自分でいいねしないようにするためです。 |
-| `$candidates->random($likeCount)` | 候補の中からランダムに `$likeCount` 人を選びます。 |
-| `$review->likedByUsers()->attach($likers->pluck('id'))` | `review_likes` 中間テーブルにレコードを挿入し、いいねを記録します。 |
+| `$users->where('id', '!=', $review->user_id)` | レビュー投稿者自身を除外した候補ユーザーリスト。自分のレビューに自分でいいねしないようにするためです。 |
+| `->random(min($likeCount, $users->count() - 1))` | 候補の中からランダムにユーザーを選びます。`min` を使い、候補数より多く選ぼうとしてエラーになるのを防ぎます。 |
+| `$user->likedReviews()->syncWithoutDetaching([$review->id])` | `review_likes` 中間テーブルにレコードを追加します。既存の紐付けは残し、再シーディング時にも重複エラーが発生しません。 |
 
 ### DatabaseSeeder の実行順序
 
 ```
-GenreSeeder      → ジャンルマスタ（依存なし）
-  ↓
 UserSeeder       → ユーザー（依存なし）
+  ↓
+GenreSeeder      → ジャンルマスタ（依存なし）
   ↓
 BookSeeder       → 書籍（ユーザー + ジャンルに依存）
   ↓
