@@ -20,6 +20,20 @@
 
 - Chapter 14 までを完了している（Basic 模範解答コードと同一の状態）
 
+## 応用機能編開始の準備: 提供 Blade ファイル（Advanced 用）の再取得
+
+Chapter 04 で配置した **Basic ブランチ** の Blade を、応用機能用の **Advanced ブランチ** の Blade に上書きします。これにより応用機能用の Blade（マイレポート画面 / 読書計画画面 / 通知画面 / 高度な検索フォーム / ISBN 検索ボタン等）が利用可能になります。
+
+```bash
+# 提供 Blade リポジトリの Advanced ブランチを取得
+git clone -b Advanced https://github.com/coachtech-prepared-file/Preparedblade-mockcase-BookShelf.git /tmp/prepared-blade-advanced
+
+# resources/views/ 配下をすべて上書き
+cp -r /tmp/prepared-blade-advanced/resources/views/. resources/views/
+```
+
+> **注:** Basic ブランチで先に動かしていた認証・書籍・ジャンル等の Blade も Advanced 版に置き換わりますが、Advanced 用 Blade は Basic 機能と互換のため動作が壊れることはありません。
+
 ## 概要（記述予定）
 
 - 15.1. マイグレーションファイルへの型宣言追加
