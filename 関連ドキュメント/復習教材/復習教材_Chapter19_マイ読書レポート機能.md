@@ -1,8 +1,14 @@
-# Chapter 17: マイ読書レポート機能の実装 (Collectionメソッド活用)
+# Chapter 19: マイ読書レポート機能の実装 (Collectionメソッド活用)
 
 ## 🎯 このセクションで学ぶこと
 
-（このセクションで学ぶ内容の要約をここに追記予定）
+ログインユーザーの読書傾向を 4 種類の統計で可視化する「マイ読書レポート」を実装します。応用機能編の中で **Collection メソッド活用** の中核となる Chapter です。
+
+- **基本サマリーの集計**: 総レビュー数・読了冊数（ユニーク書籍数）・平均評価を `count()` / `unique()->count()` / `avg()` で算出
+- **評価分布の集計**: `groupBy('rating')` + `map` で 1〜5 星ごとの件数を Collection で求める
+- **高評価書籍 TOP5**: `filter(rating >= 4)` → `sortByDesc('rating')` → `take(5)` のメソッドチェーン
+- **ジャンル別評価傾向**: `flatMap` で多対多リレーションを展開し、`groupBy('genre_id')` + `avg('rating')` で集計
+- **N+1 対策**: `User::reviews()->with('book.genres')->get()` で関連を一括ロード
 
 ---
 

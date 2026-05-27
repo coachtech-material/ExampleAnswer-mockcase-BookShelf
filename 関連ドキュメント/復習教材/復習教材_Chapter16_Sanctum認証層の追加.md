@@ -1,4 +1,4 @@
-# Chapter 18: Sanctum認証層の追加
+# Chapter 16: Sanctum認証層の追加
 
 ---
 

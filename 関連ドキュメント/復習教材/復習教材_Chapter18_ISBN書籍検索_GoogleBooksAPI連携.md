@@ -1,8 +1,14 @@
-# Chapter 16: ISBN書籍検索 (Google Books API連携)
+# Chapter 18: ISBN書籍検索 (Google Books API連携)
 
 ## 🎯 このセクションで学ぶこと
 
-（このセクションで学ぶ内容の要約をここに追記予定）
+書籍登録フォームに ISBN 入力欄を追加し、Google Books API から書籍情報（タイトル / 著者 / 出版日 / 説明 / 書影 URL）を自動取得してフォームへ反映させる機能を実装します。外部 API 連携の典型パターンを学べる Chapter です。
+
+- **API キーの安全な管理**: `.env` に `GOOGLE_BOOKS_API_KEY` を保管し、`config/services.php` 経由で参照する
+- **Laravel HTTP クライアント (`Http::get`)**: Guzzle ベースの HTTP ファサードで外部 API へリクエスト、`->json()` で JSON ボディを取り出す
+- **3 段階のエラー分岐**: 422（バリデーション）/ 404（該当書籍なし）/ 500（通信エラー）を JSON で返す
+- **非同期通信 (fetch API)**: ブラウザ側で JavaScript の `async/await` + `fetch` でエンドポイントを叩き、結果をフォームに自動入力する
+- **`config()` 経由のキー取得**: `env()` 直呼び出しではなく `config('services.google_books.api_key')` を使い、`config:cache` 互換にする
 
 ---
 
