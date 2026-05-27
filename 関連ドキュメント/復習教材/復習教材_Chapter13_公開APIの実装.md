@@ -107,19 +107,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class IndexBookRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, array<int, string>>
-     */
     public function rules(): array
     {
         return [
@@ -130,11 +122,6 @@ class IndexBookRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
@@ -166,19 +153,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBookRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, array<int, string>>
-     */
     public function rules(): array
     {
         return [
@@ -194,11 +173,6 @@ class StoreBookRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
@@ -247,19 +221,11 @@ use Illuminate\Validation\Rule;
 
 class UpdateBookRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, array<int, mixed>>
-     */
     public function rules(): array
     {
         return [
@@ -275,11 +241,6 @@ class UpdateBookRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
@@ -331,11 +292,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class GenreResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
@@ -362,11 +318,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ReviewResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
@@ -396,11 +347,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class BookResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
@@ -453,9 +399,6 @@ class Handler extends ExceptionHandler
         'password_confirmation',
     ];
 
-    /**
-     * Register the exception handling callbacks for the application.
-     */
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
@@ -463,9 +406,6 @@ class Handler extends ExceptionHandler
         });
     }
 
-    /**
-     * Render an exception into an HTTP response.
-     */
     public function render($request, Throwable $e)
     {
         if ($request->is('api/*')) {
@@ -516,9 +456,6 @@ use Illuminate\Http\Response;
 
 class BookController extends Controller
 {
-    /**
-     * 書籍一覧を取得
-     */
     public function index(IndexBookRequest $request): AnonymousResourceCollection
     {
         $query = Book::with('genres')
@@ -546,9 +483,6 @@ class BookController extends Controller
         return BookResource::collection($books);
     }
 
-    /**
-     * 書籍詳細を取得
-     */
     public function show(Book $book): BookResource
     {
         $book->load(['genres', 'reviews.user']);
@@ -558,9 +492,6 @@ class BookController extends Controller
         return new BookResource($book);
     }
 
-    /**
-     * 書籍を新規登録（認証なし -- Chapter 18 で Sanctum 認証を追加する）
-     */
     public function store(StoreBookRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -580,9 +511,6 @@ class BookController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
-    /**
-     * 書籍を更新（認証なし -- Chapter 18 で Sanctum 認証 + BookPolicy を追加する）
-     */
     public function update(UpdateBookRequest $request, Book $book): BookResource
     {
         $validated = $request->validated();
@@ -599,9 +527,6 @@ class BookController extends Controller
         return new BookResource($book);
     }
 
-    /**
-     * 書籍を削除（認証なし -- Chapter 18 で Sanctum 認証 + BookPolicy を追加する）
-     */
     public function destroy(Book $book): JsonResponse
     {
         $book->delete();

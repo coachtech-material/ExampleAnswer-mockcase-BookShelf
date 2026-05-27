@@ -77,9 +77,6 @@ use Illuminate\View\View;
 
 class RankingController extends Controller
 {
-    /**
-     * 評価ランキングを表示
-     */
     public function index(): View
     {
         $rankedBooks = Book::withAvg('reviews', 'rating')

@@ -64,9 +64,6 @@ use Illuminate\View\View;
 
 class FavoriteController extends Controller
 {
-    /**
-     * お気に入り一覧を表示
-     */
     public function index(): View
     {
         $books = Auth::user()->favoriteBooks()->paginate(10);
@@ -74,9 +71,6 @@ class FavoriteController extends Controller
         return view('favorites.index', compact('books'));
     }
 
-    /**
-     * お気に入りを追加/削除（トグル）
-     */
     public function toggle(Book $book): RedirectResponse
     {
         Auth::user()->favoriteBooks()->toggle($book->id);
