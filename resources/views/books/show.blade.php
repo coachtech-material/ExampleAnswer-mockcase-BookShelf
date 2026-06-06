@@ -74,11 +74,13 @@
                                 </div>
                             @endif
 
-                            @can('update', $book)
-                                <div class="flex gap-2 mt-4">
+                            <div class="flex gap-2 mt-4">
+                                @can('update', $book)
                                     <a href="{{ route('books.edit', $book) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                                         編集
                                     </a>
+                                @endcan
+                                @can('delete', $book)
                                     <form action="{{ route('books.destroy', $book) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')" novalidate>
                                         @csrf
                                         @method('DELETE')
@@ -86,8 +88,8 @@
                                             削除
                                         </button>
                                     </form>
-                                </div>
-                            @endcan
+                                @endcan
+                            </div>
                         </div>
                     </div>
 
@@ -189,16 +191,18 @@
                                             @endauth
 
                                             <!-- 編集・削除ボタン -->
-                                            @can('update', $review)
-                                                <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2">
+                                                @can('update', $review)
                                                     <a href="{{ route('reviews.edit', $review) }}" class="text-sm text-gray-500 hover:text-gray-700">編集</a>
+                                                @endcan
+                                                @can('delete', $review)
                                                     <form action="{{ route('reviews.destroy', $review) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')" novalidate>
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="text-sm text-red-500 hover:text-red-700">削除</button>
                                                     </form>
-                                                </div>
-                                            @endcan
+                                                @endcan
+                                            </div>
                                         </div>
                                     </div>
                                 @endforeach
