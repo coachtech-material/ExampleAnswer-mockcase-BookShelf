@@ -44,7 +44,7 @@ CRUD（クラッド）は、データの **Create（作成）・Read（読み取
 |:---|:---|:---|
 | title | required / string / max:255 | タイトルは必須です。 |
 | author | required / string / max:255 | 著者名は必須です。 |
-| isbn | nullable / string / size:13 / unique | ISBNは13桁で入力してください。 |
+| isbn | required / string / size:13 / unique | ISBNは必須です。 / ISBNは13桁で入力してください。 |
 | published_date | nullable / date | 出版日は有効な日付形式で入力してください。 |
 | description | nullable / string | — |
 | image_url | nullable / url / max:255 | 画像URLは有効なURL形式で入力してください。 / 画像URLは255文字以内で入力してください。 |

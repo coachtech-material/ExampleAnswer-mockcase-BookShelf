@@ -63,7 +63,7 @@ sail artisan notifications:table  # Laravel 標準コマンドで notifications 
 | 設計書の判断 | マイグレーションでの表現 | 背景 |
 |:---|:---|:---|
 | ユーザー退会時にデータ連動削除 | `onDelete('cascade')` | Phase 4で決定した「Cascade」ルール |
-| ISBN は nullable + UNIQUE | `->nullable()->unique()` | 応用版ではISBNは任意入力 |
+| ISBN は NOT NULL + UNIQUE | `->unique()` | 基本・応用ともISBNは必須（ユニークキーのため任意化しない） |
 | 出版日は任意入力 | `->nullable()` | Bladeのフォームで任意とされている |
 | favorites / review_likes はサロゲートキー化 | `$table->id()` + `$table->unique([...])` | 「いいね」「お気に入り」を独立エンティティとして扱う設計（book_genre は純粋な中間テーブルなので複合主キーのまま） |
 
@@ -91,7 +91,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->string('author');
-            $table->string('isbn', 13)->nullable()->unique();
+            $table->string('isbn', 13)->unique();
             $table->date('published_date')->nullable();
             $table->text('description')->nullable();
             $table->string('image_url')->nullable();
@@ -351,7 +351,7 @@ sail artisan migrate
 | `$table->id()` | `id` (BIGINT, PK, AUTO_INCREMENT) | Laravelの標準的な主キー定義。`unsignedBigInteger`で`auto_increment`な`id`カラムを作成します。 |
 | `$table->foreignId('user_id')->constrained()` | FK(`users.id`) | Laravelの命名規則（`テーブル名_id`）に従っているため、`constrained()` だけで`users`テーブルの`id`カラムへの参照を自動設定します。 |
 | `->onDelete('cascade')` | **CASCADE DELETE** | Chapter 00で「ユーザー退会時は全て消えて良い」と決めた仕様。参照先レコードが削除された時、このレコードも自動削除されます。 |
-| `$table->string('isbn', 13)->nullable()->unique()` | `isbn` (VARCHAR(13), NULLABLE, UNIQUE) | Chapter 00のヒアリングで決めた仕様をコードに反映。応用版ではISBNは任意入力のため `nullable()` を付けています。 |
+| `$table->string('isbn', 13)->unique()` | `isbn` (VARCHAR(13), NOT NULL, UNIQUE) | Chapter 00のヒアリングで決めた仕様をコードに反映。ISBN はユニークキーのため基本・応用とも必須です。 |
 | `$table->date('published_date')->nullable()` | `published_date` (DATE, NULLABLE) | 出版日も任意入力です。 |
 | `$table->text('description')->nullable()` | `description` (TEXT, NULLABLE) | 「任意」と決めた仕様を実現。 |
 | `$table->tinyInteger('rating')` | `rating` (TINYINT) | 1~5の評価値。`tinyInteger` は -128~127 の範囲を持つ最小の整数型です。 |
@@ -412,7 +412,7 @@ sail artisan migrate
 | BIGINT, PK, AUTO_INCREMENT | `$table->id()` | 主キーの定義 |
 | FK(`users.id`) | `$table->foreignId('user_id')->constrained()` | 外部キーの定義 |
 | CASCADE DELETE | `->onDelete('cascade')` | 親レコード削除時の連動削除 |
-| VARCHAR(13), NULLABLE, UNIQUE | `$table->string('isbn', 13)->nullable()->unique()` | 桁数指定 + 任意 + 重複禁止 |
+| VARCHAR(13), NOT NULL, UNIQUE | `$table->string('isbn', 13)->unique()` | 桁数指定 + 必須 + 重複禁止 |
 | TINYINT | `$table->tinyInteger('rating')` | 最小の整数型 |
 | 複合主キー | `$table->primary(['col1', 'col2'])` | 2カラムの組み合わせで主キーを定義 |
 

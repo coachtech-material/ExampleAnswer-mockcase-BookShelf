@@ -246,7 +246,7 @@ erDiagram
 | ユーザーID | `user_id` | BIGINT | No | FK(`users.id`), **CASCADE DELETE** |
 | タイトル | `title` | VARCHAR(255) | No |  |
 | 著者 | `author` | VARCHAR(255) | No |  |
-| ISBN | `isbn` | VARCHAR(13) | **Yes** | **UNIQUE**, nullable |
+| ISBN | `isbn` | VARCHAR(13) | **No** | **UNIQUE** |
 | 出版日 | `published_date` | DATE | **Yes** | nullable |
 | 説明 | `description` | TEXT | **Yes** |  |
 | 画像URL | `image_url` | VARCHAR(255) | **Yes** |  |
