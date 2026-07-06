@@ -33,7 +33,7 @@
     <!-- ISBN -->
     <div>
         <label for="isbn" class="block font-medium text-sm text-gray-700 mb-1">
-            ISBN-13
+            ISBN-13 <span class="text-red-500">*</span>
         </label>
         <input type="text" name="isbn" id="isbn" value="{{ old('isbn', $book->isbn ?? '') }}"
             class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block w-full"
